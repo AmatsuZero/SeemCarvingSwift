@@ -10,6 +10,53 @@ public protocol BackwardEnergyProvider: Sendable {
     func compute(for image: RGBA8Image) throws -> EnergyMap
 }
 
+@_spi(Benchmark)
+public struct BackendPhaseDurations: Sendable, Codable, Equatable {
+    public var bridgeNS: UInt64
+    public var energyNS: UInt64
+    public var maskNS: UInt64
+    public var dynamicProgrammingNS: UInt64
+    public var backtrackNS: UInt64
+    public var editNS: UInt64
+    public var commandEncodingNS: UInt64
+    public var gpuWaitNS: UInt64
+    public var totalNS: UInt64
+    public var peakScratchBytes: UInt64
+
+    public init(
+        bridgeNS: UInt64,
+        energyNS: UInt64,
+        maskNS: UInt64,
+        dynamicProgrammingNS: UInt64,
+        backtrackNS: UInt64,
+        editNS: UInt64,
+        commandEncodingNS: UInt64,
+        gpuWaitNS: UInt64,
+        totalNS: UInt64,
+        peakScratchBytes: UInt64
+    ) {
+        self.bridgeNS = bridgeNS
+        self.energyNS = energyNS
+        self.maskNS = maskNS
+        self.dynamicProgrammingNS = dynamicProgrammingNS
+        self.backtrackNS = backtrackNS
+        self.editNS = editNS
+        self.commandEncodingNS = commandEncodingNS
+        self.gpuWaitNS = gpuWaitNS
+        self.totalNS = totalNS
+        self.peakScratchBytes = peakScratchBytes
+    }
+}
+
+@_spi(Benchmark)
+public protocol InstrumentedSeamCarvingBackend: SeamCarvingBackend {
+    func benchmarkResize(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions
+    ) async throws -> (RGBA8Image, BackendPhaseDurations)
+}
+
 @_spi(Backend)
 public struct MappedSeamSet: Sendable, Equatable {
     public let orientation: SeamOrientation

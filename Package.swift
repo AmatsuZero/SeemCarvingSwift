@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
         .executable(name: "seamcarve-cli", targets: ["seamcarve-cli"]),
+        .executable(name: "seamcarve-benchmark", targets: ["seamcarve-benchmark"]),
     ],
     targets: [
         .target(name: "SeamCarvingCore"),
@@ -34,7 +35,12 @@ let package = Package(
             name: "seamcarve-cli",
             dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]
         ),
-        .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore"]),
+        .target(
+            name: "SeamCarvingBenchmark",
+            dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]
+        ),
+        .executableTarget(name: "seamcarve-benchmark", dependencies: ["SeamCarvingBenchmark"]),
+        .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore", "SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingMetal"]),
         .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]),
