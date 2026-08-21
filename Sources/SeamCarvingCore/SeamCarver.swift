@@ -18,3 +18,82 @@ public struct SeamCarver: Sendable {
         try await backend.resize(image, to: target, options: options)
     }
 }
+
+public extension SeamCarver {
+    /// Removes the object marked by `removalMask` by carving seams that cross it,
+    /// optionally restoring the original size afterwards.
+    func removeObject(
+        from image: RGBA8Image,
+        removalMask: Mask,
+        restoreOriginalSize: Bool,
+        options: ResizeOptions = .init()
+    ) async throws -> RGBA8Image {
+        if restoreOriginalSize {
+            throw SeamCarvingError.invalidTarget(
+                source: try PixelSize(width: image.width, height: image.height),
+                target: try PixelSize(width: image.width, height: image.height)
+            )
+        }
+        guard removalMask.width == image.width, removalMask.height == image.height else {
+            throw SeamCarvingError.invalidConfiguration("removal mask dimensions must match image")
+        }
+
+        var currentImage = image
+        var currentRemoval = removalMask
+        var currentProtection = options.masks.protectionLayers
+
+        while currentRemoval.values.contains(where: { $0 > 0 }) {
+            try Task.checkCancellation()
+
+            let masks = try MaskPair(
+                protectionLayers: currentProtection,
+                removal: currentRemoval,
+                removalWeight: options.masks.removalWeight
+            )
+            var effectiveOptions = options
+            effectiveOptions.masks = masks
+
+            let verticalSeam = try await backend.findSeam(in: currentImage, orientation: .vertical, options: effectiveOptions)
+            let horizontalSeam = try await backend.findSeam(in: currentImage, orientation: .horizontal, options: effectiveOptions)
+
+            let verticalCrosses = Self.seamCrossesRemoval(verticalSeam, currentRemoval)
+            let horizontalCrosses = Self.seamCrossesRemoval(horizontalSeam, currentRemoval)
+
+            let chosen: SeamPath
+            if verticalCrosses && horizontalCrosses {
+                let verticalNormalized = verticalSeam.totalCost / Float(currentImage.height)
+                let horizontalNormalized = horizontalSeam.totalCost / Float(currentImage.width)
+                chosen = verticalNormalized <= horizontalNormalized ? verticalSeam : horizontalSeam
+            } else if verticalCrosses {
+                chosen = verticalSeam
+            } else if horizontalCrosses {
+                chosen = horizontalSeam
+            } else {
+                throw SeamCarvingError.noFeasibleSeam
+            }
+
+            currentImage = try SeamEditor.remove(chosen, from: currentImage)
+            currentRemoval = try SeamEditor.remove(chosen, from: currentRemoval)
+            currentProtection = try currentProtection.map { layer in
+                let newMask = try SeamEditor.remove(chosen, from: layer.mask)
+                return try ProtectionLayer(mask: newMask, strength: layer.strength)
+            }
+        }
+
+        return currentImage
+    }
+
+    private static func seamCrossesRemoval(_ seam: SeamPath, _ removal: Mask) -> Bool {
+        switch seam.orientation {
+        case .vertical:
+            for (y, x) in seam.coordinates.enumerated() where removal[Int(x), y] > 0 {
+                return true
+            }
+        case .horizontal:
+            for (x, y) in seam.coordinates.enumerated() where removal[x, Int(y)] > 0 {
+                return true
+            }
+        }
+        return false
+    }
+}

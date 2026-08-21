@@ -24,3 +24,53 @@ public struct Mask: Sendable, Equatable {
         set { values[y * width + x] = newValue }
     }
 }
+
+extension MaskPair {
+    /// Validates that every protection and removal mask matches the given size.
+    func validateDimensions(width: Int, height: Int) throws {
+        for layer in protectionLayers {
+            guard layer.mask.width == width, layer.mask.height == height else {
+                throw SeamCarvingError.invalidConfiguration("protection mask dimensions must match image")
+            }
+        }
+        if let removal {
+            guard removal.width == width, removal.height == height else {
+                throw SeamCarvingError.invalidConfiguration("removal mask dimensions must match image")
+            }
+        }
+    }
+
+    /// Computes the per-pixel energy adjustment from independent protection and
+    /// removal layers, or nil when no layer is present. Hard protection yields
+    /// `+infinity` and overrides removal. Each layer is applied independently.
+    func energyAdjustment(forWidth width: Int, height: Int) throws -> EnergyMap? {
+        guard !protectionLayers.isEmpty || removal != nil else { return nil }
+        try validateDimensions(width: width, height: height)
+
+        let pixelCount = width * height
+        var values = [Float](repeating: 0, count: pixelCount)
+        for i in 0..<pixelCount {
+            var v: Float = 0
+            var hardProtected = false
+            for layer in protectionLayers {
+                switch layer.strength {
+                case .soft(let weight):
+                    v += weight * layer.mask.values[i]
+                case .hard:
+                    if layer.mask.values[i] > 0 {
+                        hardProtected = true
+                    }
+                }
+            }
+            if hardProtected {
+                values[i] = .infinity
+            } else {
+                if let removal {
+                    v -= removalWeight * removal.values[i]
+                }
+                values[i] = v
+            }
+        }
+        return try EnergyMap(width: width, height: height, values: values)
+    }
+}

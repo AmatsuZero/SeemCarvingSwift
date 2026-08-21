@@ -25,13 +25,26 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions
     ) async throws -> SeamPath {
-        switch options.energyMode {
+        try findSeam(in: image, orientation: orientation, energyMode: options.energyMode, masks: options.masks)
+    }
+
+    private func findSeam(
+        in image: RGBA8Image,
+        orientation: SeamOrientation,
+        energyMode: EnergyMode,
+        masks: MaskPair
+    ) throws -> SeamPath {
+        switch energyMode {
         case .backwardSobel:
-            let energy = try backwardEnergyProvider.compute(for: image)
-            return try DynamicProgramming.findSeam(in: energy, orientation: orientation)
+            let base = try backwardEnergyProvider.compute(for: image)
+            if let adjustment = try masks.energyAdjustment(forWidth: image.width, height: image.height) {
+                return try DynamicProgramming.findSeam(in: try base.adding(adjustment), orientation: orientation)
+            }
+            return try DynamicProgramming.findSeam(in: base, orientation: orientation)
         case .forwardLuma:
             let luminance = try LuminancePlane.luma(of: image)
-            return try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: nil)
+            let adjustment = try masks.energyAdjustment(forWidth: image.width, height: image.height)
+            return try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment)
         }
     }
 
@@ -46,8 +59,10 @@ public struct CoreResizeEngine: Sendable {
                 target: target
             )
         }
+        try options.masks.validateDimensions(width: image.width, height: image.height)
 
         var current = image
+        var currentMasks = options.masks
         var remainingVertical = image.width - target.width
         var remainingHorizontal = image.height - target.height
         let totalEdits = remainingVertical + remainingHorizontal
@@ -61,20 +76,20 @@ public struct CoreResizeEngine: Sendable {
             switch options.dimensionOrder {
             case .widthThenHeight:
                 orientation = remainingVertical > 0 ? .vertical : .horizontal
-                seam = try await findSeam(in: current, orientation: orientation, options: options)
+                seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks)
             case .heightThenWidth:
                 orientation = remainingHorizontal > 0 ? .horizontal : .vertical
-                seam = try await findSeam(in: current, orientation: orientation, options: options)
+                seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks)
             case .adaptiveNormalizedCost:
                 if remainingVertical == 0 {
                     orientation = .horizontal
-                    seam = try await findSeam(in: current, orientation: orientation, options: options)
+                    seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks)
                 } else if remainingHorizontal == 0 {
                     orientation = .vertical
-                    seam = try await findSeam(in: current, orientation: orientation, options: options)
+                    seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks)
                 } else {
-                    let verticalSeam = try await findSeam(in: current, orientation: .vertical, options: options)
-                    let horizontalSeam = try await findSeam(in: current, orientation: .horizontal, options: options)
+                    let verticalSeam = try findSeam(in: current, orientation: .vertical, energyMode: options.energyMode, masks: currentMasks)
+                    let horizontalSeam = try findSeam(in: current, orientation: .horizontal, energyMode: options.energyMode, masks: currentMasks)
                     let verticalNormalized = verticalSeam.totalCost / Float(current.height)
                     let horizontalNormalized = horizontalSeam.totalCost / Float(current.width)
                     if verticalNormalized <= horizontalNormalized {
@@ -88,6 +103,7 @@ public struct CoreResizeEngine: Sendable {
             }
 
             current = try SeamEditor.remove(seam, from: current)
+            currentMasks = try removing(seam, from: currentMasks)
 
             if orientation == .vertical {
                 remainingVertical -= 1
@@ -103,5 +119,22 @@ public struct CoreResizeEngine: Sendable {
         }
 
         return current
+    }
+
+    /// Removes a seam from every layer of a mask pair, preserving each layer's
+    /// independent soft/hard strength.
+    private func removing(_ seam: SeamPath, from masks: MaskPair) throws -> MaskPair {
+        var newProtection: [ProtectionLayer] = []
+        for layer in masks.protectionLayers {
+            let newMask = try SeamEditor.remove(seam, from: layer.mask)
+            newProtection.append(try ProtectionLayer(mask: newMask, strength: layer.strength))
+        }
+        let newRemoval: Mask?
+        if let removal = masks.removal {
+            newRemoval = try SeamEditor.remove(seam, from: removal)
+        } else {
+            newRemoval = nil
+        }
+        return try MaskPair(protectionLayers: newProtection, removal: newRemoval, removalWeight: masks.removalWeight)
     }
 }

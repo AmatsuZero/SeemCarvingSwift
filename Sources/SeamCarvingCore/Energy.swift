@@ -32,6 +32,20 @@ public struct EnergyMap: Sendable, Equatable {
     }
 }
 
+extension EnergyMap {
+    /// Adds a per-pixel adjustment (e.g., a mask adjustment) to this energy map.
+    func adding(_ adjustment: EnergyMap) throws -> EnergyMap {
+        guard adjustment.width == width, adjustment.height == height else {
+            throw SeamCarvingError.invalidConfiguration("energy adjustment dimensions mismatch")
+        }
+        var values = self.values
+        for i in 0..<values.count {
+            values[i] += adjustment.values[i]
+        }
+        return try EnergyMap(width: width, height: height, values: values)
+    }
+}
+
 /// The IEC 61966-2-1 sRGB transfer function, precomputed as a 256-entry lookup table.
 internal enum LinearSRGB {
     static let table: [Float] = (0...255).map { byte -> Float in
