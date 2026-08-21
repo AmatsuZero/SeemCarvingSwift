@@ -19,7 +19,10 @@ let package = Package(
             dependencies: ["SeamCarvingCore"],
             resources: [.copy("Shaders/SeamCarving.metal")]
         ),
-        .target(name: "SeamCarvingApple", dependencies: ["SeamCarvingCore"]),
+        .target(
+            name: "SeamCarvingApple",
+            dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal"]
+        ),
         .target(
             name: "SeamCarvingVision",
             dependencies: ["SeamCarvingCore", "SeamCarvingApple"],
@@ -28,7 +31,7 @@ let package = Package(
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingMetal"]),
-        .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple"]),
+        .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]),
         .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
     ]
 )

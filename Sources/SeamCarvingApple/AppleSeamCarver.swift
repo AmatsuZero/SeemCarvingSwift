@@ -34,11 +34,11 @@ public struct AppleSeamCarver: Sendable {
     private let backend: any SeamCarvingBackend
 
     public init(configuration: AppleSeamCarverConfiguration = .init()) throws {
-        if configuration.deterministic || configuration.backend == .cpu || configuration.backend == .automatic {
-            self.backend = CPUBackend()
-        } else {
-            throw SeamCarvingError.invalidConfiguration("backend target not wired")
-        }
+        self.backend = try BackendFactory.default.make(configuration)
+    }
+
+    init(configuration: AppleSeamCarverConfiguration, factory: BackendFactory) throws {
+        self.backend = try factory.make(configuration)
     }
 
     public func resize(
