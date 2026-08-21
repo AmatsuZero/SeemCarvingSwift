@@ -55,6 +55,17 @@ internal enum LinearSRGB {
         }
         return pow((c + 0.055) / 1.055, 2.4)
     }
+
+    /// Encodes a linear-light component back to an sRGB-encoded byte.
+    static func encode(_ linear: Float) -> UInt8 {
+        let c: Float
+        if linear <= 0.0031308 {
+            c = 12.92 * linear
+        } else {
+            c = 1.055 * pow(linear, 1.0 / 2.4) - 0.055
+        }
+        return UInt8((min(max(c, 0), 1) * 255).rounded())
+    }
 }
 
 /// Linear-light luma using the BT.709 coefficients, applied after sRGB decoding.

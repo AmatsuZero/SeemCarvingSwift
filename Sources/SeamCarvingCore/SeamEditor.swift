@@ -113,4 +113,108 @@ public enum SeamEditor {
         }
         return result
     }
+
+    // MARK: - Insertion
+
+    /// Inserts mapped vertical seams into an image in a single gather pass. Each
+    /// seam holds original-row x-coordinates; inserted pixels average the left and
+    /// right neighbors in linear light (alpha uses a rounded arithmetic mean), and
+    /// duplicate the edge pixel when no right neighbor exists.
+    public static func insertMappedVerticalSeams(
+        _ seams: [[UInt32]],
+        into image: RGBA8Image,
+        policy: InsertionPolicy
+    ) throws -> RGBA8Image {
+        let width = image.width
+        let height = image.height
+        let count = seams.count
+        for seam in seams {
+            guard seam.count == height else {
+                throw SeamCarvingError.invalidSeam
+            }
+            for raw in seam {
+                guard Int(raw) >= 0, Int(raw) < width else {
+                    throw SeamCarvingError.invalidSeam
+                }
+            }
+        }
+
+        let newWidth = width + count
+        var pixels = [UInt8]()
+        pixels.reserveCapacity(newWidth * height * 4)
+
+        for y in 0..<height {
+            let positions = seams.map { Int($0[y]) }.sorted()
+            var nextInsert = 0
+            for x in 0..<width {
+                let base = (y * width + x) * 4
+                pixels.append(contentsOf: image.pixels[base..<(base + 4)])
+                while nextInsert < positions.count, positions[nextInsert] == x {
+                    let pixel = neighborAverage(image, x: x, y: y, policy: policy)
+                    pixels.append(pixel.r)
+                    pixels.append(pixel.g)
+                    pixels.append(pixel.b)
+                    pixels.append(pixel.a)
+                    nextInsert += 1
+                }
+            }
+        }
+        return try RGBA8Image(width: newWidth, height: height, pixels: pixels)
+    }
+
+    /// Inserts mapped vertical seams into a mask, mirroring the image edit.
+    public static func insertMappedVerticalSeams(
+        _ seams: [[UInt32]],
+        into mask: Mask
+    ) throws -> Mask {
+        let width = mask.width
+        let height = mask.height
+        let count = seams.count
+        for seam in seams {
+            guard seam.count == height else {
+                throw SeamCarvingError.invalidSeam
+            }
+            for raw in seam {
+                guard Int(raw) >= 0, Int(raw) < width else {
+                    throw SeamCarvingError.invalidSeam
+                }
+            }
+        }
+
+        let newWidth = width + count
+        var values = [Float]()
+        values.reserveCapacity(newWidth * height)
+
+        for y in 0..<height {
+            let positions = seams.map { Int($0[y]) }.sorted()
+            var nextInsert = 0
+            for x in 0..<width {
+                values.append(mask.values[y * width + x])
+                while nextInsert < positions.count, positions[nextInsert] == x {
+                    let rightX = min(x + 1, width - 1)
+                    values.append((mask.values[y * width + x] + mask.values[y * width + rightX]) / 2)
+                    nextInsert += 1
+                }
+            }
+        }
+        return try Mask(width: newWidth, height: height, values: values)
+    }
+
+    private static func neighborAverage(_ image: RGBA8Image, x: Int, y: Int, policy: InsertionPolicy) -> RGBA8 {
+        switch policy {
+        case .neighborAverage:
+            let rightX = min(x + 1, image.width - 1)
+            let left = image[x, y]
+            let right = image[rightX, y]
+            let r = LinearSRGB.encode((LinearSRGB.table[Int(left.r)] + LinearSRGB.table[Int(right.r)]) / 2)
+            let g = LinearSRGB.encode((LinearSRGB.table[Int(left.g)] + LinearSRGB.table[Int(right.g)]) / 2)
+            let b = LinearSRGB.encode((LinearSRGB.table[Int(left.b)] + LinearSRGB.table[Int(right.b)]) / 2)
+            let a = UInt8((UInt16(left.a) + UInt16(right.a) + 1) / 2)
+            return RGBA8(r: r, g: g, b: b, a: a)
+        }
+    }
+}
+
+public enum InsertionPolicy: Sendable, Equatable {
+    case neighborAverage
 }

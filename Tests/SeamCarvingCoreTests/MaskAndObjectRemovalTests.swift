@@ -86,15 +86,12 @@ final class MaskAndObjectRemovalTests: XCTestCase {
         XCTAssertEqual(Self.grayColumnValues(result), [10, 200])
     }
 
-    func testRemoveObjectRestoreThrows() async throws {
+    func testRemoveObjectRestoresSize() async throws {
         let image = try Self.grayColumns(width: 3, height: 3, values: [10, 100, 200])
         let removalMask = try Self.columnMask(width: 3, height: 3, column: 1)
-        do {
-            _ = try await SeamCarver().removeObject(from: image, removalMask: removalMask, restoreOriginalSize: true)
-            XCTFail("expected throw")
-        } catch let error as SeamCarvingError {
-            XCTAssertEqual(error, .invalidTarget(source: try PixelSize(width: 3, height: 3), target: try PixelSize(width: 3, height: 3)))
-        }
+        let result = try await SeamCarver().removeObject(from: image, removalMask: removalMask, restoreOriginalSize: true)
+        XCTAssertEqual(result.width, 3)
+        XCTAssertEqual(result.height, 3)
     }
 
     // MARK: - Helpers

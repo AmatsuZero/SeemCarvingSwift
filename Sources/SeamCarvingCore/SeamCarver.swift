@@ -28,12 +28,6 @@ public extension SeamCarver {
         restoreOriginalSize: Bool,
         options: ResizeOptions = .init()
     ) async throws -> RGBA8Image {
-        if restoreOriginalSize {
-            throw SeamCarvingError.invalidTarget(
-                source: try PixelSize(width: image.width, height: image.height),
-                target: try PixelSize(width: image.width, height: image.height)
-            )
-        }
         guard removalMask.width == image.width, removalMask.height == image.height else {
             throw SeamCarvingError.invalidConfiguration("removal mask dimensions must match image")
         }
@@ -78,6 +72,17 @@ public extension SeamCarver {
                 let newMask = try SeamEditor.remove(chosen, from: layer.mask)
                 return try ProtectionLayer(mask: newMask, strength: layer.strength)
             }
+        }
+
+        if restoreOriginalSize {
+            let originalSize = try PixelSize(width: image.width, height: image.height)
+            var restoreOptions = options
+            restoreOptions.masks = try MaskPair(
+                protectionLayers: currentProtection,
+                removal: nil,
+                removalWeight: options.masks.removalWeight
+            )
+            return try await backend.resize(currentImage, to: originalSize, options: restoreOptions)
         }
 
         return currentImage

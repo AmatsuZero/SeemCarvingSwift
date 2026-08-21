@@ -21,15 +21,11 @@ final class SeamCarverTests: XCTestCase {
         }
     }
 
-    func testEnlargementRejectedForShrinkOnly() async throws {
+    func testEnlargementSupported() async throws {
         let image = try Self.gradientImage(width: 3, height: 2)
-        let target = try PixelSize(width: 5, height: 2)
-        do {
-            _ = try await SeamCarver().resize(image, to: target)
-            XCTFail("expected throw")
-        } catch let error as SeamCarvingError {
-            XCTAssertEqual(error, .invalidTarget(source: try PixelSize(width: 3, height: 2), target: target))
-        }
+        let result = try await SeamCarver().resize(image, to: try PixelSize(width: 5, height: 2))
+        XCTAssertEqual(result.width, 5)
+        XCTAssertEqual(result.height, 2)
     }
 
     func testProgressSequence() async throws {
