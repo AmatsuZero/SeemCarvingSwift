@@ -70,8 +70,7 @@ public enum CGImageBridge {
     }
 
     /// Applies an EXIF orientation to an upright top-left-origin RGBA8 image.
-    static func applyOrientation(_ orientation: CGImagePropertyOrientation, to image: RGBA8Image) throws -> RGBA8Image {
-        let rawWidth = image.width
+    static func applyOrientation(_ orientation: CGImagePropertyOrientation, to image: RGBA8Image) throws -> RGBA8Image {        let rawWidth = image.width
         let rawHeight = image.height
         let (outWidth, outHeight) = orientedSize(width: rawWidth, height: rawHeight, orientation: orientation)
         var out = [UInt8](repeating: 0, count: outWidth * outHeight * 4)
@@ -87,6 +86,21 @@ public enum CGImageBridge {
             }
         }
         return try RGBA8Image(width: outWidth, height: outHeight, pixels: out)
+    }
+
+    /// Applies an EXIF orientation to an upright top-left-origin mask.
+    public static func applyOrientation(_ orientation: CGImagePropertyOrientation, to mask: Mask) throws -> Mask {
+        let rawWidth = mask.width
+        let rawHeight = mask.height
+        let (outWidth, outHeight) = orientedSize(width: rawWidth, height: rawHeight, orientation: orientation)
+        var out = [Float](repeating: 0, count: outWidth * outHeight)
+        for v in 0..<outHeight {
+            for u in 0..<outWidth {
+                let (sx, sy) = sourceCoordinate(u: u, v: v, orientation: orientation, rawWidth: rawWidth, rawHeight: rawHeight)
+                out[v * outWidth + u] = mask.values[sy * rawWidth + sx]
+            }
+        }
+        return try Mask(width: outWidth, height: outHeight, values: out)
     }
 
     /// Encodes straight-alpha RGBA8 into an sRGB premultiplied-last `CGImage`.
