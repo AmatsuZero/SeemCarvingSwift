@@ -34,6 +34,21 @@ final class MetalParityTests: XCTestCase {
         XCTAssertEqual(cpuResult.pixels, metalResult.pixels)
     }
 
+    func testForwardDPParity() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
+        let context = try MetalContext.makeDefault()
+        let cpu = CPUBackend()
+        let metal = MetalBackend(context: context)
+        var options = ResizeOptions()
+        options.energyMode = .forwardLuma
+        for image in try Self.fixtures() {
+            let cpuSeam = try await cpu.findSeam(in: image, orientation: .vertical, options: options)
+            let metalSeam = try await metal.findSeam(in: image, orientation: .vertical, options: options)
+            XCTAssertEqual(cpuSeam.coordinates, metalSeam.coordinates, "forward seam mismatch for \(image.width)x\(image.height)")
+            XCTAssertEqual(cpuSeam.totalCost, metalSeam.totalCost, accuracy: 1e-3)
+        }
+    }
+
     // MARK: - Fixtures
 
     static func fixtures() throws -> [RGBA8Image] {

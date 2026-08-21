@@ -199,3 +199,90 @@ kernel void transposeUInt32IndexMap(device const uint* input [[buffer(0)]],
     if (i >= size.x || j >= size.y) { return; }
     output[i * size.y + j] = input[j * size.x + i];
 }
+
+// MARK: - Full GPU dynamic programming
+
+kernel void initializeDPRow(device const float* values [[buffer(0)]],
+                            device float* prevRow       [[buffer(1)]],
+                            constant uint& width        [[buffer(2)]],
+                            uint x                      [[thread_position_in_grid]]) {
+    if (x >= width) { return; }
+    prevRow[x] = values[x];
+}
+
+kernel void accumulateDPRow(device const float* prevRow [[buffer(0)]],
+                            device float* currRow       [[buffer(1)]],
+                            device char* parents        [[buffer(2)]],
+                            device const float* energy  [[buffer(3)]],
+                            constant uint2& size        [[buffer(4)]],
+                            uint x                      [[thread_position_in_grid]]) {
+    uint width = size.x;
+    uint y = size.y;
+    if (x >= width) { return; }
+    uint leftX = (x > 0) ? (x - 1) : 0u;
+    uint rightX = (x + 1 < width) ? (x + 1) : (width - 1);
+    float left = prevRow[leftX];
+    float center = prevRow[x];
+    float right = prevRow[rightX];
+    float best = left;
+    int pred = int(leftX);
+    if (center < best) { best = center; pred = int(x); }
+    if (right < best) { best = right; pred = int(rightX); }
+    currRow[x] = energy[y * width + x] + best;
+    parents[y * width + x] = char(pred - int(x));
+}
+
+kernel void accumulateForwardDPRow(device const float* prevRow [[buffer(0)]],
+                                   device float* currRow       [[buffer(1)]],
+                                   device char* parents        [[buffer(2)]],
+                                   device const float* luma    [[buffer(3)]],
+                                   device const float* base    [[buffer(4)]],
+                                   constant uint2& lumaSize    [[buffer(5)]],
+                                   constant uint& y            [[buffer(6)]],
+                                   constant uint& hasBase      [[buffer(7)]],
+                                   uint x                      [[thread_position_in_grid]]) {
+    uint width = lumaSize.x;
+    uint height = lumaSize.y;
+    if (x >= width) { return; }
+    int ix = int(x);
+    int iy = int(y);
+    float cu = fabs(sampleClamped(luma, width, height, ix + 1, iy) - sampleClamped(luma, width, height, ix - 1, iy));
+    float cl = cu + fabs(sampleClamped(luma, width, height, ix, iy - 1) - sampleClamped(luma, width, height, ix - 1, iy));
+    float cr = cu + fabs(sampleClamped(luma, width, height, ix, iy - 1) - sampleClamped(luma, width, height, ix + 1, iy));
+    float b = (hasBase != 0u) ? base[y * width + x] : 0.0f;
+    float best = INFINITY;
+    int pred = int(x);
+    if (x > 0) { float c = prevRow[x - 1] + cl; if (c < best) { best = c; pred = int(x) - 1; } }
+    { float c = prevRow[x] + cu; if (c < best) { best = c; pred = int(x); } }
+    if (x + 1 < width) { float c = prevRow[x + 1] + cr; if (c < best) { best = c; pred = int(x) + 1; } }
+    currRow[x] = b + best;
+    parents[y * width + x] = char(pred - int(x));
+}
+
+kernel void reduceFinalRow(device const float* row  [[buffer(0)]],
+                           device uint* argmin       [[buffer(1)]],
+                           constant uint& width      [[buffer(2)]],
+                           uint tid                  [[thread_position_in_grid]]) {
+    if (tid != 0) { return; }
+    float best = INFINITY;
+    uint bestX = 0u;
+    for (uint x = 0; x < width; x++) {
+        if (row[x] < best) { best = row[x]; bestX = x; }
+    }
+    argmin[0] = isfinite(best) ? bestX : 0xFFFFFFFFu;
+}
+
+kernel void backtrackSeam(device const char* parents [[buffer(0)]],
+                          device uint* seam          [[buffer(1)]],
+                          device const uint* startX  [[buffer(2)]],
+                          constant uint& width       [[buffer(3)]],
+                          constant uint& height      [[buffer(4)]],
+                          uint tid                   [[thread_position_in_grid]]) {
+    if (tid != 0) { return; }
+    uint x = startX[0];
+    seam[height - 1] = x;
+    for (int y = int(height) - 1; y > 0; y--) {
+        x = uint(int(x) + int(parents[uint(y) * width + x]));
+        seam[uint(y) - 1] = x;
+    }
+}
