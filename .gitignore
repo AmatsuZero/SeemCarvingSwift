@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Git worktrees
+.worktrees/
+worktrees/
+
+# Local tooling / agent state
+.omx/
+.codebuddy/
