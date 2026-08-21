@@ -17,7 +17,8 @@ public struct LuminancePlane: Sendable, Equatable {
     }
 
     /// Computes the linear-light luma plane for an image.
-    static func luma(of image: RGBA8Image) throws -> LuminancePlane {
+    @_spi(Backend)
+    public static func luma(of image: RGBA8Image) throws -> LuminancePlane {
         let width = image.width
         let height = image.height
         let pixelCount = width * height

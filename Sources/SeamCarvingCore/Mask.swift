@@ -27,7 +27,8 @@ public struct Mask: Sendable, Equatable {
 
 extension MaskPair {
     /// Validates that every protection and removal mask matches the given size.
-    func validateDimensions(width: Int, height: Int) throws {
+    @_spi(Backend)
+    public func validateDimensions(width: Int, height: Int) throws {
         for layer in protectionLayers {
             guard layer.mask.width == width, layer.mask.height == height else {
                 throw SeamCarvingError.invalidConfiguration("protection mask dimensions must match image")
@@ -43,7 +44,8 @@ extension MaskPair {
     /// Computes the per-pixel energy adjustment from independent protection and
     /// removal layers, or nil when no layer is present. Hard protection yields
     /// `+infinity` and overrides removal. Each layer is applied independently.
-    func energyAdjustment(forWidth width: Int, height: Int) throws -> EnergyMap? {
+    @_spi(Backend)
+    public func energyAdjustment(forWidth width: Int, height: Int) throws -> EnergyMap? {
         guard !protectionLayers.isEmpty || removal != nil else { return nil }
         try validateDimensions(width: width, height: height)
 

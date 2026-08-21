@@ -3,7 +3,7 @@ import Foundation
 @_spi(Backend) import SeamCarvingCore
 
 public actor MetalContext {
-    public let device: any MTLDevice
+    public nonisolated let device: any MTLDevice
     private let library: any MTLLibrary
     private let queue: any MTLCommandQueue
     private var pipelineCache: [String: any MTLComputePipelineState] = [:]
