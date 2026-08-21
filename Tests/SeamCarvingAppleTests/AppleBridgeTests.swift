@@ -1,6 +1,8 @@
 import XCTest
 import CoreGraphics
 import ImageIO
+import CoreImage
+import CoreVideo
 import SeamCarvingCore
 @testable import SeamCarvingApple
 
@@ -91,6 +93,40 @@ final class AppleBridgeTests: XCTestCase {
         let decoded = try CGImageBridge.decode(cgImage)
         XCTAssertEqual(decoded.width, 2)
         XCTAssertEqual(decoded.height, 2)
+    }
+
+    func testCIImageResize() async throws {
+        let cgImage = try Self.makeCGImage(width: 4, height: 3, pixels: Self.gradientPixels(width: 4, height: 3), alphaInfo: .last)
+        let ciImage = CIImage(cgImage: cgImage)
+        let carver = try AppleSeamCarver()
+        let result = try await carver.resize(ciImage, orientation: .up, toPixelSize: try PixelSize(width: 2, height: 2))
+        XCTAssertEqual(result.extent.width, 2)
+        XCTAssertEqual(result.extent.height, 2)
+    }
+
+    func testCVPixelBufferRoundTrip() throws {
+        let width = 2
+        let height = 2
+        var pixelBuffer: CVPixelBuffer?
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
+        let buffer = try XCTUnwrap(pixelBuffer)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        let base = CVPixelBufferGetBaseAddress(buffer)!
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+        let raw = base.assumingMemoryBound(to: UInt8.self)
+        // BGRA: pixel 0 = [10,20,30,255] (B=10,G=20,R=30,A=255)
+        raw[0] = 10; raw[1] = 20; raw[2] = 30; raw[3] = 255
+        raw[4] = 40; raw[5] = 50; raw[6] = 60; raw[7] = 128
+        raw[bytesPerRow + 0] = 70; raw[bytesPerRow + 1] = 80; raw[bytesPerRow + 2] = 90; raw[bytesPerRow + 3] = 255
+        raw[bytesPerRow + 4] = 100; raw[bytesPerRow + 5] = 110; raw[bytesPerRow + 6] = 120; raw[bytesPerRow + 7] = 255
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+
+        let decoded = try CVPixelBufferBridge.decode(buffer, orientation: .up)
+        XCTAssertEqual(decoded.width, 2)
+        XCTAssertEqual(decoded.height, 2)
+        XCTAssertEqual(decoded[0, 0], RGBA8(r: 30, g: 20, b: 10, a: 255))
+        XCTAssertEqual(decoded[1, 0], RGBA8(r: 60, g: 50, b: 40, a: 128))
+        XCTAssertEqual(decoded[0, 1], RGBA8(r: 90, g: 80, b: 70, a: 255))
     }
 
     // MARK: - Fixtures
