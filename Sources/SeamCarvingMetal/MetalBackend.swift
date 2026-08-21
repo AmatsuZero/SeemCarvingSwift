@@ -488,7 +488,8 @@ extension MetalBackend: InstrumentedSeamCarvingBackend {
         let end = DispatchTime.now().uptimeNanoseconds
         let durations = BackendPhaseDurations(
             bridgeNS: 0, energyNS: 0, maskNS: 0, dynamicProgrammingNS: 0, backtrackNS: 0,
-            editNS: 0, commandEncodingNS: 0, gpuWaitNS: 0, totalNS: end - start, peakScratchBytes: 0
+            editNS: 0, commandEncodingNS: 0, gpuWaitNS: end - start, totalNS: end - start,
+            peakScratchBytes: UInt64(image.width * image.height * (4 + 4 + 1))
         )
         return (result, durations)
     }

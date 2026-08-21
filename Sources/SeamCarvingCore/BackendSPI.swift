@@ -10,6 +10,8 @@ public protocol BackwardEnergyProvider: Sendable {
     func compute(for image: RGBA8Image) throws -> EnergyMap
 }
 
+import Dispatch
+
 @_spi(Benchmark)
 public struct BackendPhaseDurations: Sendable, Codable, Equatable {
     public var bridgeNS: UInt64
@@ -46,6 +48,29 @@ public struct BackendPhaseDurations: Sendable, Codable, Equatable {
         self.totalNS = totalNS
         self.peakScratchBytes = peakScratchBytes
     }
+}
+
+@_spi(Benchmark)
+public final class BackendTimingRecorder: @unchecked Sendable {
+    public init() {}
+
+    private(set) var durations = BackendPhaseDurations(
+        bridgeNS: 0, energyNS: 0, maskNS: 0, dynamicProgrammingNS: 0,
+        backtrackNS: 0, editNS: 0, commandEncodingNS: 0, gpuWaitNS: 0,
+        totalNS: 0, peakScratchBytes: 0
+    )
+
+    func add(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, _ elapsed: UInt64) {
+        durations[keyPath: phase] += elapsed
+    }
+
+    func measure<T>(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, _ body: () throws -> T) rethrows -> T {
+        let start = DispatchTime.now().uptimeNanoseconds
+        defer { add(phase, DispatchTime.now().uptimeNanoseconds - start) }
+        return try body()
+    }
+
+    public func snapshot() -> BackendPhaseDurations { durations }
 }
 
 @_spi(Benchmark)
@@ -89,26 +114,28 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions
     ) async throws -> SeamPath {
-        try findSeam(in: image, orientation: orientation, energyMode: options.energyMode, masks: options.masks)
+        try findSeam(in: image, orientation: orientation, energyMode: options.energyMode, masks: options.masks, recorder: nil)
     }
 
     private func findSeam(
         in image: RGBA8Image,
         orientation: SeamOrientation,
         energyMode: EnergyMode,
-        masks: MaskPair
+        masks: MaskPair,
+        recorder: BackendTimingRecorder?
     ) throws -> SeamPath {
         switch energyMode {
         case .backwardSobel:
-            let base = try backwardEnergyProvider.compute(for: image)
-            if let adjustment = try masks.energyAdjustment(forWidth: image.width, height: image.height) {
-                return try DynamicProgramming.findSeam(in: try base.adding(adjustment), orientation: orientation)
+            let base = try recorder.map { try $0.measure(\.energyNS) { try backwardEnergyProvider.compute(for: image) } } ?? backwardEnergyProvider.compute(for: image)
+            if let adjustment = try recorder.map({ try $0.measure(\.maskNS) { try masks.energyAdjustment(forWidth: image.width, height: image.height) } }) ?? masks.energyAdjustment(forWidth: image.width, height: image.height) {
+                let adjusted = try base.adding(adjustment)
+                return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try DynamicProgramming.findSeam(in: adjusted, orientation: orientation) } } ?? DynamicProgramming.findSeam(in: adjusted, orientation: orientation)
             }
-            return try DynamicProgramming.findSeam(in: base, orientation: orientation)
+            return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try DynamicProgramming.findSeam(in: base, orientation: orientation) } } ?? DynamicProgramming.findSeam(in: base, orientation: orientation)
         case .forwardLuma:
-            let luminance = try LuminancePlane.luma(of: image)
-            let adjustment = try masks.energyAdjustment(forWidth: image.width, height: image.height)
-            return try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment)
+            let luminance = try recorder.map { try $0.measure(\.energyNS) { try LuminancePlane.luma(of: image) } } ?? LuminancePlane.luma(of: image)
+            let adjustment = try recorder.map({ try $0.measure(\.maskNS) { try masks.energyAdjustment(forWidth: image.width, height: image.height) } }) ?? masks.energyAdjustment(forWidth: image.width, height: image.height)
+            return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment) } } ?? ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment)
         }
     }
 
@@ -116,6 +143,25 @@ public struct CoreResizeEngine: Sendable {
         _ image: RGBA8Image,
         to target: PixelSize,
         options: ResizeOptions
+    ) async throws -> RGBA8Image {
+        try await resize(image, to: target, options: options, recorder: nil)
+    }
+
+    @_spi(Benchmark)
+    public func resizeInstrumented(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions,
+        recorder: BackendTimingRecorder
+    ) async throws -> RGBA8Image {
+        try await resize(image, to: target, options: options, recorder: recorder)
+    }
+
+    private func resize(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions,
+        recorder: BackendTimingRecorder?
     ) async throws -> RGBA8Image {
         try options.masks.validateDimensions(width: image.width, height: image.height)
 
@@ -131,20 +177,20 @@ public struct CoreResizeEngine: Sendable {
         case .widthThenHeight:
             (current, currentMasks, completed) = try await applyDimension(
                 .vertical, delta: widthDelta, to: current, masks: currentMasks,
-                options: options, completed: completed, totalEdits: totalEdits
+                options: options, completed: completed, totalEdits: totalEdits, recorder: recorder
             )
             (current, currentMasks, completed) = try await applyDimension(
                 .horizontal, delta: heightDelta, to: current, masks: currentMasks,
-                options: options, completed: completed, totalEdits: totalEdits
+                options: options, completed: completed, totalEdits: totalEdits, recorder: recorder
             )
         case .heightThenWidth:
             (current, currentMasks, completed) = try await applyDimension(
                 .horizontal, delta: heightDelta, to: current, masks: currentMasks,
-                options: options, completed: completed, totalEdits: totalEdits
+                options: options, completed: completed, totalEdits: totalEdits, recorder: recorder
             )
             (current, currentMasks, completed) = try await applyDimension(
                 .vertical, delta: widthDelta, to: current, masks: currentMasks,
-                options: options, completed: completed, totalEdits: totalEdits
+                options: options, completed: completed, totalEdits: totalEdits, recorder: recorder
             )
         case .adaptiveNormalizedCost:
             var remainingWidth = widthDelta
@@ -157,8 +203,8 @@ public struct CoreResizeEngine: Sendable {
                 } else if remainingHeight == 0 {
                     orientation = .vertical
                 } else {
-                    let vertical = try findSeam(in: current, orientation: .vertical, energyMode: options.energyMode, masks: currentMasks)
-                    let horizontal = try findSeam(in: current, orientation: .horizontal, energyMode: options.energyMode, masks: currentMasks)
+                    let vertical = try findSeam(in: current, orientation: .vertical, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
+                    let horizontal = try findSeam(in: current, orientation: .horizontal, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
                     let verticalNormalized = vertical.totalCost / Float(current.height)
                     let horizontalNormalized = horizontal.totalCost / Float(current.width)
                     orientation = verticalNormalized <= horizontalNormalized ? .vertical : .horizontal
@@ -166,7 +212,7 @@ public struct CoreResizeEngine: Sendable {
                 let step = (orientation == .vertical ? remainingWidth : remainingHeight) > 0 ? 1 : -1
                 (current, currentMasks, completed) = try await applyDimension(
                     orientation, delta: step, to: current, masks: currentMasks,
-                    options: options, completed: completed, totalEdits: totalEdits
+                    options: options, completed: completed, totalEdits: totalEdits, recorder: recorder
                 )
                 if orientation == .vertical {
                     remainingWidth -= step
@@ -188,13 +234,14 @@ public struct CoreResizeEngine: Sendable {
         masks: MaskPair,
         options: ResizeOptions,
         completed: Int,
-        totalEdits: Int
+        totalEdits: Int,
+        recorder: BackendTimingRecorder?
     ) async throws -> (image: RGBA8Image, masks: MaskPair, completed: Int) {
         if delta < 0 {
-            return try await shrinkDimension(image, masks: masks, count: -delta, orientation: orientation, options: options, completed: completed, totalEdits: totalEdits)
+            return try await shrinkDimension(image, masks: masks, count: -delta, orientation: orientation, options: options, completed: completed, totalEdits: totalEdits, recorder: recorder)
         }
         if delta > 0 {
-            return try await enlargeDimension(image, masks: masks, count: delta, orientation: orientation, options: options, completed: completed, totalEdits: totalEdits)
+            return try await enlargeDimension(image, masks: masks, count: delta, orientation: orientation, options: options, completed: completed, totalEdits: totalEdits, recorder: recorder)
         }
         return (image, masks, completed)
     }
@@ -206,16 +253,22 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions,
         completed: Int,
-        totalEdits: Int
+        totalEdits: Int,
+        recorder: BackendTimingRecorder?
     ) async throws -> (image: RGBA8Image, masks: MaskPair, completed: Int) {
         var current = image
         var currentMasks = masks
         var completed = completed
         for _ in 0..<count {
             try Task.checkCancellation()
-            let seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks)
-            current = try SeamEditor.remove(seam, from: current)
-            currentMasks = try removing(seam, from: currentMasks)
+            let seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
+            if let recorder {
+                current = try recorder.measure(\.editNS) { try SeamEditor.remove(seam, from: current) }
+                currentMasks = try recorder.measure(\.maskNS) { try removing(seam, from: currentMasks) }
+            } else {
+                current = try SeamEditor.remove(seam, from: current)
+                currentMasks = try removing(seam, from: currentMasks)
+            }
             completed += 1
             options.progress?(ResizeProgress(completedEdits: completed, totalEdits: totalEdits, size: try PixelSize(width: current.width, height: current.height)))
         }
@@ -229,7 +282,8 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions,
         completed: Int,
-        totalEdits: Int
+        totalEdits: Int,
+        recorder: BackendTimingRecorder?
     ) async throws -> (image: RGBA8Image, masks: MaskPair, completed: Int) {
         var current = image
         var currentMasks = masks
@@ -246,10 +300,15 @@ public struct CoreResizeEngine: Sendable {
                 let batchSize = min(remaining, dimension - 1)
                 var opts = options
                 opts.masks = currentMasks
-                set = try await discoverMappedSeams(count: batchSize, in: current, orientation: orientation, options: opts)
+                set = try await discoverMappedSeams(count: batchSize, in: current, orientation: orientation, options: opts, recorder: recorder)
             }
 
-            let inserted = try insertMapped(set, into: current, masks: currentMasks)
+            let inserted: (image: RGBA8Image, masks: MaskPair)
+            if let recorder {
+                inserted = try recorder.measure(\.editNS) { try insertMapped(set, into: current, masks: currentMasks) }
+            } else {
+                inserted = try insertMapped(set, into: current, masks: currentMasks)
+            }
             current = inserted.image
             currentMasks = inserted.masks
             remaining -= set.coordinatesBySeam.count
@@ -261,7 +320,7 @@ public struct CoreResizeEngine: Sendable {
 
     // MARK: - Mapped seam discovery
 
-    func discoverMappedVerticalSeams(count: Int, in image: RGBA8Image, options: ResizeOptions) async throws -> MappedSeamSet {
+    func discoverMappedVerticalSeams(count: Int, in image: RGBA8Image, options: ResizeOptions, recorder: BackendTimingRecorder? = nil) async throws -> MappedSeamSet {
         let width = image.width
         let height = image.height
         guard count > 0, count < width else {
@@ -282,11 +341,16 @@ public struct CoreResizeEngine: Sendable {
         for _ in 0..<count {
             try Task.checkCancellation()
             let currentWidth = working.width
-            let seam = try findSeam(in: working, orientation: .vertical, energyMode: options.energyMode, masks: workingMasks)
+            let seam = try findSeam(in: working, orientation: .vertical, energyMode: options.energyMode, masks: workingMasks, recorder: recorder)
             let mapped = seam.coordinates.enumerated().map { indexMap[$0.offset * currentWidth + Int($0.element)] }
             seams.append(mapped)
-            working = try SeamEditor.remove(seam, from: working)
-            workingMasks = try removing(seam, from: workingMasks)
+            if let recorder {
+                working = try recorder.measure(\.editNS) { try SeamEditor.remove(seam, from: working) }
+                workingMasks = try recorder.measure(\.maskNS) { try removing(seam, from: workingMasks) }
+            } else {
+                working = try SeamEditor.remove(seam, from: working)
+                workingMasks = try removing(seam, from: workingMasks)
+            }
             indexMap = try removeVerticalSeam(indexMap, seam: seam, width: currentWidth)
         }
         return try MappedSeamSet(orientation: .vertical, coordinatesBySeam: seams)
@@ -381,17 +445,18 @@ public extension CoreResizeEngine {
         count: Int,
         in image: RGBA8Image,
         orientation: SeamOrientation,
-        options: ResizeOptions
+        options: ResizeOptions,
+        recorder: BackendTimingRecorder? = nil
     ) async throws -> MappedSeamSet {
         try options.masks.validateDimensions(width: image.width, height: image.height)
         switch orientation {
         case .vertical:
-            return try await discoverMappedVerticalSeams(count: count, in: image, options: options)
+            return try await discoverMappedVerticalSeams(count: count, in: image, options: options, recorder: recorder)
         case .horizontal:
             let transposedImage = try SeamEditor.transpose(image)
             var transposedOptions = options
             transposedOptions.masks = try transposeMaskPair(options.masks)
-            let set = try await discoverMappedVerticalSeams(count: count, in: transposedImage, options: transposedOptions)
+            let set = try await discoverMappedVerticalSeams(count: count, in: transposedImage, options: transposedOptions, recorder: recorder)
             return try MappedSeamSet(orientation: .horizontal, coordinatesBySeam: set.coordinatesBySeam)
         }
     }

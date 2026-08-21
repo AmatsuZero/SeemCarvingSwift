@@ -18,9 +18,9 @@ public actor MetalContext {
     public init(device: any MTLDevice) throws {
         self.device = device
         do {
-            self.library = try device.makeLibrary(source: MetalShaderLibrary.source, options: nil)
+            self.library = try MetalShaderLibrary.makeLibrary(on: device)
         } catch {
-            throw SeamCarvingError.metalExecutionFailed("shader compilation failed: \(error)")
+            throw error
         }
         guard let queue = device.makeCommandQueue() else {
             throw SeamCarvingError.metalExecutionFailed("command queue unavailable")

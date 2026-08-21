@@ -31,12 +31,11 @@ extension CPUBackend: SeamCarvingBackend {
 extension CPUBackend: InstrumentedSeamCarvingBackend {
     public func benchmarkResize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> (RGBA8Image, BackendPhaseDurations) {
         let start = DispatchTime.now().uptimeNanoseconds
-        let result = try await resize(image, to: target, options: options)
+        let recorder = BackendTimingRecorder()
+        let result = try await engine.resizeInstrumented(image, to: target, options: options, recorder: recorder)
         let end = DispatchTime.now().uptimeNanoseconds
-        let durations = BackendPhaseDurations(
-            bridgeNS: 0, energyNS: 0, maskNS: 0, dynamicProgrammingNS: 0, backtrackNS: 0,
-            editNS: 0, commandEncodingNS: 0, gpuWaitNS: 0, totalNS: end - start, peakScratchBytes: 0
-        )
+        var durations = recorder.snapshot()
+        durations.totalNS = end - start
         return (result, durations)
     }
 }

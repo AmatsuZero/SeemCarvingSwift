@@ -1,16 +1,27 @@
 import Foundation
+@preconcurrency import Metal
 @_spi(Backend) import SeamCarvingCore
 
 enum MetalShaderLibrary {
-    /// Loads the bundled Metal source once per process.
-    static let source: String = {
-        guard let url = Bundle.module.url(forResource: "SeamCarving", withExtension: "metal") else {
-            fatalError("SeamCarving.metal resource not found in bundle")
+    /// Loads the compiled library emitted by SwiftPM/Xcode for every platform.
+    /// Xcode does not copy the `.metal` source into simulator test bundles.
+    static func makeLibrary(on device: any MTLDevice) throws -> any MTLLibrary {
+        if let url = Bundle.module.url(forResource: "default", withExtension: "metallib") {
+            do {
+                return try device.makeLibrary(URL: url)
+            } catch {
+                throw SeamCarvingError.metalExecutionFailed("failed to load compiled Metal library: \(error)")
+            }
+        }
+
+        guard let sourceURL = Bundle.module.url(forResource: "SeamCarving", withExtension: "metal") else {
+            throw SeamCarvingError.metalExecutionFailed("Metal source and compiled library are missing from bundle")
         }
         do {
-            return try String(contentsOf: url, encoding: .utf8)
+            let source = try String(contentsOf: sourceURL, encoding: .utf8)
+            return try device.makeLibrary(source: source, options: nil)
         } catch {
-            fatalError("Failed to load SeamCarving.metal: \(error)")
+            throw SeamCarvingError.metalExecutionFailed("failed to compile Metal source: \(error)")
         }
-    }()
+    }
 }
