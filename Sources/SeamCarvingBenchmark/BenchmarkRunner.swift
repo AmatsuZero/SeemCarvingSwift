@@ -60,8 +60,14 @@ public struct BenchmarkRunner {
             _ = try await instrumented.benchmarkResize(image, to: target, options: options)
         }
         for _ in 0..<iterations {
+            let bridgeStart = DispatchTime.now().uptimeNanoseconds
+            let encoded = try CGImageBridge.encode(image)
+            _ = try CGImageBridge.decode(encoded)
+            let bridgeNS = DispatchTime.now().uptimeNanoseconds - bridgeStart
             let (_, d) = try await instrumented.benchmarkResize(image, to: target, options: options)
-            durations.append(d)
+            var measured = d
+            measured.bridgeNS = bridgeNS
+            durations.append(measured)
         }
 
         let peak = durations.map(\.peakScratchBytes).max() ?? 0
@@ -81,6 +87,9 @@ public struct BenchmarkRunner {
         }
         guard let count = Int(value), count > 0 else {
             throw SeamCarvingError.invalidConfiguration("invalid seam count \(value)")
+        }
+        guard count < min(width, height) else {
+            throw SeamCarvingError.invalidConfiguration("seam count \(count) must be smaller than both image dimensions")
         }
         return count
     }

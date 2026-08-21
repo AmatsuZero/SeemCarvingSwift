@@ -43,6 +43,7 @@ extension AccelerateBackend: InstrumentedSeamCarvingBackend {
         let end = DispatchTime.now().uptimeNanoseconds
         var durations = recorder.snapshot()
         durations.totalNS = end - start
+        durations.peakScratchBytes = UInt64(image.width * image.height * (4 + 4 + 4 + 1))
         return (result, durations)
     }
 }

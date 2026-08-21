@@ -71,6 +71,10 @@ public final class BackendTimingRecorder: @unchecked Sendable {
     }
 
     public func snapshot() -> BackendPhaseDurations { durations }
+
+    public func record(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, elapsed: UInt64) {
+        add(phase, elapsed)
+    }
 }
 
 @_spi(Benchmark)

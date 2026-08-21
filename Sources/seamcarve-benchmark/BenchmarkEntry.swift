@@ -49,7 +49,7 @@ enum BenchmarkEntry {
                 let value = try next()
                 result.sizes = value.split(separator: ",").compactMap { part -> (Int, Int)? in
                     let dims = part.split(separator: "x")
-                    guard dims.count == 2, let w = Int(dims[0]), let h = Int(dims[1]) else { return nil }
+                    guard dims.count == 2, let w = Int(dims[0]), let h = Int(dims[1]), w > 0, h > 0 else { return nil }
                     return (w, h)
                 }
             case "--seams":
@@ -68,10 +68,12 @@ enum BenchmarkEntry {
             case "--output":
                 result.output = try next()
             default:
-                break
+                throw NSError(domain: "benchmark", code: 2, userInfo: [NSLocalizedDescriptionKey: "unknown argument \(arg)"])
             }
             index += 1
         }
+        guard !result.sizes.isEmpty else { throw NSError(domain: "benchmark", code: 3, userInfo: [NSLocalizedDescriptionKey: "at least one valid --sizes value is required"]) }
+        guard !result.seams.isEmpty else { throw NSError(domain: "benchmark", code: 4, userInfo: [NSLocalizedDescriptionKey: "at least one --seams value is required"]) }
         return result
     }
 }

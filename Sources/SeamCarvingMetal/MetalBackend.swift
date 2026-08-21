@@ -14,22 +14,26 @@ public struct MetalBackend: Sendable {
 
     // MARK: - Energy
 
-    private func computeEnergy(image: RGBA8Image, masks: MaskPair) async throws -> EnergyMap {
+    private func computeEnergy(image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> EnergyMap {
+        let phaseStart = DispatchTime.now().uptimeNanoseconds
+        defer {
+            recorder?.record(\.energyNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart)
+        }
         let device = context.device
         let width = image.width
         let height = image.height
         let pixelCount = width * height
 
-        let imageBuffer = device.makeBuffer(bytes: image.pixels, length: image.pixels.count)!
-        let lumaBuffer = device.makeBuffer(length: pixelCount * MemoryLayout<Float>.size)!
+        let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
+        let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
         var size = SIMD2<UInt32>(UInt32(width), UInt32(height))
-        let sizeBuffer = device.makeBuffer(bytes: &size, length: MemoryLayout<SIMD2<UInt32>>.size)!
+        let sizeBuffer = try requiredBuffer(value: &size, device: device)
 
         let lumaPipeline = try await context.pipeline(named: "rgbaToLinearLuma")
         let sobelPipeline = try await context.pipeline(named: "sobelEnergy")
 
         try await context.submit { commandBuffer in
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(lumaPipeline)
             encoder.setBuffer(imageBuffer, offset: 0, index: 0)
             encoder.setBuffer(lumaBuffer, offset: 0, index: 1)
@@ -38,9 +42,9 @@ public struct MetalBackend: Sendable {
         }
 
         // Sobel into a fresh energy buffer.
-        let energyBuffer = device.makeBuffer(length: pixelCount * MemoryLayout<Float>.size)!
+        let energyBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
         try await context.submit { commandBuffer in
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(sobelPipeline)
             encoder.setBuffer(lumaBuffer, offset: 0, index: 0)
             encoder.setBuffer(energyBuffer, offset: 0, index: 1)
@@ -78,12 +82,12 @@ public struct MetalBackend: Sendable {
             removalValues = removal.values
         }
 
-        let baseBuffer = device.makeBuffer(bytes: base, length: base.count * MemoryLayout<Float>.size)!
-        let outBuffer = device.makeBuffer(length: base.count * MemoryLayout<Float>.size)!
-        let softMaskBuffer = softValues.isEmpty ? device.makeBuffer(length: 1)! : device.makeBuffer(bytes: softValues, length: softValues.count * MemoryLayout<Float>.size)!
-        let softWeightBuffer = softWeights.isEmpty ? device.makeBuffer(length: 1)! : device.makeBuffer(bytes: softWeights, length: softWeights.count * MemoryLayout<Float>.size)!
-        let hardMaskBuffer = hardValues.isEmpty ? device.makeBuffer(length: 1)! : device.makeBuffer(bytes: hardValues, length: hardValues.count * MemoryLayout<Float>.size)!
-        let removalBuffer = removalValues.isEmpty ? device.makeBuffer(length: 1)! : device.makeBuffer(bytes: removalValues, length: removalValues.count * MemoryLayout<Float>.size)!
+        let baseBuffer = try requiredBuffer(bytes: base, device: device)
+        let outBuffer = try requiredBuffer(length: base.count * MemoryLayout<Float>.size, device: device)
+        let softMaskBuffer = try requiredBuffer(bytes: softValues, device: device)
+        let softWeightBuffer = try requiredBuffer(bytes: softWeights, device: device)
+        let hardMaskBuffer = try requiredBuffer(bytes: hardValues, device: device)
+        let removalBuffer = try requiredBuffer(bytes: removalValues, device: device)
 
         var params = MaskParams(
             pixelCount: UInt32(pixelCount),
@@ -92,11 +96,11 @@ public struct MetalBackend: Sendable {
             hasRemoval: hasRemoval ? 1 : 0,
             removalWeight: masks.removalWeight
         )
-        let paramsBuffer = device.makeBuffer(bytes: &params, length: MemoryLayout<MaskParams>.size)!
+        let paramsBuffer = try requiredBuffer(value: &params, device: device)
 
         let pipeline = try await context.pipeline(named: "applyMasks")
         try await context.submit { commandBuffer in
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(baseBuffer, offset: 0, index: 0)
             encoder.setBuffer(outBuffer, offset: 0, index: 1)
@@ -113,20 +117,28 @@ public struct MetalBackend: Sendable {
 
     // MARK: - Seam finding
 
-    private func findVerticalSeam(in image: RGBA8Image, options: ResizeOptions) async throws -> SeamPath {
+    private func findVerticalSeam(in image: RGBA8Image, options: ResizeOptions, recorder: BackendTimingRecorder? = nil) async throws -> SeamPath {
         switch options.energyMode {
         case .backwardSobel:
-            let energy = try await computeEnergy(image: image, masks: options.masks)
+            let energy = try await computeEnergy(image: image, masks: options.masks, recorder: recorder)
             if mode == .full {
+                let start = DispatchTime.now().uptimeNanoseconds
+                defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
                 return try await findSeamOnGPU(energy: energy)
             }
+            let start = DispatchTime.now().uptimeNanoseconds
+            defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
             return try DynamicProgramming.findVerticalSeam(in: energy)
         case .forwardLuma:
             if mode == .full {
+                let start = DispatchTime.now().uptimeNanoseconds
+                defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
                 return try await findForwardSeamOnGPU(image: image, masks: options.masks)
             }
             let luma = try LuminancePlane.luma(of: image)
             let adjustment = try options.masks.energyAdjustment(forWidth: image.width, height: image.height)
+            let start = DispatchTime.now().uptimeNanoseconds
+            defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
             return try ForwardEnergy.findVerticalSeam(in: luma, adjustedBaseEnergy: adjustment)
         }
     }
@@ -138,11 +150,11 @@ public struct MetalBackend: Sendable {
         let height = image.height
         let pixelCount = width * height
 
-        let imageBuffer = device.makeBuffer(bytes: image.pixels, length: image.pixels.count)!
-        let lumaBuffer = device.makeBuffer(length: pixelCount * MemoryLayout<Float>.size)!
+        let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
+        let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
         let lumaPipeline = try await context.pipeline(named: "rgbaToLinearLuma")
         try await context.submit { cb in
-            guard let enc = cb.makeComputeCommandEncoder() else { return }
+            guard let enc = cb.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             enc.setComputePipelineState(lumaPipeline)
             enc.setBuffer(imageBuffer, offset: 0, index: 0)
             enc.setBuffer(lumaBuffer, offset: 0, index: 1)
@@ -153,13 +165,13 @@ public struct MetalBackend: Sendable {
         let adjustment = try masks.energyAdjustment(forWidth: width, height: height)
         let baseValues = adjustment?.values ?? [Float](repeating: 0, count: pixelCount)
         let hasBase = adjustment != nil
-        let baseBuffer = device.makeBuffer(bytes: baseValues, length: baseValues.count * MemoryLayout<Float>.size)!
+        let baseBuffer = try requiredBuffer(bytes: baseValues, device: device)
 
-        let rowA = device.makeBuffer(length: width * MemoryLayout<Float>.size)!
-        let rowB = device.makeBuffer(length: width * MemoryLayout<Float>.size)!
-        let parentsBuffer = device.makeBuffer(length: width * height)!
-        let argminBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.size)!
-        let seamBuffer = device.makeBuffer(length: height * MemoryLayout<UInt32>.size)!
+        let rowA = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
+        let rowB = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
+        let parentsBuffer = try requiredBuffer(length: width * height, device: device)
+        let argminBuffer = try requiredBuffer(length: MemoryLayout<UInt32>.size, device: device)
+        let seamBuffer = try requiredBuffer(length: height * MemoryLayout<UInt32>.size, device: device)
 
         let widthVal = UInt32(width)
         let heightVal = UInt32(height)
@@ -172,7 +184,7 @@ public struct MetalBackend: Sendable {
         let backtrackPipeline = try await context.pipeline(named: "backtrackSeam")
 
         try await context.submit { cb in
-            guard let enc = cb.makeComputeCommandEncoder() else { return }
+            guard let enc = cb.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             let rows = [rowA, rowB]
             var cur = 0
 
@@ -230,12 +242,12 @@ public struct MetalBackend: Sendable {
         let width = energy.width
         let height = energy.height
 
-        let energyBuffer = device.makeBuffer(bytes: energy.values, length: energy.values.count * MemoryLayout<Float>.size)!
-        let rowA = device.makeBuffer(length: width * MemoryLayout<Float>.size)!
-        let rowB = device.makeBuffer(length: width * MemoryLayout<Float>.size)!
-        let parentsBuffer = device.makeBuffer(length: width * height)!
-        let argminBuffer = device.makeBuffer(length: MemoryLayout<UInt32>.size)!
-        let seamBuffer = device.makeBuffer(length: height * MemoryLayout<UInt32>.size)!
+        let energyBuffer = try requiredBuffer(bytes: energy.values, device: device)
+        let rowA = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
+        let rowB = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
+        let parentsBuffer = try requiredBuffer(length: width * height, device: device)
+        let argminBuffer = try requiredBuffer(length: MemoryLayout<UInt32>.size, device: device)
+        let seamBuffer = try requiredBuffer(length: height * MemoryLayout<UInt32>.size, device: device)
 
         let widthVal = UInt32(width)
         let heightVal = UInt32(height)
@@ -246,7 +258,7 @@ public struct MetalBackend: Sendable {
         let backtrackPipeline = try await context.pipeline(named: "backtrackSeam")
 
         try await context.submit { cb in
-            guard let enc = cb.makeComputeCommandEncoder() else { return }
+            guard let enc = cb.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             let rows = [rowA, rowB]
             var cur = 0
             let w = widthVal
@@ -299,7 +311,9 @@ public struct MetalBackend: Sendable {
 
     // MARK: - Seam editing
 
-    private func removeVerticalSeam(_ seam: SeamPath, from image: RGBA8Image, masks: MaskPair) async throws -> (RGBA8Image, MaskPair) {
+    private func removeVerticalSeam(_ seam: SeamPath, from image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> (RGBA8Image, MaskPair) {
+        let phaseStart = DispatchTime.now().uptimeNanoseconds
+        defer { recorder?.record(\.editNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart) }
         let device = context.device
         let newImage = try await removeVerticalRGBA(seam, image: image, device: device)
         let newMasks = try await removeVerticalMasks(seam, masks: masks, device: device)
@@ -309,15 +323,15 @@ public struct MetalBackend: Sendable {
     private func removeVerticalRGBA(_ seam: SeamPath, image: RGBA8Image, device: any MTLDevice) async throws -> RGBA8Image {
         let width = image.width
         let height = image.height
-        let inBuffer = device.makeBuffer(bytes: image.pixels, length: image.pixels.count)!
-        let outBuffer = device.makeBuffer(length: (width - 1) * height * 4)!
-        let seamBuffer = device.makeBuffer(bytes: seam.coordinates, length: seam.coordinates.count * MemoryLayout<UInt32>.size)!
+        let inBuffer = try requiredBuffer(bytes: image.pixels, device: device)
+        let outBuffer = try requiredBuffer(length: (width - 1) * height * 4, device: device)
+        let seamBuffer = try requiredBuffer(bytes: seam.coordinates, device: device)
         var size = SIMD2<UInt32>(UInt32(width), UInt32(height))
-        let sizeBuffer = device.makeBuffer(bytes: &size, length: MemoryLayout<SIMD2<UInt32>>.size)!
+        let sizeBuffer = try requiredBuffer(value: &size, device: device)
 
         let pipeline = try await context.pipeline(named: "removeVerticalRGBA")
         try await context.submit { commandBuffer in
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(inBuffer, offset: 0, index: 0)
             encoder.setBuffer(outBuffer, offset: 0, index: 1)
@@ -348,15 +362,15 @@ public struct MetalBackend: Sendable {
     private func removeVerticalMask(_ seam: SeamPath, mask: Mask, device: any MTLDevice) async throws -> Mask {
         let width = mask.width
         let height = mask.height
-        let inBuffer = device.makeBuffer(bytes: mask.values, length: mask.values.count * MemoryLayout<Float>.size)!
-        let outBuffer = device.makeBuffer(length: (width - 1) * height * MemoryLayout<Float>.size)!
-        let seamBuffer = device.makeBuffer(bytes: seam.coordinates, length: seam.coordinates.count * MemoryLayout<UInt32>.size)!
+        let inBuffer = try requiredBuffer(bytes: mask.values, device: device)
+        let outBuffer = try requiredBuffer(length: (width - 1) * height * MemoryLayout<Float>.size, device: device)
+        let seamBuffer = try requiredBuffer(bytes: seam.coordinates, device: device)
         var size = SIMD2<UInt32>(UInt32(width), UInt32(height))
-        let sizeBuffer = device.makeBuffer(bytes: &size, length: MemoryLayout<SIMD2<UInt32>>.size)!
+        let sizeBuffer = try requiredBuffer(value: &size, device: device)
 
         let pipeline = try await context.pipeline(named: "removeVerticalMask")
         try await context.submit { commandBuffer in
-            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(inBuffer, offset: 0, index: 0)
             encoder.setBuffer(outBuffer, offset: 0, index: 1)
@@ -370,6 +384,32 @@ public struct MetalBackend: Sendable {
     }
 
     // MARK: - Public SPI
+
+    private func requiredBuffer(length: Int, device: any MTLDevice) throws -> any MTLBuffer {
+        guard let buffer = device.makeBuffer(length: max(1, length), options: .storageModeShared) else {
+            throw SeamCarvingError.metalExecutionFailed("buffer allocation failed (\(length) bytes)")
+        }
+        return buffer
+    }
+
+    private func requiredBuffer<T>(bytes values: [T], device: any MTLDevice) throws -> any MTLBuffer {
+        guard !values.isEmpty else { return try requiredBuffer(length: 1, device: device) }
+        guard let buffer = values.withUnsafeBytes({ raw in
+            device.makeBuffer(bytes: raw.baseAddress!, length: raw.count, options: .storageModeShared)
+        }) else {
+            throw SeamCarvingError.metalExecutionFailed("buffer allocation failed (\(values.count) elements)")
+        }
+        return buffer
+    }
+
+    private func requiredBuffer<T>(value: inout T, device: any MTLDevice) throws -> any MTLBuffer {
+        guard let buffer = withUnsafePointer(to: &value, { pointer in
+            device.makeBuffer(bytes: pointer, length: MemoryLayout<T>.stride, options: .storageModeShared)
+        }) else {
+            throw SeamCarvingError.metalExecutionFailed("buffer allocation failed (\(MemoryLayout<T>.stride) bytes)")
+        }
+        return buffer
+    }
 
     private func readFloats(_ buffer: any MTLBuffer, count: Int) -> [Float] {
         let ptr = buffer.contents().assumingMemoryBound(to: Float.self)
@@ -407,6 +447,18 @@ extension MetalBackend: SeamCarvingBackend {
     }
 
     public func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> RGBA8Image {
+        try await resize(image, to: target, options: options, recorder: nil)
+    }
+
+    private func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions, recorder: BackendTimingRecorder?) async throws -> RGBA8Image {
+        // The Metal kernels currently implement the shrink path.  Delegate
+        // enlargement and adaptive ordering to the reference backend rather
+        // than silently returning the wrong extent or ordering seams by a
+        // different policy.
+        if target.width > image.width || target.height > image.height || options.dimensionOrder == .adaptiveNormalizedCost {
+            return try await CPUBackend().resize(image, to: target, options: options)
+        }
+
         // Shrink-only sequential loop using GPU energy + GPU vertical edits and
         // CPU transpose for horizontal handling.
         try options.masks.validateDimensions(width: image.width, height: image.height)
@@ -415,11 +467,15 @@ extension MetalBackend: SeamCarvingBackend {
         var currentMasks = options.masks
         var remainingVertical = image.width - target.width
         var remainingHorizontal = image.height - target.height
+        var completedEdits = 0
+        let totalEdits = remainingVertical + remainingHorizontal
 
         func removeOne(_ orientation: SeamOrientation) async throws {
             let seam: SeamPath
             if orientation == .vertical {
-                seam = try await findVerticalSeam(in: current, options: options)
+                var currentOptions = options
+                currentOptions.masks = currentMasks
+                seam = try await findVerticalSeam(in: current, options: currentOptions, recorder: recorder)
             } else {
                 let t = try SeamEditor.transpose(current)
                 var to = options
@@ -428,13 +484,13 @@ extension MetalBackend: SeamCarvingBackend {
                     removal: try currentMasks.removal.map { try SeamEditor.transpose($0) },
                     removalWeight: currentMasks.removalWeight
                 )
-                let vs = try await findVerticalSeam(in: t, options: to)
+                let vs = try await findVerticalSeam(in: t, options: to, recorder: recorder)
                 seam = try SeamPath(orientation: .horizontal, coordinates: vs.coordinates, totalCost: vs.totalCost)
             }
 
             let device = context.device
             if seam.orientation == .vertical {
-                (current, currentMasks) = try await removeVerticalSeam(seam, from: current, masks: currentMasks)
+                (current, currentMasks) = try await removeVerticalSeam(seam, from: current, masks: currentMasks, recorder: recorder)
             } else {
                 let t = try SeamEditor.transpose(current)
                 var to = currentMasks
@@ -444,7 +500,7 @@ extension MetalBackend: SeamCarvingBackend {
                     removalWeight: currentMasks.removalWeight
                 )
                 let vs = try SeamPath(orientation: .vertical, coordinates: seam.coordinates, totalCost: seam.totalCost)
-                let (tResult, tMasks) = try await removeVerticalSeam(vs, from: t, masks: to)
+                let (tResult, tMasks) = try await removeVerticalSeam(vs, from: t, masks: to, recorder: recorder)
                 current = try SeamEditor.transpose(tResult)
                 currentMasks = try MaskPair(
                     protectionLayers: tMasks.protectionLayers.map { try ProtectionLayer(mask: SeamEditor.transpose($0.mask), strength: $0.strength) },
@@ -474,6 +530,12 @@ extension MetalBackend: SeamCarvingBackend {
                     remainingHorizontal -= 1
                 }
             }
+            completedEdits += 1
+            options.progress?(ResizeProgress(
+                completedEdits: completedEdits,
+                totalEdits: totalEdits,
+                size: try PixelSize(width: current.width, height: current.height)
+            ))
         }
 
         return current
@@ -484,13 +546,13 @@ extension MetalBackend: SeamCarvingBackend {
 extension MetalBackend: InstrumentedSeamCarvingBackend {
     public func benchmarkResize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> (RGBA8Image, BackendPhaseDurations) {
         let start = DispatchTime.now().uptimeNanoseconds
-        let result = try await resize(image, to: target, options: options)
+        let recorder = BackendTimingRecorder()
+        let result = try await resize(image, to: target, options: options, recorder: recorder)
         let end = DispatchTime.now().uptimeNanoseconds
-        let durations = BackendPhaseDurations(
-            bridgeNS: 0, energyNS: 0, maskNS: 0, dynamicProgrammingNS: 0, backtrackNS: 0,
-            editNS: 0, commandEncodingNS: 0, gpuWaitNS: end - start, totalNS: end - start,
-            peakScratchBytes: UInt64(image.width * image.height * (4 + 4 + 1))
-        )
+        var durations = recorder.snapshot()
+        durations.gpuWaitNS = end - start
+        durations.totalNS = end - start
+        durations.peakScratchBytes = UInt64(image.width * image.height * (4 + 4 + 1))
         return (result, durations)
     }
 }

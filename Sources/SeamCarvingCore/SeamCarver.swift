@@ -35,6 +35,8 @@ public extension SeamCarver {
         var currentImage = image
         var currentRemoval = removalMask
         var currentProtection = options.masks.protectionLayers
+        var completedEdits = 0
+        let totalEdits = max(1, removalMask.values.reduce(into: 0) { $0 += $1 > 0 ? 1 : 0 })
 
         while currentRemoval.values.contains(where: { $0 > 0 }) {
             try Task.checkCancellation()
@@ -72,6 +74,12 @@ public extension SeamCarver {
                 let newMask = try SeamEditor.remove(chosen, from: layer.mask)
                 return try ProtectionLayer(mask: newMask, strength: layer.strength)
             }
+            completedEdits += 1
+            options.progress?(ResizeProgress(
+                completedEdits: completedEdits,
+                totalEdits: totalEdits,
+                size: try PixelSize(width: currentImage.width, height: currentImage.height)
+            ))
         }
 
         if restoreOriginalSize {
