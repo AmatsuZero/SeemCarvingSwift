@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "SeamCarvingMetal", targets: ["SeamCarvingMetal"]),
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
+        .executable(name: "seamcarve-cli", targets: ["seamcarve-cli"]),
     ],
     targets: [
         .target(name: "SeamCarvingCore"),
@@ -28,10 +29,16 @@ let package = Package(
             dependencies: ["SeamCarvingCore", "SeamCarvingApple"],
             linkerSettings: [.linkedFramework("Vision")]
         ),
+        .target(name: "SeamCarvingCLI", dependencies: ["SeamCarvingCore"]),
+        .executableTarget(
+            name: "seamcarve-cli",
+            dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]
+        ),
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingMetal"]),
         .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]),
         .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
+        .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]),
     ]
 )
