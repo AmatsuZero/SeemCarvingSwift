@@ -25,8 +25,14 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions
     ) async throws -> SeamPath {
-        let energy = try adjustedEnergy(for: image, options: options)
-        return try DynamicProgramming.findSeam(in: energy, orientation: orientation)
+        switch options.energyMode {
+        case .backwardSobel:
+            let energy = try backwardEnergyProvider.compute(for: image)
+            return try DynamicProgramming.findSeam(in: energy, orientation: orientation)
+        case .forwardLuma:
+            let luminance = try LuminancePlane.luma(of: image)
+            return try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: nil)
+        }
     }
 
     public func resize(
@@ -97,14 +103,5 @@ public struct CoreResizeEngine: Sendable {
         }
 
         return current
-    }
-
-    private func adjustedEnergy(for image: RGBA8Image, options: ResizeOptions) throws -> EnergyMap {
-        switch options.energyMode {
-        case .backwardSobel:
-            return try backwardEnergyProvider.compute(for: image)
-        case .forwardLuma:
-            throw SeamCarvingError.invalidConfiguration("forward energy is not available yet")
-        }
     }
 }
