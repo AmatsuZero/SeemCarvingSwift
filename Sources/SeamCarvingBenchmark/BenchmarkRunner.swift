@@ -145,7 +145,7 @@ public struct BenchmarkRunner {
     }
 
     private func xcodeVersion() -> String {
-        #if canImport(Darwin)
+        #if os(macOS)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
         process.arguments = ["-version"]
