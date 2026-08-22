@@ -530,6 +530,7 @@ extension MetalBackend: SeamCarvingBackend {
                     remainingHorizontal -= 1
                 }
             }
+            try Task.checkCancellation()
             completedEdits += 1
             options.progress?(ResizeProgress(
                 completedEdits: completedEdits,
