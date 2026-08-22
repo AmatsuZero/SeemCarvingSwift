@@ -39,5 +39,46 @@ Release measurements from both an iPhone/iPad and an Apple-silicon Mac.
 Before making Metal the preferred production path for a request-size bucket,
 Metal must show at least 15% lower p50 than Accelerate without worsening p95
 peak scratch by more than 10%. Record vertical and horizontal shrink separately;
-horizontal results include CPU transpose overhead and should not be inferred
-from vertical-only measurements.
+horizontal results include GPU transpose overhead (the Metal horizontal path
+transposes RGBA and mask buffers on the GPU via the `transposeRGBA` /
+`transposeMask` kernels) and should not be inferred from vertical-only
+measurements.
+
+## Production decision matrix (iPad, 2026-08-22)
+
+Device: iPad (id `00008122-0009185E26DA801C`), iPadOS 17+. One sample per case,
+direct resize, deterministic seeded image, 1280x720, 8-seam removal.
+
+### Orientation split
+
+| Orientation / energy | CPU | Accelerate | Metal hybrid | Metal full |
+|---|---:|---:|---:|---:|
+| vertical / backward | 8347 ms | 6811 ms | 4673 ms | **44 ms** |
+| vertical / forward | 3121 ms | 3132 ms | 3133 ms | **55 ms** |
+| horizontal / backward | 11719 ms | 10182 ms | 4649 ms | **69 ms** |
+| horizontal / forward | 6135 ms | 6130 ms | 3116 ms | **86 ms** |
+
+### Decision
+
+- Horizontal Metal full dropped from ~3514 ms (CPU transpose) to ~69 ms after
+  the GPU transpose optimization, bringing it to ~1.6x of vertical Metal full
+  (well within the 3x stop threshold). No persistent GPU buffer redesign,
+  enlargement, adaptive ordering, or parallel final-row reduction is warranted.
+- Metal full is >100x faster than Accelerate for both orientations at this size
+  with exact CPU/Metal pixel and seam parity (verified on macOS). The 15%
+  threshold is exceeded by a wide margin, so Metal remains the preferred
+  production path for supported shrink requests (vertical and horizontal).
+- Enlargement and `.adaptiveNormalizedCost` ordering still delegate to the CPU
+  reference backend, preserving package-wide semantics.
+
+Command:
+
+```bash
+xcodebuild -project Apps/SeamCarvingTestHost/SeamCarvingTestHost.xcodeproj \
+  -scheme SeamCarvingDeviceTests \
+  -destination 'id=00008122-0009185E26DA801C' test \
+  -only-testing:SeamCarvingMetalDeviceTests/PerformanceTests/testDeviceOrientationScreening \
+  -parallel-testing-enabled NO -enableCodeCoverage NO \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=TCU9L9SQC4 \
+  CODE_SIGN_IDENTITY='iPhone Developer'
+```
