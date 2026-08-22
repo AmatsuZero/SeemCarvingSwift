@@ -70,6 +70,16 @@ public final class AppModel {
     /// The single owned resize task. A new `resize()` cancels the prior one.
     private var resizeTask: Task<Void, Never>?
 
+    /// Monotonic generation counter. Each `resize()` mints a new generation; only
+    /// the task holding the *current* generation may write a terminal `phase`.
+    /// This prevents a stale completion (or a stray cancel) from clobbering a
+    /// newer resize's result.
+    private var resizeGeneration: UInt64 = 0
+
+    /// The generation owned by `resizeTask`. Lets `cancelResize()` decide whether
+    /// it is safe to write `.cancelled` without overwriting a newer completion.
+    private var resizeTaskGeneration: UInt64 = 0
+
     public init(
         configuration: ResizeConfiguration = ResizeConfiguration(),
         service: SeamCarvingService = AppleSeamCarverService()
@@ -122,14 +132,18 @@ public final class AppModel {
 
     // MARK: Resize
 
-    public func resize() async {
+    /// Starts a resize and returns immediately. The work runs detached on a
+    /// background task; completion/cancellation is observed via `phase`. A newer
+    /// `resize()` (or `cancelResize()`) cancels the in-flight task, and only the
+    /// most-recently-started task may write a terminal phase.
+    public func resize() {
         guard let document else {
             errorMessage = "No document imported."
             phase = .failed
             return
         }
 
-        // Cancel any in-flight resize before starting a new one.
+        // Cancel any in-flight resize before starting a new generation.
         resizeTask?.cancel()
 
         // Validate configuration against the source size and masks.
@@ -142,6 +156,11 @@ public final class AppModel {
             return
         }
 
+        // Mint a new generation; only this task may write the terminal phase.
+        resizeGeneration &+= 1
+        let myGeneration = resizeGeneration
+        resizeTaskGeneration = myGeneration
+
         let source = document.sourceImage
         let target = configuration.targetSize
         let options = ResizeOptions(
@@ -149,9 +168,10 @@ public final class AppModel {
             dimensionOrder: configuration.dimensionOrder,
             masks: document.currentMasks,
             preScaleStrategy: configuration.preScaleStrategy,
-            progress: { [weak self] progress in
+            progress: { [myGeneration] progress in
                 Task { @MainActor in
-                    guard let self, case .resizing = self.phase else { return }
+                    // Ignore progress from a stale or superseded generation.
+                    guard myGeneration == self.resizeGeneration, case .resizing = self.phase else { return }
                     self.phase = .resizing(progress: progress)
                 }
             }
@@ -167,22 +187,22 @@ public final class AppModel {
             _ in AppleSeamCarverService(backend: configuration.backend, deterministic: configuration.deterministic)
         } ?? service
 
-        let task = Task {
+        resizeTask = Task { [weak self] in
             do {
                 let result = try await activeService.resize(source, to: target, options: options)
                 try Task.checkCancellation()
-                await self.applyResult(result)
+                await self?.applyResult(result, generation: myGeneration)
             } catch is CancellationError {
-                await self.handleCancellation()
+                await self?.handleCancellation(generation: myGeneration)
             } catch {
-                await self.handleFailure(error)
+                await self?.handleFailure(error, generation: myGeneration)
             }
         }
-        resizeTask = task
-        await task.value
     }
 
-    private func applyResult(_ result: RGBA8Image) async {
+    private func applyResult(_ result: RGBA8Image, generation: UInt64) async {
+        // Only the current generation may write the completed terminal phase.
+        guard generation == resizeGeneration else { return }
         guard let document else { return }
         document.replaceWorkingImage(result)
         document.targetSize = configuration.targetSize
@@ -190,13 +210,18 @@ public final class AppModel {
         errorMessage = nil
     }
 
-    private func handleCancellation() async {
-        // Source image is retained untouched; return to a cancelled state.
+    private func handleCancellation(generation: UInt64) async {
+        // Only the current generation may write the cancelled terminal phase; this
+        // prevents a stale task from clobbering a newer completion. The source image
+        // is retained untouched, so the document returns to a cancelled state.
+        guard generation == resizeGeneration else { return }
         phase = .cancelled
         errorMessage = nil
     }
 
-    private func handleFailure(_ error: Error) async {
+    private func handleFailure(_ error: Error, generation: UInt64) async {
+        // Only the current generation may write the failed terminal phase.
+        guard generation == resizeGeneration else { return }
         errorMessage = error.localizedDescription
         phase = .failed
     }
@@ -204,7 +229,10 @@ public final class AppModel {
     public func cancelResize() {
         resizeTask?.cancel()
         resizeTask = nil
-        // Source image remains intact; document is not mutated.
+        // Only set `.cancelled` if the task we just cancelled is still the current
+        // generation. If a newer `resize()` is running (or already completed), its
+        // result owns the phase and we must not clobber it.
+        guard resizeTaskGeneration == resizeGeneration else { return }
         phase = .cancelled
         errorMessage = nil
     }
@@ -219,16 +247,21 @@ public final class AppModel {
         }
         // Export is delegated to a platform encoder (Task 4). Here we validate
         // that a completed result exists and record metadata; a real encoder
-        // would convert `document.sourceImage` to PNG/data. We fail cleanly if
-        // no completed result is present or the encoder throws.
+        // would convert `document.workingImage` (the carve result) to PNG/data.
+        // The immutable `sourceImage` is NOT the export artifact.
         guard phase == .completed else {
+            errorMessage = "Nothing to export; run a resize first."
+            phase = .failed
+            return
+        }
+        guard let result = document.workingImage else {
             errorMessage = "Nothing to export; run a resize first."
             phase = .failed
             return
         }
         do {
             // Placeholder: encodes to PNG bytes via CGImage bridge when available.
-            let _ = try encodePNG(document.sourceImage)
+            let _ = try encodePNG(result)
             document.exportMetadata = ExportMetadata(byteCount: 0, format: "png")
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"

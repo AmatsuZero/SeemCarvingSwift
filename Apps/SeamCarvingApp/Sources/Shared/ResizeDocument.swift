@@ -64,7 +64,16 @@ public struct ExportMetadata: Equatable, Sendable {
 /// only ever touched on the main actor. It holds the canonical `RGBA8Image` so
 /// the model is fully portable and UI-framework-free beyond this Apple module.
 public final class ResizeDocument {
-    public var sourceImage: RGBA8Image
+    /// The immutable original import. The source is only set on init/re-import
+    /// and is never overwritten by a carve. Cancellation returns the document to
+    /// a cancelled state *with this source intact*.
+    public let sourceImage: RGBA8Image
+
+    /// The current/working image. `nil` until a carve completes; after a
+    /// successful resize it holds the carved result. Keeping it separate from
+    /// `sourceImage` preserves the original for cancellation semantics.
+    public var workingImage: RGBA8Image?
+
     public var currentMasks: MaskPair
     public var faceRegions: [FaceRegion]?
     public var sourceSize: PixelSize
@@ -86,14 +95,10 @@ public final class ResizeDocument {
         self.exportMetadata = exportMetadata
     }
 
-    /// Replaces the working image (e.g. after a completed carve) while keeping
-    /// the source intact. The source is only reset on re-import.
+    /// Stores a completed carve result into `workingImage` without touching the
+    /// immutable `sourceImage`. The source is only reset on re-import.
     public func replaceWorkingImage(_ image: RGBA8Image) {
-        // `sourceImage` is the original import; callers that need to mutate the
-        // working pixels should use a separate field. We intentionally retain the
-        // source for cancellation semantics in `AppModel`.
-        self.sourceImage = image
-        self.sourceSize = try! PixelSize(width: image.width, height: image.height)
+        self.workingImage = image
     }
 
     /// Validates that the document's masks match the source image dimensions.

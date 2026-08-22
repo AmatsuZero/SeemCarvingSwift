@@ -26,6 +26,9 @@ struct FakeSeamCarvingService: SeamCarvingService {
     func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> RGBA8Image {
         for progress in progressReports {
             options.progress?(progress)
+            // Yield so the model's main-actor progress hop can run and the UI can
+            // observe an intermediate `.resizing(progress:)` state.
+            try await Task.sleep(nanoseconds: 5_000_000)
         }
         if stall {
             try await Task.sleep(nanoseconds: 30_000_000_000)
