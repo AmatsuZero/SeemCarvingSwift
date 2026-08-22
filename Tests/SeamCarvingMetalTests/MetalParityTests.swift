@@ -34,6 +34,26 @@ final class MetalParityTests: XCTestCase {
         XCTAssertEqual(cpuResult.pixels, metalResult.pixels)
     }
 
+    func testUnsupportedResizePoliciesUseReferenceSemantics() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
+        let context = try MetalContext.makeDefault()
+        let cpu = CPUBackend()
+        let metal = MetalBackend(context: context)
+        let image = try Self.gradient(width: 10, height: 8)
+
+        let enlargedTarget = try PixelSize(width: 12, height: 9)
+        let cpuEnlarged = try await cpu.resize(image, to: enlargedTarget, options: .init())
+        let metalEnlarged = try await metal.resize(image, to: enlargedTarget, options: .init())
+        XCTAssertEqual(cpuEnlarged.pixels, metalEnlarged.pixels)
+
+        var adaptive = ResizeOptions()
+        adaptive.dimensionOrder = .adaptiveNormalizedCost
+        let adaptiveTarget = try PixelSize(width: 8, height: 6)
+        let cpuAdaptive = try await cpu.resize(image, to: adaptiveTarget, options: adaptive)
+        let metalAdaptive = try await metal.resize(image, to: adaptiveTarget, options: adaptive)
+        XCTAssertEqual(cpuAdaptive.pixels, metalAdaptive.pixels)
+    }
+
     func testForwardDPParity() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
         let context = try MetalContext.makeDefault()
