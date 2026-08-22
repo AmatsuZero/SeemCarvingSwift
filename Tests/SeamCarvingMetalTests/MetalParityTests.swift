@@ -42,6 +42,7 @@ final class MetalParityTests: XCTestCase {
         let image = try Self.gradient(width: 10, height: 8)
 
         let enlargedTarget = try PixelSize(width: 12, height: 9)
+        XCTAssertEqual(metal.effectiveIdentifier(from: try PixelSize(width: image.width, height: image.height), to: enlargedTarget, options: .init()), "cpu-fallback")
         let cpuEnlarged = try await cpu.resize(image, to: enlargedTarget, options: .init())
         let metalEnlarged = try await metal.resize(image, to: enlargedTarget, options: .init())
         XCTAssertEqual(cpuEnlarged.pixels, metalEnlarged.pixels)
@@ -49,6 +50,7 @@ final class MetalParityTests: XCTestCase {
         var adaptive = ResizeOptions()
         adaptive.dimensionOrder = .adaptiveNormalizedCost
         let adaptiveTarget = try PixelSize(width: 8, height: 6)
+        XCTAssertEqual(metal.effectiveIdentifier(from: try PixelSize(width: image.width, height: image.height), to: adaptiveTarget, options: adaptive), "cpu-fallback")
         let cpuAdaptive = try await cpu.resize(image, to: adaptiveTarget, options: adaptive)
         let metalAdaptive = try await metal.resize(image, to: adaptiveTarget, options: adaptive)
         XCTAssertEqual(cpuAdaptive.pixels, metalAdaptive.pixels)

@@ -12,6 +12,16 @@ public struct MetalBackend: Sendable {
         self.mode = mode
     }
 
+    /// Returns the implementation path used for a request. Metal currently
+    /// delegates enlargement and adaptive ordering to the reference CPU
+    /// backend so those requests preserve the package-wide semantics.
+    public func effectiveIdentifier(from source: PixelSize, to target: PixelSize, options: ResizeOptions) -> String {
+        if target.width > source.width || target.height > source.height || options.dimensionOrder == .adaptiveNormalizedCost {
+            return "cpu-fallback"
+        }
+        return identifier
+    }
+
     // MARK: - Energy
 
     private func computeEnergy(image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> EnergyMap {
