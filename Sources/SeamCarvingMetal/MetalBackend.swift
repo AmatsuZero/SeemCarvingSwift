@@ -225,6 +225,14 @@ public struct MetalBackend: Sendable {
             withUnsafePointer(to: widthVal) { enc.setBytes($0, length: 4, index: 2) }
             enc.dispatchThreads(MTLSizeMake(1, 1, 1), threadsPerThreadgroup: MTLSizeMake(1, 1, 1))
 
+            enc.endEncoding()
+        }
+
+        let backtrackStart = DispatchTime.now().uptimeNanoseconds
+        try await submit(recorder: recorder) { cb in
+            guard let enc = cb.makeComputeCommandEncoder() else {
+                throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable")
+            }
             enc.setComputePipelineState(backtrackPipeline)
             enc.setBuffer(parentsBuffer, offset: 0, index: 0)
             enc.setBuffer(seamBuffer, offset: 0, index: 1)
@@ -234,8 +242,6 @@ public struct MetalBackend: Sendable {
             enc.dispatchThreads(MTLSizeMake(1, 1, 1), threadsPerThreadgroup: MTLSizeMake(1, 1, 1))
             enc.endEncoding()
         }
-
-        let backtrackStart = DispatchTime.now().uptimeNanoseconds
         let argmin = argminBuffer.contents().assumingMemoryBound(to: UInt32.self)[0]
         guard argmin != UInt32.max else {
             throw SeamCarvingError.noFeasibleSeam
@@ -274,7 +280,6 @@ public struct MetalBackend: Sendable {
             let rows = [rowA, rowB]
             var cur = 0
             let w = widthVal
-            let h = heightVal
 
             enc.setComputePipelineState(initPipeline)
             enc.setBuffer(energyBuffer, offset: 0, index: 0)
@@ -300,17 +305,23 @@ public struct MetalBackend: Sendable {
             withUnsafePointer(to: w) { enc.setBytes($0, length: 4, index: 2) }
             enc.dispatchThreads(MTLSizeMake(1, 1, 1), threadsPerThreadgroup: MTLSizeMake(1, 1, 1))
 
-            enc.setComputePipelineState(backtrackPipeline)
-            enc.setBuffer(parentsBuffer, offset: 0, index: 0)
-            enc.setBuffer(seamBuffer, offset: 0, index: 1)
-            enc.setBuffer(argminBuffer, offset: 0, index: 2)
-            withUnsafePointer(to: w) { enc.setBytes($0, length: 4, index: 3) }
-            withUnsafePointer(to: h) { enc.setBytes($0, length: 4, index: 4) }
-            enc.dispatchThreads(MTLSizeMake(1, 1, 1), threadsPerThreadgroup: MTLSizeMake(1, 1, 1))
             enc.endEncoding()
         }
 
         let backtrackStart = DispatchTime.now().uptimeNanoseconds
+        try await submit(recorder: recorder) { cb in
+            guard let enc = cb.makeComputeCommandEncoder() else {
+                throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable")
+            }
+            enc.setComputePipelineState(backtrackPipeline)
+            enc.setBuffer(parentsBuffer, offset: 0, index: 0)
+            enc.setBuffer(seamBuffer, offset: 0, index: 1)
+            enc.setBuffer(argminBuffer, offset: 0, index: 2)
+            withUnsafePointer(to: widthVal) { enc.setBytes($0, length: 4, index: 3) }
+            withUnsafePointer(to: heightVal) { enc.setBytes($0, length: 4, index: 4) }
+            enc.dispatchThreads(MTLSizeMake(1, 1, 1), threadsPerThreadgroup: MTLSizeMake(1, 1, 1))
+            enc.endEncoding()
+        }
         let argmin = argminBuffer.contents().assumingMemoryBound(to: UInt32.self)[0]
         guard argmin != UInt32.max else {
             throw SeamCarvingError.noFeasibleSeam
