@@ -40,5 +40,13 @@ semantics are the default. Caire is reference material only; `.caireInspired`
 is not equivalent to Caire. The Vision module is optional and never imported by
 Core. A project license is intentionally not selected by this plan.
 
+Metal is an optional, asynchronous acceleration backend for shrink requests.
+Its full path accelerates energy, dynamic programming, and vertical seam
+editing, while horizontal edits still use CPU transposition. Enlargement and
+adaptive dimension ordering intentionally use the CPU reference backend to
+preserve package-wide semantics. `.automatic` tries Metal first, then
+Accelerate, and finally CPU; use `.deterministic` or `.cpu` when reproducible
+reference behavior is required.
+
 Run the tests with `swift test`. See `Benchmarks/README.md` for reproducible
 Release measurements and the explicit rule for changing `.automatic` policy.

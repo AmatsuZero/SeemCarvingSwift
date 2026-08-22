@@ -30,7 +30,14 @@ swift run -c release seamcarve-benchmark \
 
 ## `.automatic` policy rule
 
-`.automatic` currently selects Accelerate with CPU as its only fallback. To change
-the default to Metal, both an iPhone and an Apple-silicon Mac must show Metal at
-least 15% lower p50 than Accelerate, without worsening p95 peak scratch by more
-than 10% for the affected request-size bucket.
+`.automatic` currently tries Metal, then Accelerate, and finally CPU. The Metal
+backend is intentionally partial: shrink requests use its GPU path where
+supported, while enlargement and adaptive dimension ordering use the CPU
+reference path. Any change to this policy must be based on parity-checked
+Release measurements from both an iPhone/iPad and an Apple-silicon Mac.
+
+Before making Metal the preferred production path for a request-size bucket,
+Metal must show at least 15% lower p50 than Accelerate without worsening p95
+peak scratch by more than 10%. Record vertical and horizontal shrink separately;
+horizontal results include CPU transpose overhead and should not be inferred
+from vertical-only measurements.

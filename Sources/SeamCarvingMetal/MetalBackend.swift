@@ -13,8 +13,9 @@ public struct MetalBackend: Sendable {
     }
 
     /// Returns the implementation path used for a request. Metal currently
-    /// delegates enlargement and adaptive ordering to the reference CPU
-    /// backend so those requests preserve the package-wide semantics.
+    /// accelerates shrink requests, with CPU-assisted transposition for
+    /// horizontal seams. It delegates enlargement and adaptive ordering to the
+    /// reference CPU backend so those requests preserve package-wide semantics.
     public func effectiveIdentifier(from source: PixelSize, to target: PixelSize, options: ResizeOptions) -> String {
         if target.width > source.width || target.height > source.height || options.dimensionOrder == .adaptiveNormalizedCost {
             return "cpu-fallback"
