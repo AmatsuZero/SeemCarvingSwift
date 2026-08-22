@@ -48,6 +48,38 @@ final class PerformanceTests: XCTestCase {
         }
     }
 
+    func testDeviceOrientationScreening() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
+
+        let image = try Self.randomImage(width: 1280, height: 720, seed: 43)
+        let seamCount = 8
+        let cases: [(String, PixelSize)] = [
+            ("vertical-only", try PixelSize(width: image.width - seamCount, height: image.height)),
+            ("horizontal-only", try PixelSize(width: image.width, height: image.height - seamCount)),
+        ]
+        let energies: [EnergyMode] = [.backwardSobel, .forwardLuma]
+        let backendNames = ["cpu", "accelerate", "metal-hybrid", "metal-full"]
+        let totalCases = cases.count * energies.count * backendNames.count
+        var completedCases = 0
+
+        print("[device-orientation-benchmark] \(totalCases) cases; direct resize, one sample")
+        for (orientationName, target) in cases {
+            for energy in energies {
+                var options = ResizeOptions()
+                options.energyMode = energy
+                for backendName in backendNames {
+                    let backend = try await Self.makeBackend(named: backendName)
+                    let start = DispatchTime.now().uptimeNanoseconds
+                    _ = try await backend.resize(image, to: target, options: options)
+                    let elapsed = DispatchTime.now().uptimeNanoseconds - start
+                    completedCases += 1
+                    let energyName = energy == .backwardSobel ? "backward" : "forward"
+                    print("[device-orientation-benchmark] [\(completedCases)/\(totalCases)] orientation=\(orientationName) energy=\(energyName) backend=\(backendName) elapsed=\(Double(elapsed) / 1_000_000.0)ms")
+                }
+            }
+        }
+    }
+
     private static func makeBackend(named name: String) async throws -> any SeamCarvingBackend {
         switch name {
         case "cpu":
