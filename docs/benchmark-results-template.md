@@ -2,6 +2,14 @@
 
 Status: **pending physical-device release gate**
 
+Local Mac verification (2026-08-22): M1 MacBookPro18,1, macOS 26.6.2,
+Metal API/GPU Validation passed in the iOS Simulator. SwiftPM Core TSan (50
+tests) and the Xcode-built Core/Metal test bundles (50 + 9 tests) passed when
+the Xcode TSan runtime was preloaded with `DYLD_INSERT_LIBRARIES`. The normal
+`xcodebuild ENABLE_THREAD_SANITIZER=YES test` wrapper aborts before test
+bootstrap on this environment; retain the manual bundle command as the local
+TSan evidence.
+
 | Field | Value |
 |---|---|
 | Device model / UDID suffix | |
