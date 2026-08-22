@@ -16,6 +16,19 @@ public enum DimensionOrder: Sendable, Equatable {
     case adaptiveNormalizedCost
 }
 
+/// Strategy for pre-scaling the image before residual seam carving.
+///
+/// - `none`: Seam carving operates directly on the source image. This is the
+///   default and preserves the exact, mask-aware seam-carving semantics.
+/// - `lanczosThenExactResidual`: An intermediate Lanczos pre-scale is applied
+///   to the image and every protection/removal mask, then the residual seam
+///   carving reaches the exact target dimensions. This is an opt-in
+///   approximation that is NOT performed implicitly in `none` mode.
+public enum PreScaleStrategy: Sendable, Equatable {
+    case none
+    case lanczosThenExactResidual
+}
+
 public struct ResizeProgress: Sendable, Equatable {
     public let completedEdits: Int
     public let totalEdits: Int
@@ -86,17 +99,20 @@ public struct ResizeOptions: Sendable {
     public var energyMode: EnergyMode
     public var dimensionOrder: DimensionOrder
     public var masks: MaskPair
+    public var preScaleStrategy: PreScaleStrategy
     public var progress: (@Sendable (ResizeProgress) -> Void)?
 
     public init(
         energyMode: EnergyMode = .backwardSobel,
         dimensionOrder: DimensionOrder = .widthThenHeight,
         masks: MaskPair = .init(),
+        preScaleStrategy: PreScaleStrategy = .none,
         progress: (@Sendable (ResizeProgress) -> Void)? = nil
     ) {
         self.energyMode = energyMode
         self.dimensionOrder = dimensionOrder
         self.masks = masks
+        self.preScaleStrategy = preScaleStrategy
         self.progress = progress
     }
 }

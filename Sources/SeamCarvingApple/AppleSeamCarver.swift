@@ -47,7 +47,15 @@ public struct AppleSeamCarver: Sendable {
         options: ResizeOptions = .init()
     ) async throws -> CGImage {
         let decoded = try CGImageBridge.decode(image)
-        let result = try await backend.resize(decoded, to: target, options: options)
+        let planned = try PreScalePlanner.plan(
+            image: decoded,
+            masks: options.masks,
+            target: target,
+            strategy: options.preScaleStrategy
+        )
+        var plannedOptions = options
+        plannedOptions.masks = planned.masks
+        let result = try await backend.resize(planned.image, to: target, options: plannedOptions)
         return try CGImageBridge.encode(result)
     }
 

@@ -52,6 +52,55 @@ final class AppleBridgeTests: XCTestCase {
         XCTAssertEqual(result.height, 2)
     }
 
+    // MARK: - Pre-scale (Lanczos) opt-in
+
+    /// Builds a `MaskPair` with a constant protection layer and a removal mask.
+    private static func sampleMaskPair(width: Int, height: Int) throws -> MaskPair {
+        let protectionValues = [Float](repeating: 0.5, count: width * height)
+        let protection = try ProtectionLayer(
+            mask: try Mask(width: width, height: height, values: protectionValues),
+            strength: .soft(1)
+        )
+        let removalValues = [Float](repeating: 0.25, count: width * height)
+        let removal = try Mask(width: width, height: height, values: removalValues)
+        return try MaskPair(protectionLayers: [protection], removal: removal, removalWeight: 100)
+    }
+
+    /// NOTE: Lanczos pre-scale is an APPROXIMATION. These tests assert only that
+    /// the final output reaches the EXACT requested target dimensions and that
+    /// no error is thrown when masks are supplied — they do NOT assert
+    /// pixel-exact parity with the exact (`.none`) mode.
+    func testLanczosPreScaleReachesTargetWithMasks() async throws {
+        let carver = try AppleSeamCarver()
+
+        let scenarios: [(Int, Int, Int, Int)] = [
+            (8, 6, 16, 12),   // enlargement
+            (16, 12, 8, 6),   // shrink
+            (16, 8, 8, 10),   // mixed width/height changes
+            (8, 6, 8, 6),     // no-op resize
+        ]
+
+        for (w, h, tw, th) in scenarios {
+            let cgImage = try Self.makeCGImage(width: w, height: h, pixels: Self.gradientPixels(width: w, height: h), alphaInfo: .last)
+            var options = ResizeOptions()
+            options.preScaleStrategy = .lanczosThenExactResidual
+            options.masks = try Self.sampleMaskPair(width: w, height: h)
+            let result = try await carver.resize(cgImage, toPixelSize: try PixelSize(width: tw, height: th), options: options)
+            XCTAssertEqual(result.width, tw, "width mismatch for \(w)x\(h)->\(tw)x\(th)")
+            XCTAssertEqual(result.height, th, "height mismatch for \(w)x\(h)->\(tw)x\(th)")
+        }
+    }
+
+    func testLanczosPreScaleNoMask() async throws {
+        let carver = try AppleSeamCarver()
+        let cgImage = try Self.makeCGImage(width: 16, height: 12, pixels: Self.gradientPixels(width: 16, height: 12), alphaInfo: .last)
+        var options = ResizeOptions()
+        options.preScaleStrategy = .lanczosThenExactResidual
+        let result = try await carver.resize(cgImage, toPixelSize: try PixelSize(width: 8, height: 6), options: options)
+        XCTAssertEqual(result.width, 8)
+        XCTAssertEqual(result.height, 6)
+    }
+
     func testGrayscaleDecode() throws {
         let cgImage = try Self.makeGrayscaleImage(width: 2, height: 1, values: [50, 200])
         let decoded = try CGImageBridge.decode(cgImage)

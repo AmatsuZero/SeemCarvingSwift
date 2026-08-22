@@ -18,14 +18,16 @@ public struct BenchmarkResult: Codable, Equatable {
     public let seams: String
     public let energy: String
     public let backend: String
+    public let prescale: String
     public let phaseSummaries: [String: PhaseSummary]
     public let peakScratchBytes: UInt64
 
-    public init(size: String, seams: String, energy: String, backend: String, phaseSummaries: [String: PhaseSummary], peakScratchBytes: UInt64) {
+    public init(size: String, seams: String, energy: String, backend: String, prescale: String, phaseSummaries: [String: PhaseSummary], peakScratchBytes: UInt64) {
         self.size = size
         self.seams = seams
         self.energy = energy
         self.backend = backend
+        self.prescale = prescale
         self.phaseSummaries = phaseSummaries
         self.peakScratchBytes = peakScratchBytes
     }

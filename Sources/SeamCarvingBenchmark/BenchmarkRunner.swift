@@ -9,87 +9,99 @@ import SeamCarvingAccelerate
 import SeamCarvingMetal
 import SeamCarvingApple
 
-public struct BenchmarkRunner {
-    public let sizes: [(Int, Int)]
-    public let seams: [String]
-    public let energies: [EnergyMode]
-    public let backends: [String]
-    public let warmup: Int
-    public let iterations: Int
+    public struct BenchmarkRunner {
+        public let sizes: [(Int, Int)]
+        public let seams: [String]
+        public let energies: [EnergyMode]
+        public let backends: [String]
+        /// Pre-scale modes to benchmark. Timings and parity for `exact` and
+        /// `lanczos-residual` are NEVER merged into a single bucket — each is a
+        /// distinct, labeled case.
+        public let prescaleModes: [(label: String, strategy: PreScaleStrategy)]
+        public let warmup: Int
+        public let iterations: Int
 
-    public init(sizes: [(Int, Int)], seams: [String], energies: [EnergyMode], backends: [String], warmup: Int, iterations: Int) {
-        self.sizes = sizes
-        self.seams = seams
-        self.energies = energies
-        self.backends = backends
-        self.warmup = warmup
-        self.iterations = iterations
-    }
+        public init(sizes: [(Int, Int)], seams: [String], energies: [EnergyMode], backends: [String], warmup: Int, iterations: Int, prescaleModes: [(String, PreScaleStrategy)]? = nil) {
+            self.sizes = sizes
+            self.seams = seams
+            self.energies = energies
+            self.backends = backends
+            self.prescaleModes = prescaleModes ?? [
+                ("exact", .none),
+                ("lanczos-residual", .lanczosThenExactResidual),
+            ]
+            self.warmup = warmup
+            self.iterations = iterations
+        }
 
-    public func run() async throws -> BenchmarkReport {
-        var results: [BenchmarkResult] = []
-        let totalCases = sizes.count * seams.count * energies.count * backends.count
-        var completedCases = 0
-        print("[benchmark] \(totalCases) cases; warmup=\(warmup), iterations=\(iterations)")
-        for (width, height) in sizes {
-            for seamSpec in seams {
-                let seamCount = try resolveSeamCount(seamSpec, width: width, height: height)
-                for energy in energies {
-                    for backendName in backends {
-                        let result = try await benchmark(size: (width, height), seams: seamCount, seamLabel: seamSpec, energy: energy, backend: backendName)
-                        results.append(result)
-                        completedCases += 1
-                        let energyName = energy == .backwardSobel ? "backward" : "forward"
-                        print("[benchmark] [\(completedCases)/\(totalCases)] \(width)x\(height) seams=\(seamSpec) energy=\(energyName) backend=\(backendName)")
+        public func run() async throws -> BenchmarkReport {
+            var results: [BenchmarkResult] = []
+            let totalCases = sizes.count * seams.count * energies.count * backends.count * prescaleModes.count
+            var completedCases = 0
+            print("[benchmark] \(totalCases) cases; warmup=\(warmup), iterations=\(iterations)")
+            for (width, height) in sizes {
+                for seamSpec in seams {
+                    let seamCount = try resolveSeamCount(seamSpec, width: width, height: height)
+                    for energy in energies {
+                        for backendName in backends {
+                            for mode in prescaleModes {
+                                let result = try await benchmark(size: (width, height), seams: seamCount, seamLabel: seamSpec, energy: energy, backend: backendName, prescaleLabel: mode.label, strategy: mode.strategy)
+                                results.append(result)
+                                completedCases += 1
+                                let energyName = energy == .backwardSobel ? "backward" : "forward"
+                                print("[benchmark] [\(completedCases)/\(totalCases)] \(width)x\(height) seams=\(seamSpec) energy=\(energyName) backend=\(backendName) prescale=\(mode.label)")
+                            }
+                        }
                     }
                 }
             }
-        }
-        return BenchmarkReport(
-            schemaVersion: 1,
-            hardware: hardwareName(),
-            os: osVersion(),
-            swift: swiftVersion(),
-            xcode: xcodeVersion(),
-            results: results
-        )
-    }
-
-    private func benchmark(size: (Int, Int), seams: Int, seamLabel: String, energy: EnergyMode, backend: String) async throws -> BenchmarkResult {
-        let image = try Self.generateImage(width: size.0, height: size.1, seed: 42)
-        let target = try PixelSize(width: max(1, size.0 - seams), height: max(1, size.1 - seams))
-
-        let instrumented: any InstrumentedSeamCarvingBackend = try makeBackend(backend)
-        let options = ResizeOptions(energyMode: energy)
-        let reportBackend = (instrumented as? MetalBackend)?.effectiveIdentifier(
-            from: try PixelSize(width: size.0, height: size.1), to: target, options: options
-        ) ?? backend
-
-        var durations: [BackendPhaseDurations] = []
-        for _ in 0..<warmup {
-            _ = try await instrumented.benchmarkResize(image, to: target, options: options)
-        }
-        for _ in 0..<iterations {
-            let bridgeStart = DispatchTime.now().uptimeNanoseconds
-            let encoded = try CGImageBridge.encode(image)
-            _ = try CGImageBridge.decode(encoded)
-            let bridgeNS = DispatchTime.now().uptimeNanoseconds - bridgeStart
-            let (_, d) = try await instrumented.benchmarkResize(image, to: target, options: options)
-            var measured = d
-            measured.bridgeNS = bridgeNS
-            durations.append(measured)
+            return BenchmarkReport(
+                schemaVersion: 1,
+                hardware: hardwareName(),
+                os: osVersion(),
+                swift: swiftVersion(),
+                xcode: xcodeVersion(),
+                results: results
+            )
         }
 
-        let peak = durations.map(\.peakScratchBytes).max() ?? 0
-        return BenchmarkResult(
-            size: "\(size.0)x\(size.1)",
-            seams: seamLabel,
-            energy: energy == .backwardSobel ? "backward" : "forward",
-            backend: reportBackend,
-            phaseSummaries: BenchmarkPhases.summarize(durations),
-            peakScratchBytes: peak
-        )
-    }
+        private func benchmark(size: (Int, Int), seams: Int, seamLabel: String, energy: EnergyMode, backend: String, prescaleLabel: String, strategy: PreScaleStrategy) async throws -> BenchmarkResult {
+            let image = try Self.generateImage(width: size.0, height: size.1, seed: 42)
+            let target = try PixelSize(width: max(1, size.0 - seams), height: max(1, size.1 - seams))
+
+            let instrumented: any InstrumentedSeamCarvingBackend = try makeBackend(backend)
+            var options = ResizeOptions(energyMode: energy)
+            options.preScaleStrategy = strategy
+            let reportBackend = (instrumented as? MetalBackend)?.effectiveIdentifier(
+                from: try PixelSize(width: size.0, height: size.1), to: target, options: options
+            ) ?? backend
+
+            var durations: [BackendPhaseDurations] = []
+            for _ in 0..<warmup {
+                _ = try await instrumented.benchmarkResize(image, to: target, options: options)
+            }
+            for _ in 0..<iterations {
+                let bridgeStart = DispatchTime.now().uptimeNanoseconds
+                let encoded = try CGImageBridge.encode(image)
+                _ = try CGImageBridge.decode(encoded)
+                let bridgeNS = DispatchTime.now().uptimeNanoseconds - bridgeStart
+                let (_, d) = try await instrumented.benchmarkResize(image, to: target, options: options)
+                var measured = d
+                measured.bridgeNS = bridgeNS
+                durations.append(measured)
+            }
+
+            let peak = durations.map(\.peakScratchBytes).max() ?? 0
+            return BenchmarkResult(
+                size: "\(size.0)x\(size.1)",
+                seams: seamLabel,
+                energy: energy == .backwardSobel ? "backward" : "forward",
+                backend: reportBackend,
+                prescale: prescaleLabel,
+                phaseSummaries: BenchmarkPhases.summarize(durations),
+                peakScratchBytes: peak
+            )
+        }
 
     private func resolveSeamCount(_ value: String, width: Int, height: Int) throws -> Int {
         if value.hasSuffix("%"), let percent = Double(value.dropLast()), percent > 0, percent <= 100 {

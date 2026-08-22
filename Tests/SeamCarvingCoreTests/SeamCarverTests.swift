@@ -15,6 +15,23 @@ final class SeamCarverTests: XCTestCase {
         XCTAssertEqual(result, image)
     }
 
+    func testNonePreScaleStrategyMatchesDefault() async throws {
+        // `.none` must preserve the existing exact, mask-aware seam-carving
+        // semantics — it is the default and must reach the requested dimensions.
+        let image = try Self.gradientImage(width: 4, height: 3)
+        let target = try PixelSize(width: 2, height: 2)
+
+        var explicit = ResizeOptions()
+        explicit.preScaleStrategy = .none
+        let explicitResult = try await SeamCarver().resize(image, to: target, options: explicit)
+
+        let defaultResult = try await SeamCarver().resize(image, to: target)
+
+        XCTAssertEqual(explicitResult, defaultResult)
+        XCTAssertEqual(explicitResult.width, target.width)
+        XCTAssertEqual(explicitResult.height, target.height)
+    }
+
     func testZeroTargetRejected() {
         XCTAssertThrowsError(try PixelSize(width: 0, height: 2)) { error in
             XCTAssertEqual(error as? SeamCarvingError, .invalidDimensions)

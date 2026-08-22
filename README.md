@@ -45,10 +45,17 @@ for the current capability set.
 
 The package does not provide video temporal coherence, learned saliency,
 transport maps, approximate multi-seam batches, HDR/extended-range input,
-MLX, Core ML, or conventional Lanczos pre-scaling. Exact sequential seam
-semantics are the default. Caire is reference material only; `.caireInspired`
-is not equivalent to Caire. The Vision module is optional and never imported by
-Core. A project license is intentionally not selected by this plan.
+MLX, or Core ML. Conventional automatic Lanczos pre-scaling is NOT performed:
+exact sequential seam semantics are the default and the `none` pre-scale
+strategy never pre-scales implicitly. An explicit, opt-in
+`.lanczosThenExactResidual` pre-scale strategy IS available
+(`ResizeOptions.preScaleStrategy`); it Lanczos-scales the image and every
+protection/removal mask to an intermediate size before the residual seam
+carving reaches the exact target dimensions. This is an approximation and is
+Apple-platform only (it requires Core Image). Caire is reference material only;
+`.caireInspired` is not equivalent to Caire. The Vision module is optional and
+never imported by Core. A project license is intentionally not selected by this
+plan.
 
 Metal is an optional, asynchronous acceleration backend for shrink requests.
 Its full path accelerates energy, dynamic programming, and vertical seam
