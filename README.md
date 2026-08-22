@@ -31,6 +31,16 @@ protection is an optional adapter: choose an explicit Vision request revision,
 `.caireInspired` or `.visionQuality`, and `.detectOnce` or `.redetectEachPass`.
 All face rectangles use the same upright canonical coordinates as Core masks.
 
+## Capability alignment
+
+The package's user-facing capabilities are tracked against a Caire-inspired
+checklist in [`docs/capability-matrix.md`](docs/capability-matrix.md). That
+document classifies each capability as existing, requiring API exposure, or
+requiring new implementation, and freezes the public product contract — the
+GUI only consumes the existing `ResizeOptions` (energy mode, dimension order,
+masks, progress) and `AppleSeamCarver` facade; no new library APIs are needed
+for the current capability set.
+
 ## Scope and limitations
 
 The package does not provide video temporal coherence, learned saliency,
