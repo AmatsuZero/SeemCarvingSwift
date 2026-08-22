@@ -28,6 +28,9 @@ public struct BenchmarkRunner {
 
     public func run() async throws -> BenchmarkReport {
         var results: [BenchmarkResult] = []
+        let totalCases = sizes.count * seams.count * energies.count * backends.count
+        var completedCases = 0
+        print("[benchmark] \(totalCases) cases; warmup=\(warmup), iterations=\(iterations)")
         for (width, height) in sizes {
             for seamSpec in seams {
                 let seamCount = try resolveSeamCount(seamSpec, width: width, height: height)
@@ -35,6 +38,9 @@ public struct BenchmarkRunner {
                     for backendName in backends {
                         let result = try await benchmark(size: (width, height), seams: seamCount, seamLabel: seamSpec, energy: energy, backend: backendName)
                         results.append(result)
+                        completedCases += 1
+                        let energyName = energy == .backwardSobel ? "backward" : "forward"
+                        print("[benchmark] [\(completedCases)/\(totalCases)] \(width)x\(height) seams=\(seamSpec) energy=\(energyName) backend=\(backendName)")
                     }
                 }
             }
