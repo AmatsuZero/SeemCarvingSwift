@@ -45,15 +45,17 @@ public actor MetalContext {
         return pipeline
     }
 
-    public func submit(_ encode: @Sendable (any MTLCommandBuffer) throws -> Void) async throws {
+    public func submit(_ encode: @Sendable (any MTLCommandBuffer) throws -> Void) async throws -> UInt64 {
         guard let commandBuffer = queue.makeCommandBuffer() else {
             throw SeamCarvingError.metalExecutionFailed("command buffer unavailable")
         }
+        let encodingStart = DispatchTime.now().uptimeNanoseconds
         do {
             try encode(commandBuffer)
         } catch {
             throw error
         }
+        let encodingNS = DispatchTime.now().uptimeNanoseconds - encodingStart
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             commandBuffer.addCompletedHandler { buffer in
                 if let error = buffer.error {
@@ -64,5 +66,6 @@ public actor MetalContext {
             }
             commandBuffer.commit()
         }
+        return encodingNS
     }
 }
