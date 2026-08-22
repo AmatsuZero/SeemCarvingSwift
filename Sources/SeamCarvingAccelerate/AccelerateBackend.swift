@@ -45,8 +45,10 @@ extension AccelerateBackend: InstrumentedSeamCarvingBackend {
         durations.totalNS = end - start
         let pixels = UInt64(image.width * image.height)
         let masks = UInt64(options.masks.protectionLayers.count + (options.masks.removal == nil ? 0 : 1)) * pixels * 4
-        let luma = options.energyMode == .forwardLuma ? pixels * 4 : 0
-        durations.peakScratchBytes = max(durations.peakScratchBytes, pixels * (4 + 4 + 1) + luma + masks + UInt64(max(image.width, image.height) * 8))
+        // AccelerateEnergy retains three channel planes, eight shifted planes,
+        // gx/gy/scratch, luma, and the output energy map concurrently.
+        let energyScratch = options.energyMode == .backwardSobel ? pixels * 64 : pixels * 13
+        durations.peakScratchBytes = max(durations.peakScratchBytes, energyScratch + masks + UInt64(max(image.width, image.height) * 8))
         return (result, durations)
     }
 }

@@ -30,7 +30,8 @@ public struct MetalBackend: Sendable {
         let width = image.width
         let height = image.height
         let pixelCount = width * height
-        recorder?.recordScratch(bytes: UInt64(pixelCount * (4 + 4 + 4) + MemoryLayout<SIMD2<UInt32>>.stride))
+        let maskLayers = masks.protectionLayers.count + (masks.removal == nil ? 0 : 1)
+        recorder?.recordScratch(bytes: UInt64(pixelCount * (24 + maskLayers * 4) + MemoryLayout<SIMD2<UInt32>>.stride))
 
         let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
@@ -164,7 +165,7 @@ public struct MetalBackend: Sendable {
         let height = image.height
         let pixelCount = width * height
         let energyStart = DispatchTime.now().uptimeNanoseconds
-        recorder?.recordScratch(bytes: UInt64(pixelCount * (4 + 4 + 4) + width * 8 + pixelCount + height * 4 + 32))
+        recorder?.recordScratch(bytes: UInt64(pixelCount * 17 + width * 8 + pixelCount + height * 4 + 32))
 
         let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
