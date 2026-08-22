@@ -30,6 +30,7 @@ public struct MetalBackend: Sendable {
         let width = image.width
         let height = image.height
         let pixelCount = width * height
+        recorder?.recordScratch(bytes: UInt64(pixelCount * (4 + 4 + 4) + MemoryLayout<SIMD2<UInt32>>.stride))
 
         let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
@@ -91,6 +92,7 @@ public struct MetalBackend: Sendable {
         if let removal = masks.removal {
             removalValues = removal.values
         }
+        recorder?.recordScratch(bytes: UInt64(base.count * 4 * 2 + (softValues.count + hardValues.count + removalValues.count) * 4 + 32))
 
         let baseBuffer = try requiredBuffer(bytes: base, device: device)
         let outBuffer = try requiredBuffer(length: base.count * MemoryLayout<Float>.size, device: device)
@@ -160,6 +162,7 @@ public struct MetalBackend: Sendable {
         let height = image.height
         let pixelCount = width * height
         let energyStart = DispatchTime.now().uptimeNanoseconds
+        recorder?.recordScratch(bytes: UInt64(pixelCount * (4 + 4 + 4) + width * 8 + pixelCount + height * 4 + 32))
 
         let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
@@ -261,6 +264,7 @@ public struct MetalBackend: Sendable {
         let device = context.device
         let width = energy.width
         let height = energy.height
+        recorder?.recordScratch(bytes: UInt64(width * height * 4 + width * 8 + width * height + height * 4 + 32))
 
         let energyBuffer = try requiredBuffer(bytes: energy.values, device: device)
         let rowA = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
@@ -350,6 +354,7 @@ public struct MetalBackend: Sendable {
     private func removeVerticalRGBA(_ seam: SeamPath, image: RGBA8Image, device: any MTLDevice, recorder: BackendTimingRecorder? = nil) async throws -> RGBA8Image {
         let width = image.width
         let height = image.height
+        recorder?.recordScratch(bytes: UInt64(width * height * 4 + (width - 1) * height * 4 + height * 4 + 8))
         let inBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let outBuffer = try requiredBuffer(length: (width - 1) * height * 4, device: device)
         let seamBuffer = try requiredBuffer(bytes: seam.coordinates, device: device)
@@ -590,7 +595,7 @@ extension MetalBackend: InstrumentedSeamCarvingBackend {
         let end = DispatchTime.now().uptimeNanoseconds
         var durations = recorder.snapshot()
         durations.totalNS = end - start
-        durations.peakScratchBytes = UInt64(image.width * image.height * (4 + 4 + 1))
+        durations.peakScratchBytes = max(durations.peakScratchBytes, UInt64(image.width * image.height * (4 + 4 + 1)))
         return (result, durations)
     }
 }

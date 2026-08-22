@@ -75,6 +75,10 @@ public final class BackendTimingRecorder: @unchecked Sendable {
     public func record(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, elapsed: UInt64) {
         add(phase, elapsed)
     }
+
+    public func recordScratch(bytes: UInt64) {
+        durations.peakScratchBytes = max(durations.peakScratchBytes, bytes)
+    }
 }
 
 @_spi(Benchmark)
