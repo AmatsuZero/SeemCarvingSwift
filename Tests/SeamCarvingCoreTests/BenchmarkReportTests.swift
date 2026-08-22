@@ -19,11 +19,12 @@ final class BenchmarkReportTests: XCTestCase {
     }
 
     func testReportSchemaVersion() throws {
-        let report = BenchmarkReport(schemaVersion: 1, hardware: "h", os: "o", swift: "6", results: [])
+        let report = BenchmarkReport(schemaVersion: 1, hardware: "h", os: "o", swift: "6", xcode: "Xcode 26", results: [])
         let data = try JSONEncoder().encode(report)
         let object = try JSONSerialization.jsonObject(with: data)
         let dict = object as? [String: Any]
         XCTAssertEqual(dict?["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(dict?["xcode"] as? String, "Xcode 26")
     }
 
     func testPhaseSummariesCoverAllPhases() throws {

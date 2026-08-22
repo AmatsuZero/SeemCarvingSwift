@@ -36,13 +36,15 @@ public struct BenchmarkReport: Codable {
     public let hardware: String
     public let os: String
     public let swift: String
+    public let xcode: String
     public let results: [BenchmarkResult]
 
-    public init(schemaVersion: Int, hardware: String, os: String, swift: String, results: [BenchmarkResult]) {
+    public init(schemaVersion: Int, hardware: String, os: String, swift: String, xcode: String = "unknown", results: [BenchmarkResult]) {
         self.schemaVersion = schemaVersion
         self.hardware = hardware
         self.os = os
         self.swift = swift
+        self.xcode = xcode
         self.results = results
     }
 }

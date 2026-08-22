@@ -44,6 +44,7 @@ public struct BenchmarkRunner {
             hardware: hardwareName(),
             os: osVersion(),
             swift: swiftVersion(),
+            xcode: xcodeVersion(),
             results: results
         )
     }
@@ -141,5 +142,26 @@ public struct BenchmarkRunner {
 
     private func swiftVersion() -> String {
         "6"
+    }
+
+    private func xcodeVersion() -> String {
+        #if canImport(Darwin)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.arguments = ["-version"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            return output.split(separator: "\n").first.map(String.init) ?? "unknown"
+        } catch {
+            return "unknown"
+        }
+        #else
+        return "unknown"
+        #endif
     }
 }
