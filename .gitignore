@@ -18,3 +18,13 @@ worktrees/
 # Local tooling / agent state
 .omx/
 .codebuddy/
+
+# Editor / IDE
+.vscode/
+
+# Agent workbench dirs
+.workbuddy/
+
+# Coverage / profiling artifacts
+*.profraw
+default.profraw
