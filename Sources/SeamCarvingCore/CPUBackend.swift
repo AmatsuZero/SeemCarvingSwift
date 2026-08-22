@@ -38,7 +38,9 @@ extension CPUBackend: InstrumentedSeamCarvingBackend {
         durations.totalNS = end - start
         let pixels = UInt64(image.width * image.height)
         let masks = UInt64(options.masks.protectionLayers.count + (options.masks.removal == nil ? 0 : 1)) * pixels * 4
-        let luma = options.energyMode == .forwardLuma ? pixels * 4 : 0
+        // BackwardEnergy also retains a full-frame linear-luma plane while
+        // producing the Sobel energy map.
+        let luma = pixels * 4
         durations.peakScratchBytes = max(durations.peakScratchBytes, pixels * (4 + 4 + 1) + luma + masks + UInt64(max(image.width, image.height) * 8))
         return (result, durations)
     }
