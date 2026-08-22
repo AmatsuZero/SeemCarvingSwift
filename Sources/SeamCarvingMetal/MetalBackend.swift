@@ -490,6 +490,83 @@ public struct MetalBackend: Sendable {
         let ptr = buffer.contents().assumingMemoryBound(to: Float.self)
         return Array(UnsafeBufferPointer(start: ptr, count: count))
     }
+
+    // MARK: - Transpose (GPU-backed)
+
+    /// Transposes an RGBA image on the GPU using the existing `transposeRGBA`
+    /// kernel. The output dimensions follow `SeamEditor.transpose` semantics
+    /// (new width = source height, new height = source width).
+    private func transposeRGBAOnGPU(_ image: RGBA8Image, recorder: BackendTimingRecorder? = nil) async throws -> RGBA8Image {
+        let device = context.device
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else {
+            return try SeamEditor.transpose(image)
+        }
+        recorder?.recordScratch(bytes: UInt64(image.pixels.count + (width * height * 4) + MemoryLayout<SIMD2<UInt32>>.stride))
+        let inBuffer = try requiredBuffer(bytes: image.pixels, device: device)
+        let outBuffer = try requiredBuffer(length: width * height * 4, device: device)
+        var size = SIMD2<UInt32>(UInt32(width), UInt32(height))
+        let sizeBuffer = try requiredBuffer(value: &size, device: device)
+
+        let pipeline = try await context.pipeline(named: "transposeRGBA")
+        try await submit(recorder: recorder) { commandBuffer in
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(inBuffer, offset: 0, index: 0)
+            encoder.setBuffer(outBuffer, offset: 0, index: 1)
+            encoder.setBuffer(sizeBuffer, offset: 0, index: 2)
+            encoder.dispatchThreads(MTLSizeMake(height, width, 1), threadsPerThreadgroup: MTLSizeMake(8, 8, 1))
+            encoder.endEncoding()
+        }
+        let pixels = [UInt8](UnsafeRawBufferPointer(start: outBuffer.contents(), count: width * height * 4))
+        return try RGBA8Image(width: height, height: width, pixels: pixels)
+    }
+
+    /// Transposes a Mask on the GPU using the existing `transposeMask` kernel.
+    private func transposeMaskOnGPU(_ mask: Mask, recorder: BackendTimingRecorder? = nil) async throws -> Mask {
+        let device = context.device
+        let width = mask.width
+        let height = mask.height
+        guard width > 0, height > 0 else {
+            return try SeamEditor.transpose(mask)
+        }
+        recorder?.recordScratch(bytes: UInt64(mask.values.count * MemoryLayout<Float>.size + (width * height * MemoryLayout<Float>.size) + MemoryLayout<SIMD2<UInt32>>.stride))
+        let inBuffer = try requiredBuffer(bytes: mask.values, device: device)
+        let outBuffer = try requiredBuffer(length: width * height * MemoryLayout<Float>.size, device: device)
+        var size = SIMD2<UInt32>(UInt32(width), UInt32(height))
+        let sizeBuffer = try requiredBuffer(value: &size, device: device)
+
+        let pipeline = try await context.pipeline(named: "transposeMask")
+        try await submit(recorder: recorder) { commandBuffer in
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(inBuffer, offset: 0, index: 0)
+            encoder.setBuffer(outBuffer, offset: 0, index: 1)
+            encoder.setBuffer(sizeBuffer, offset: 0, index: 2)
+            encoder.dispatchThreads(MTLSizeMake(height, width, 1), threadsPerThreadgroup: MTLSizeMake(8, 8, 1))
+            encoder.endEncoding()
+        }
+        let values = readFloats(outBuffer, count: width * height)
+        return try Mask(width: height, height: width, values: values)
+    }
+
+    /// Builds a MaskPair whose layers and removal mask are each transposed on
+    /// the GPU, preserving the original strengths and removal weight.
+    private func transposeMaskPairOnGPU(_ masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> MaskPair {
+        var newProtection: [ProtectionLayer] = []
+        for layer in masks.protectionLayers {
+            let newMask = try await transposeMaskOnGPU(layer.mask, recorder: recorder)
+            newProtection.append(try ProtectionLayer(mask: newMask, strength: layer.strength))
+        }
+        let newRemoval: Mask?
+        if let removal = masks.removal {
+            newRemoval = try await transposeMaskOnGPU(removal, recorder: recorder)
+        } else {
+            newRemoval = nil
+        }
+        return try MaskPair(protectionLayers: newProtection, removal: newRemoval, removalWeight: masks.removalWeight)
+    }
 }
 
 struct MaskParams {
@@ -509,13 +586,10 @@ extension MetalBackend: SeamCarvingBackend {
         case .vertical:
             return try await findVerticalSeam(in: image, options: options)
         case .horizontal:
-            let transposed = try SeamEditor.transpose(image)
+            let transposed = try await transposeRGBAOnGPU(image)
+            let transposedMasks = try await transposeMaskPairOnGPU(options.masks)
             var transposedOptions = options
-            transposedOptions.masks = try MaskPair(
-                protectionLayers: options.masks.protectionLayers.map { try ProtectionLayer(mask: SeamEditor.transpose($0.mask), strength: $0.strength) },
-                removal: try options.masks.removal.map { try SeamEditor.transpose($0) },
-                removalWeight: options.masks.removalWeight
-            )
+            transposedOptions.masks = transposedMasks
             let seam = try await findVerticalSeam(in: transposed, options: transposedOptions)
             return try SeamPath(orientation: .horizontal, coordinates: seam.coordinates, totalCost: seam.totalCost)
         }
@@ -552,13 +626,10 @@ extension MetalBackend: SeamCarvingBackend {
                 currentOptions.masks = currentMasks
                 seam = try await findVerticalSeam(in: current, options: currentOptions, recorder: recorder)
             } else {
-                let t = try SeamEditor.transpose(current)
+                let t = try await transposeRGBAOnGPU(current, recorder: recorder)
+                let transposedMasks = try await transposeMaskPairOnGPU(currentMasks, recorder: recorder)
                 var to = options
-                to.masks = try MaskPair(
-                    protectionLayers: currentMasks.protectionLayers.map { try ProtectionLayer(mask: SeamEditor.transpose($0.mask), strength: $0.strength) },
-                    removal: try currentMasks.removal.map { try SeamEditor.transpose($0) },
-                    removalWeight: currentMasks.removalWeight
-                )
+                to.masks = transposedMasks
                 let vs = try await findVerticalSeam(in: t, options: to, recorder: recorder)
                 seam = try SeamPath(orientation: .horizontal, coordinates: vs.coordinates, totalCost: vs.totalCost)
             }
@@ -566,21 +637,12 @@ extension MetalBackend: SeamCarvingBackend {
             if seam.orientation == .vertical {
                 (current, currentMasks) = try await removeVerticalSeam(seam, from: current, masks: currentMasks, recorder: recorder)
             } else {
-                let t = try SeamEditor.transpose(current)
-                var to = currentMasks
-                to = try MaskPair(
-                    protectionLayers: currentMasks.protectionLayers.map { try ProtectionLayer(mask: SeamEditor.transpose($0.mask), strength: $0.strength) },
-                    removal: try currentMasks.removal.map { try SeamEditor.transpose($0) },
-                    removalWeight: currentMasks.removalWeight
-                )
+                let t = try await transposeRGBAOnGPU(current, recorder: recorder)
+                let to = try await transposeMaskPairOnGPU(currentMasks, recorder: recorder)
                 let vs = try SeamPath(orientation: .vertical, coordinates: seam.coordinates, totalCost: seam.totalCost)
                 let (tResult, tMasks) = try await removeVerticalSeam(vs, from: t, masks: to, recorder: recorder)
-                current = try SeamEditor.transpose(tResult)
-                currentMasks = try MaskPair(
-                    protectionLayers: tMasks.protectionLayers.map { try ProtectionLayer(mask: SeamEditor.transpose($0.mask), strength: $0.strength) },
-                    removal: try tMasks.removal.map { try SeamEditor.transpose($0) },
-                    removalWeight: tMasks.removalWeight
-                )
+                current = try await transposeRGBAOnGPU(tResult, recorder: recorder)
+                currentMasks = try await transposeMaskPairOnGPU(tMasks, recorder: recorder)
             }
         }
 

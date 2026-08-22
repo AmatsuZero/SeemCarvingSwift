@@ -107,6 +107,66 @@ final class MetalKernelTests: XCTestCase {
         XCTAssertEqual(gpu, oracle.pixels)
     }
 
+    func testTransposeRGBANonSquareParity() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device available") }
+        let context = try MetalContext.makeDefault()
+        let device = context.device
+        // Device-sized non-square fixture: 17x11 (transpose -> 11x17).
+        let image = try Self.grayGradient(width: 17, height: 11)
+        let oracle = try SeamEditor.transpose(image)
+
+        var size = SIMD2<UInt32>(UInt32(image.width), UInt32(image.height))
+        let sizeBuffer = device.makeBuffer(bytes: &size, length: MemoryLayout<SIMD2<UInt32>>.size)!
+        let inBuffer = device.makeBuffer(bytes: image.pixels, length: image.pixels.count)!
+        let outBuffer = device.makeBuffer(length: image.pixels.count)!
+
+        let pipeline = try await context.pipeline(named: "transposeRGBA")
+        try await context.submit { cb in
+            guard let enc = cb.makeComputeCommandEncoder() else { return }
+            enc.setComputePipelineState(pipeline)
+            enc.setBuffer(inBuffer, offset: 0, index: 0)
+            enc.setBuffer(outBuffer, offset: 0, index: 1)
+            enc.setBuffer(sizeBuffer, offset: 0, index: 2)
+            enc.dispatchThreads(MTLSizeMake(image.height, image.width, 1), threadsPerThreadgroup: MTLSizeMake(8, 8, 1))
+            enc.endEncoding()
+        }
+        let gpu = [UInt8](UnsafeRawBufferPointer(start: outBuffer.contents(), count: image.pixels.count))
+        XCTAssertEqual(gpu, oracle.pixels)
+    }
+
+    func testTransposeMaskNonSquareParity() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device available") }
+        let context = try MetalContext.makeDefault()
+        let device = context.device
+        let image = try Self.grayGradient(width: 17, height: 11)
+        var maskValues = [Float]()
+        for y in 0..<image.height {
+            for x in 0..<image.width {
+                maskValues.append(Float((x * 61 + y * 37) % 256) / 255.0)
+            }
+        }
+        let mask = try Mask(width: image.width, height: image.height, values: maskValues)
+        let oracle = try SeamEditor.transpose(mask)
+
+        var size = SIMD2<UInt32>(UInt32(mask.width), UInt32(mask.height))
+        let sizeBuffer = device.makeBuffer(bytes: &size, length: MemoryLayout<SIMD2<UInt32>>.size)!
+        let inBuffer = device.makeBuffer(bytes: mask.values, length: mask.values.count * MemoryLayout<Float>.size)!
+        let outBuffer = device.makeBuffer(length: mask.values.count * MemoryLayout<Float>.size)!
+
+        let pipeline = try await context.pipeline(named: "transposeMask")
+        try await context.submit { cb in
+            guard let enc = cb.makeComputeCommandEncoder() else { return }
+            enc.setComputePipelineState(pipeline)
+            enc.setBuffer(inBuffer, offset: 0, index: 0)
+            enc.setBuffer(outBuffer, offset: 0, index: 1)
+            enc.setBuffer(sizeBuffer, offset: 0, index: 2)
+            enc.dispatchThreads(MTLSizeMake(mask.height, mask.width, 1), threadsPerThreadgroup: MTLSizeMake(8, 8, 1))
+            enc.endEncoding()
+        }
+        let gpu = [Float](UnsafeBufferPointer(start: outBuffer.contents().assumingMemoryBound(to: Float.self), count: mask.values.count))
+        XCTAssertEqual(gpu, oracle.values)
+    }
+
     func testRemoveAndInsertParity() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device available") }
         let context = try MetalContext.makeDefault()
