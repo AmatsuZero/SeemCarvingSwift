@@ -159,6 +159,7 @@ public struct MetalBackend: Sendable {
         let width = image.width
         let height = image.height
         let pixelCount = width * height
+        let energyStart = DispatchTime.now().uptimeNanoseconds
 
         let imageBuffer = try requiredBuffer(bytes: image.pixels, device: device)
         let lumaBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
@@ -171,6 +172,7 @@ public struct MetalBackend: Sendable {
             enc.dispatchThreads(MTLSizeMake(pixelCount, 1, 1), threadsPerThreadgroup: MTLSizeMake(min(pixelCount, 256), 1, 1))
             enc.endEncoding()
         }
+        recorder?.record(\.energyNS, elapsed: DispatchTime.now().uptimeNanoseconds - energyStart)
 
         let adjustment = try masks.energyAdjustment(forWidth: width, height: height)
         let baseValues = adjustment?.values ?? [Float](repeating: 0, count: pixelCount)
