@@ -1,0 +1,47 @@
+import Foundation
+
+struct CPUBackwardEnergyProvider: BackwardEnergyProvider {
+    func compute(for image: RGBA8Image) throws -> EnergyMap {
+        try BackwardEnergy.compute(for: image)
+    }
+}
+
+public struct CPUBackend: Sendable {
+    private let engine: CoreResizeEngine
+
+    public init() {
+        self.engine = CoreResizeEngine(backwardEnergyProvider: CPUBackwardEnergyProvider())
+    }
+}
+
+@_spi(Backend)
+extension CPUBackend: SeamCarvingBackend {
+    public var identifier: String { "cpu" }
+
+    public func findSeam(in image: RGBA8Image, orientation: SeamOrientation, options: ResizeOptions) async throws -> SeamPath {
+        try await engine.findSeam(in: image, orientation: orientation, options: options)
+    }
+
+    public func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> RGBA8Image {
+        try await engine.resize(image, to: target, options: options)
+    }
+}
+
+@_spi(Benchmark)
+extension CPUBackend: InstrumentedSeamCarvingBackend {
+    public func benchmarkResize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> (RGBA8Image, BackendPhaseDurations) {
+        let start = DispatchTime.now().uptimeNanoseconds
+        let recorder = BackendTimingRecorder()
+        let result = try await engine.resizeInstrumented(image, to: target, options: options, recorder: recorder)
+        let end = DispatchTime.now().uptimeNanoseconds
+        var durations = recorder.snapshot()
+        durations.totalNS = end - start
+        let pixels = UInt64(image.width * image.height)
+        let masks = UInt64(options.masks.protectionLayers.count + (options.masks.removal == nil ? 0 : 1)) * pixels * 4
+        // BackwardEnergy also retains a full-frame linear-luma plane while
+        // producing the Sobel energy map.
+        let luma = pixels * 4
+        durations.peakScratchBytes = max(durations.peakScratchBytes, pixels * (4 + 4 + 1) + luma + masks + UInt64(max(image.width, image.height) * 8))
+        return (result, durations)
+    }
+}
