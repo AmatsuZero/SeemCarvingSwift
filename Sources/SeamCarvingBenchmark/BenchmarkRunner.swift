@@ -55,6 +55,9 @@ public struct BenchmarkRunner {
 
         let instrumented: any InstrumentedSeamCarvingBackend = try makeBackend(backend)
         var options = ResizeOptions(energyMode: energy)
+        let reportBackend = (instrumented as? MetalBackend)?.effectiveIdentifier(
+            from: try PixelSize(width: size.0, height: size.1), to: target, options: options
+        ) ?? backend
 
         var durations: [BackendPhaseDurations] = []
         for _ in 0..<warmup {
@@ -76,7 +79,7 @@ public struct BenchmarkRunner {
             size: "\(size.0)x\(size.1)",
             seams: seamLabel,
             energy: energy == .backwardSobel ? "backward" : "forward",
-            backend: backend,
+            backend: reportBackend,
             phaseSummaries: BenchmarkPhases.summarize(durations),
             peakScratchBytes: peak
         )

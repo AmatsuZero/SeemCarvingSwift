@@ -25,6 +25,10 @@ final class BenchmarkReportTests: XCTestCase {
         let dict = object as? [String: Any]
         XCTAssertEqual(dict?["schemaVersion"] as? Int, 1)
         XCTAssertEqual(dict?["xcode"] as? String, "Xcode 26")
+
+        let legacy = #"{"schemaVersion":1,"hardware":"h","os":"o","swift":"6","results":[]}"#.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(BenchmarkReport.self, from: legacy)
+        XCTAssertEqual(decoded.xcode, "unknown")
     }
 
     func testPhaseSummariesCoverAllPhases() throws {

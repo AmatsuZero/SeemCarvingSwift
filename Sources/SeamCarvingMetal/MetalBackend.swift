@@ -19,7 +19,7 @@ public struct MetalBackend: Sendable {
         if target.width > source.width || target.height > source.height || options.dimensionOrder == .adaptiveNormalizedCost {
             return "cpu-fallback"
         }
-        return identifier
+        return mode == .hybrid ? "metal-hybrid" : "metal-full"
     }
 
     // MARK: - Energy
@@ -92,7 +92,9 @@ public struct MetalBackend: Sendable {
         if let removal = masks.removal {
             removalValues = removal.values
         }
-        recorder?.recordScratch(bytes: UInt64(base.count * 4 * 2 + (softValues.count + hardValues.count + removalValues.count) * 4 + 32))
+        recorder?.recordScratch(bytes: UInt64(
+            base.count * 4 * 3 + (softValues.count + softWeights.count + hardValues.count + removalValues.count) * 4 + 32
+        ))
 
         let baseBuffer = try requiredBuffer(bytes: base, device: device)
         let outBuffer = try requiredBuffer(length: base.count * MemoryLayout<Float>.size, device: device)
@@ -394,6 +396,7 @@ public struct MetalBackend: Sendable {
     private func removeVerticalMask(_ seam: SeamPath, mask: Mask, device: any MTLDevice, recorder: BackendTimingRecorder? = nil) async throws -> Mask {
         let width = mask.width
         let height = mask.height
+        recorder?.recordScratch(bytes: UInt64(mask.values.count * 4 + (width - 1) * height * 4 + seam.coordinates.count * 4 + 8))
         let inBuffer = try requiredBuffer(bytes: mask.values, device: device)
         let outBuffer = try requiredBuffer(length: (width - 1) * height * MemoryLayout<Float>.size, device: device)
         let seamBuffer = try requiredBuffer(bytes: seam.coordinates, device: device)

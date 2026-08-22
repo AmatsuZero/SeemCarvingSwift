@@ -47,6 +47,20 @@ public struct BenchmarkReport: Codable {
         self.xcode = xcode
         self.results = results
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, hardware, os, swift, xcode, results
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        hardware = try container.decode(String.self, forKey: .hardware)
+        os = try container.decode(String.self, forKey: .os)
+        swift = try container.decode(String.self, forKey: .swift)
+        xcode = try container.decodeIfPresent(String.self, forKey: .xcode) ?? "unknown"
+        results = try container.decode([BenchmarkResult].self, forKey: .results)
+    }
 }
 
 public enum Percentile {
