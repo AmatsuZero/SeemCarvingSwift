@@ -16,9 +16,6 @@ public struct MetalBackend: Sendable {
 
     private func computeEnergy(image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> EnergyMap {
         let phaseStart = DispatchTime.now().uptimeNanoseconds
-        defer {
-            recorder?.record(\.energyNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart)
-        }
         let device = context.device
         let width = image.width
         let height = image.height
@@ -55,14 +52,17 @@ public struct MetalBackend: Sendable {
 
         // Apply masks on GPU when present.
         var adjusted = readFloats(energyBuffer, count: pixelCount)
+        recorder?.record(\.energyNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart)
         if !masks.protectionLayers.isEmpty || masks.removal != nil {
-            adjusted = try await applyMasks(base: adjusted, masks: masks, pixelCount: pixelCount)
+            adjusted = try await applyMasks(base: adjusted, masks: masks, pixelCount: pixelCount, recorder: recorder)
         }
 
         return try EnergyMap(width: width, height: height, values: adjusted)
     }
 
-    private func applyMasks(base: [Float], masks: MaskPair, pixelCount: Int) async throws -> [Float] {
+    private func applyMasks(base: [Float], masks: MaskPair, pixelCount: Int, recorder: BackendTimingRecorder? = nil) async throws -> [Float] {
+        let phaseStart = DispatchTime.now().uptimeNanoseconds
+        defer { recorder?.record(\.maskNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart) }
         let device = context.device
         var softValues: [Float] = []
         var softWeights: [Float] = []
@@ -124,7 +124,7 @@ public struct MetalBackend: Sendable {
             if mode == .full {
                 let start = DispatchTime.now().uptimeNanoseconds
                 defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
-                return try await findSeamOnGPU(energy: energy)
+                return try await findSeamOnGPU(energy: energy, recorder: recorder)
             }
             let start = DispatchTime.now().uptimeNanoseconds
             defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
@@ -133,7 +133,7 @@ public struct MetalBackend: Sendable {
             if mode == .full {
                 let start = DispatchTime.now().uptimeNanoseconds
                 defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
-                return try await findForwardSeamOnGPU(image: image, masks: options.masks)
+                return try await findForwardSeamOnGPU(image: image, masks: options.masks, recorder: recorder)
             }
             let luma = try LuminancePlane.luma(of: image)
             let adjustment = try options.masks.energyAdjustment(forWidth: image.width, height: image.height)
@@ -144,7 +144,7 @@ public struct MetalBackend: Sendable {
     }
 
     /// Full GPU forward-energy dynamic programming (luma + CU/CL/CR recurrence).
-    private func findForwardSeamOnGPU(image: RGBA8Image, masks: MaskPair) async throws -> SeamPath {
+    private func findForwardSeamOnGPU(image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> SeamPath {
         let device = context.device
         let width = image.width
         let height = image.height
@@ -225,6 +225,7 @@ public struct MetalBackend: Sendable {
             enc.endEncoding()
         }
 
+        let backtrackStart = DispatchTime.now().uptimeNanoseconds
         let argmin = argminBuffer.contents().assumingMemoryBound(to: UInt32.self)[0]
         guard argmin != UInt32.max else {
             throw SeamCarvingError.noFeasibleSeam
@@ -232,12 +233,13 @@ public struct MetalBackend: Sendable {
         let coordinates = [UInt32](UnsafeBufferPointer(start: seamBuffer.contents().assumingMemoryBound(to: UInt32.self), count: height))
         let lastRow = (height - 1) % 2 == 0 ? rowA : rowB
         let totalCost = lastRow.contents().assumingMemoryBound(to: Float.self)[Int(argmin)]
+        recorder?.record(\.backtrackNS, elapsed: DispatchTime.now().uptimeNanoseconds - backtrackStart)
         return try SeamPath(orientation: .vertical, coordinates: coordinates, totalCost: totalCost)
     }
 
     /// Full GPU dynamic programming: row-by-row serial dispatches with ping-pong
     /// float rows, an Int8 parent map, single-thread argmin, and one-thread backtrack.
-    private func findSeamOnGPU(energy: EnergyMap) async throws -> SeamPath {
+    private func findSeamOnGPU(energy: EnergyMap, recorder: BackendTimingRecorder? = nil) async throws -> SeamPath {
         let device = context.device
         let width = energy.width
         let height = energy.height
@@ -298,6 +300,7 @@ public struct MetalBackend: Sendable {
             enc.endEncoding()
         }
 
+        let backtrackStart = DispatchTime.now().uptimeNanoseconds
         let argmin = argminBuffer.contents().assumingMemoryBound(to: UInt32.self)[0]
         guard argmin != UInt32.max else {
             throw SeamCarvingError.noFeasibleSeam
@@ -306,6 +309,7 @@ public struct MetalBackend: Sendable {
 
         let lastRow = (height - 1) % 2 == 0 ? rowA : rowB
         let totalCost = lastRow.contents().assumingMemoryBound(to: Float.self)[Int(argmin)]
+        recorder?.record(\.backtrackNS, elapsed: DispatchTime.now().uptimeNanoseconds - backtrackStart)
         return try SeamPath(orientation: .vertical, coordinates: coordinates, totalCost: totalCost)
     }
 
