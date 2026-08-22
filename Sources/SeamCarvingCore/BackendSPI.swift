@@ -11,6 +11,7 @@ public protocol BackwardEnergyProvider: Sendable {
 }
 
 import Dispatch
+import Foundation
 
 @_spi(Benchmark)
 public struct BackendPhaseDurations: Sendable, Codable, Equatable {
@@ -54,6 +55,7 @@ public struct BackendPhaseDurations: Sendable, Codable, Equatable {
 public final class BackendTimingRecorder: @unchecked Sendable {
     public init() {}
 
+    private let lock = NSLock()
     private(set) var durations = BackendPhaseDurations(
         bridgeNS: 0, energyNS: 0, maskNS: 0, dynamicProgrammingNS: 0,
         backtrackNS: 0, editNS: 0, commandEncodingNS: 0, gpuWaitNS: 0,
@@ -61,6 +63,8 @@ public final class BackendTimingRecorder: @unchecked Sendable {
     )
 
     func add(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, _ elapsed: UInt64) {
+        lock.lock()
+        defer { lock.unlock() }
         durations[keyPath: phase] += elapsed
     }
 
@@ -70,13 +74,19 @@ public final class BackendTimingRecorder: @unchecked Sendable {
         return try body()
     }
 
-    public func snapshot() -> BackendPhaseDurations { durations }
+    public func snapshot() -> BackendPhaseDurations {
+        lock.lock()
+        defer { lock.unlock() }
+        return durations
+    }
 
     public func record(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, elapsed: UInt64) {
         add(phase, elapsed)
     }
 
     public func recordScratch(bytes: UInt64) {
+        lock.lock()
+        defer { lock.unlock() }
         durations.peakScratchBytes = max(durations.peakScratchBytes, bytes)
     }
 }
@@ -134,17 +144,41 @@ public struct CoreResizeEngine: Sendable {
     ) throws -> SeamPath {
         switch energyMode {
         case .backwardSobel:
-            let base = try recorder.map { try $0.measure(\.energyNS) { try backwardEnergyProvider.compute(for: image) } } ?? backwardEnergyProvider.compute(for: image)
-            if let adjustment = try recorder.map({ try $0.measure(\.maskNS) { try masks.energyAdjustment(forWidth: image.width, height: image.height) } }) ?? masks.energyAdjustment(forWidth: image.width, height: image.height) {
-                let adjusted = try base.adding(adjustment)
-                return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try DynamicProgramming.findSeam(in: adjusted, orientation: orientation) } } ?? DynamicProgramming.findSeam(in: adjusted, orientation: orientation)
+            let base = try measure(recorder, phase: \.energyNS) {
+                try backwardEnergyProvider.compute(for: image)
             }
-            return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try DynamicProgramming.findSeam(in: base, orientation: orientation) } } ?? DynamicProgramming.findSeam(in: base, orientation: orientation)
+            let adjustment = try measure(recorder, phase: \.maskNS) {
+                try masks.energyAdjustment(forWidth: image.width, height: image.height)
+            }
+            if let adjustment {
+                let adjusted = try base.adding(adjustment)
+                return try measure(recorder, phase: \.dynamicProgrammingNS) {
+                    try DynamicProgramming.findSeam(in: adjusted, orientation: orientation)
+                }
+            }
+            return try measure(recorder, phase: \.dynamicProgrammingNS) {
+                try DynamicProgramming.findSeam(in: base, orientation: orientation)
+            }
         case .forwardLuma:
-            let luminance = try recorder.map { try $0.measure(\.energyNS) { try LuminancePlane.luma(of: image) } } ?? LuminancePlane.luma(of: image)
-            let adjustment = try recorder.map({ try $0.measure(\.maskNS) { try masks.energyAdjustment(forWidth: image.width, height: image.height) } }) ?? masks.energyAdjustment(forWidth: image.width, height: image.height)
-            return try recorder.map { try $0.measure(\.dynamicProgrammingNS) { try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment) } } ?? ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment)
+            let luminance = try measure(recorder, phase: \.energyNS) {
+                try LuminancePlane.luma(of: image)
+            }
+            let adjustment = try measure(recorder, phase: \.maskNS) {
+                try masks.energyAdjustment(forWidth: image.width, height: image.height)
+            }
+            return try measure(recorder, phase: \.dynamicProgrammingNS) {
+                try ForwardEnergy.findSeam(in: luminance, orientation: orientation, adjustedBaseEnergy: adjustment)
+            }
         }
+    }
+
+    private func measure<T>(
+        _ recorder: BackendTimingRecorder?,
+        phase: WritableKeyPath<BackendPhaseDurations, UInt64>,
+        _ body: () throws -> T
+    ) rethrows -> T {
+        guard let recorder else { return try body() }
+        return try recorder.measure(phase, body)
     }
 
     public func resize(

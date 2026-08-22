@@ -36,12 +36,16 @@ extension CPUBackend: InstrumentedSeamCarvingBackend {
         let end = DispatchTime.now().uptimeNanoseconds
         var durations = recorder.snapshot()
         durations.totalNS = end - start
-        let pixels = UInt64(image.width * image.height)
-        let masks = UInt64(options.masks.protectionLayers.count + (options.masks.removal == nil ? 0 : 1)) * pixels * 4
-        // BackwardEnergy also retains a full-frame linear-luma plane while
-        // producing the Sobel energy map.
-        let luma = pixels * 4
-        durations.peakScratchBytes = max(durations.peakScratchBytes, pixels * (4 + 4 + 1) + luma + masks + UInt64(max(image.width, image.height) * 8))
+        let (pixelCount, overflow) = image.width.multipliedReportingOverflow(by: image.height)
+        guard !overflow else { throw SeamCarvingError.invalidDimensions }
+        let pixels = UInt64(pixelCount)
+        let frameBytes = pixels * UInt64(MemoryLayout<Float>.size)
+        let maskCount = UInt64(options.masks.protectionLayers.count + (options.masks.removal == nil ? 0 : 1))
+        let maskBytes = maskCount * frameBytes
+        // BackwardEnergy retains luma and energy; dynamic programming retains
+        // a bounded row buffer and parent offsets.
+        let estimatedScratch = frameBytes + frameBytes + maskBytes + UInt64(max(image.width, image.height)) * 8
+        durations.peakScratchBytes = max(durations.peakScratchBytes, estimatedScratch)
         return (result, durations)
     }
 }

@@ -4,16 +4,25 @@ import SeamCarvingCore
 @testable import SeamCarvingApple
 
 final class BackendSelectionTests: XCTestCase {
-    func testAutomaticSelectsAccelerate() throws {
+    func testAutomaticSelectsMetal() throws {
         let recorder = SelectionRecorder()
         let factory = recorder.makeFactory()
         let config = AppleSeamCarverConfiguration(backend: .automatic)
         _ = try AppleSeamCarver(configuration: config, factory: factory)
+        XCTAssertEqual(recorder.selected, "metal")
+    }
+
+    func testAutomaticFallsBackToAccelerateWhenMetalFails() throws {
+        let recorder = SelectionRecorder()
+        recorder.metalError = SeamCarvingError.metalUnavailable
+        let factory = recorder.makeFactory()
+        _ = try AppleSeamCarver(configuration: AppleSeamCarverConfiguration(backend: .automatic), factory: factory)
         XCTAssertEqual(recorder.selected, "accelerate")
     }
 
-    func testAutomaticFallsBackToCPUWhenAccelerateFails() throws {
+    func testAutomaticFallsBackToCPUWhenMetalAndAccelerateFail() throws {
         let recorder = SelectionRecorder()
+        recorder.metalError = SeamCarvingError.metalUnavailable
         recorder.accelerateError = SeamCarvingError.invalidConfiguration("no accelerate")
         let factory = recorder.makeFactory()
         _ = try AppleSeamCarver(configuration: AppleSeamCarverConfiguration(backend: .automatic), factory: factory)

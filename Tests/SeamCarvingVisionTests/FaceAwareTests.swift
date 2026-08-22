@@ -73,6 +73,36 @@ final class FaceAwareTests: XCTestCase {
         XCTAssertEqual(detector.callCount, 4)
     }
 
+    func testRedetectCadenceRejectsEnlargement() async throws {
+        let image = try Self.grayImage(width: 4, height: 4)
+        let detector = FakeDetector(regions: [])
+        let policy = try CaireInspiredParameters(expansionFraction: 0, protectionWeight: 100, minimumConfidence: 0)
+        let carver = try FaceAwareSeamCarver(detector: detector, policy: .caireInspired(policy), cadence: .redetectEveryPass)
+
+        do {
+            _ = try await carver.resize(image, orientation: .up, toPixelSize: try PixelSize(width: 5, height: 4))
+            XCTFail("redetectEveryPass should reject enlargement")
+        } catch let error as SeamCarvingError {
+            XCTAssertEqual(
+                error,
+                .invalidConfiguration("redetectEveryPass currently supports seam removal only; use detectOnceAndTransformMask for enlargement")
+            )
+        }
+    }
+
+    func testRedetectCadenceHonorsHeightThenWidthOrder() async throws {
+        let image = try Self.grayImage(width: 4, height: 3)
+        let detector = RecordingDetector()
+        let policy = try CaireInspiredParameters(expansionFraction: 0, protectionWeight: 100, minimumConfidence: 0)
+        let carver = try FaceAwareSeamCarver(detector: detector, policy: .caireInspired(policy), cadence: .redetectEveryPass)
+
+        var options = ResizeOptions()
+        options.dimensionOrder = .heightThenWidth
+        _ = try await carver.resize(image, orientation: .up, toPixelSize: try PixelSize(width: 2, height: 2), options: options)
+
+        XCTAssertEqual(detector.sizes.map { "\($0.0)x\($0.1)" }, ["4x3", "4x2", "3x2"])
+    }
+
     // MARK: - Fixtures
 
     static func grayImage(width: Int, height: Int) throws -> CGImage {
@@ -110,5 +140,19 @@ final class FakeDetector: FaceDetecting, @unchecked Sendable {
 
     var callCount: Int {
         lock.withLock { _callCount }
+    }
+}
+
+final class RecordingDetector: FaceDetecting, @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock()
+    private var _sizes: [(Int, Int)] = []
+
+    func detectFaces(inUpright image: CGImage) async throws -> [FaceRegion] {
+        lock.withLock { _sizes.append((image.width, image.height)) }
+        return []
+    }
+
+    var sizes: [(Int, Int)] {
+        lock.withLock { _sizes }
     }
 }

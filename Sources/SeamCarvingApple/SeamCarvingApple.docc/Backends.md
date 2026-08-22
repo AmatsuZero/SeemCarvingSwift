@@ -7,3 +7,6 @@ reference backend. Metal work is asynchronous and does not synchronously wait
 on the main actor.
 
 HDR and extended-range inputs are rejected rather than silently tone-mapped.
+
+In `.automatic` mode, the factory tries Metal first, then Accelerate, and finally
+the CPU reference backend. Deterministic mode always selects the CPU backend.

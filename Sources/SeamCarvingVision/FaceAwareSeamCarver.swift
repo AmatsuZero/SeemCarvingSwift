@@ -65,6 +65,12 @@ public struct FaceAwareSeamCarver: Sendable {
         var remainingVertical = image.width - target.width
         var remainingHorizontal = image.height - target.height
 
+        guard remainingVertical >= 0, remainingHorizontal >= 0 else {
+            throw SeamCarvingError.invalidConfiguration(
+                "redetectEveryPass currently supports seam removal only; use detectOnceAndTransformMask for enlargement"
+            )
+        }
+
         while remainingVertical > 0 || remainingHorizontal > 0 {
             try Task.checkCancellation()
 
@@ -77,9 +83,31 @@ public struct FaceAwareSeamCarver: Sendable {
             )
             let effective = try EnergyComposer.compose(userMasks: currentUserMasks, faceMask: faceMask, policy: policy)
 
-            let orientation: SeamOrientation = remainingVertical > 0 ? .vertical : .horizontal
             var effectiveOptions = options
             effectiveOptions.masks = effective
+            let orientation: SeamOrientation
+            switch options.dimensionOrder {
+            case .widthThenHeight:
+                orientation = remainingVertical > 0 ? .vertical : .horizontal
+            case .heightThenWidth:
+                orientation = remainingHorizontal > 0 ? .horizontal : .vertical
+            case .adaptiveNormalizedCost:
+                if remainingVertical == 0 {
+                    orientation = .horizontal
+                } else if remainingHorizontal == 0 {
+                    orientation = .vertical
+                } else {
+                    let vertical = try await appleCarver.findSeam(
+                        in: currentCG, orientation: .vertical, options: effectiveOptions
+                    )
+                    let horizontal = try await appleCarver.findSeam(
+                        in: currentCG, orientation: .horizontal, options: effectiveOptions
+                    )
+                    let verticalNormalized = vertical.totalCost / Float(currentImage.height)
+                    let horizontalNormalized = horizontal.totalCost / Float(currentImage.width)
+                    orientation = verticalNormalized <= horizontalNormalized ? .vertical : .horizontal
+                }
+            }
             let seam = try await appleCarver.findSeam(in: currentCG, orientation: orientation, options: effectiveOptions)
 
             currentImage = try SeamEditor.remove(seam, from: currentImage)

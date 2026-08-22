@@ -20,7 +20,6 @@ public enum CGImageBridge {
 
         let rawWidth = image.width
         let rawHeight = image.height
-        let (outWidth, outHeight) = orientedSize(width: rawWidth, height: rawHeight, orientation: orientation)
 
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
         guard let context = CGContext(
@@ -144,8 +143,8 @@ public enum CGImageBridge {
     }
 
     private static func unpremultiply(_ component: UInt8, alpha: UInt8) -> UInt8 {
-        let numerator = UInt32(component) * 255 + UInt32(alpha) / 2
-        return UInt8(numerator / UInt32(alpha))
+        let value = (Float(component) * 255 / Float(alpha)).rounded()
+        return UInt8(min(max(value, 0), 255))
     }
 
     private static func orientedSize(width: Int, height: Int, orientation: CGImagePropertyOrientation) -> (width: Int, height: Int) {

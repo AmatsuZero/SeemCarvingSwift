@@ -16,7 +16,8 @@ enum AccelerateEnergy {
     static func compute(for image: RGBA8Image) throws -> EnergyMap {
         let width = image.width
         let height = image.height
-        let pixelCount = width * height
+        let (pixelCount, overflow) = width.multipliedReportingOverflow(by: height)
+        guard !overflow else { throw SeamCarvingError.invalidDimensions }
 
         // 1. Linear-light luma via the sRGB LUT and a vDSP linear combination.
         var lr = [Float](repeating: 0, count: pixelCount)
@@ -35,39 +36,31 @@ enum AccelerateEnergy {
         vDSP.add(luma, scale(lg, by: 0.7152), result: &luma)
         vDSP.add(luma, scale(lb, by: 0.0722), result: &luma)
 
-        // 2. Sobel via vDSP, symmetric-difference form with clamp-to-edge.
-        let leftUp = shifted(luma, width: width, height: height, dx: -1, dy: -1)
-        let midUp = shifted(luma, width: width, height: height, dx: 0, dy: -1)
-        let rightUp = shifted(luma, width: width, height: height, dx: 1, dy: -1)
-        let leftMid = shifted(luma, width: width, height: height, dx: -1, dy: 0)
-        let rightMid = shifted(luma, width: width, height: height, dx: 1, dy: 0)
-        let leftDown = shifted(luma, width: width, height: height, dx: -1, dy: 1)
-        let midDown = shifted(luma, width: width, height: height, dx: 0, dy: 1)
-        let rightDown = shifted(luma, width: width, height: height, dx: 1, dy: 1)
-
-        var scratch = [Float](repeating: 0, count: pixelCount)
-        var gx = [Float](repeating: 0, count: pixelCount)
-        var gy = [Float](repeating: 0, count: pixelCount)
-
-        // gx = (rightUp - leftUp) + 2*(rightMid - leftMid) + (rightDown - leftDown)
-        vDSP.subtract(rightUp, leftUp, result: &gx)
-        vDSP.subtract(rightMid, leftMid, result: &scratch)
-        vDSP.add(gx, scale(scratch, by: 2), result: &gx)
-        vDSP.subtract(rightDown, leftDown, result: &scratch)
-        vDSP.add(gx, scratch, result: &gx)
-
-        // gy = (leftDown - leftUp) + 2*(midDown - midUp) + (rightDown - rightUp)
-        vDSP.subtract(leftDown, leftUp, result: &gy)
-        vDSP.subtract(midDown, midUp, result: &scratch)
-        vDSP.add(gy, scale(scratch, by: 2), result: &gy)
-        vDSP.subtract(rightDown, rightUp, result: &scratch)
-        vDSP.add(gy, scratch, result: &gy)
-
-        // energy = |gx| + |gy|
-        vDSP.absolute(gx, result: &gx)
-        vDSP.absolute(gy, result: &gy)
         var energy = [Float](repeating: 0, count: pixelCount)
-        vDSP.add(gx, gy, result: &energy)
+        // Directly sample the eight neighbors with clamp-to-edge semantics.
+        // This keeps only luma and energy resident instead of allocating eight
+        // additional full-frame shifted planes.
+        for y in 0..<height {
+            let yUp = max(y - 1, 0)
+            let yDown = min(y + 1, height - 1)
+            for x in 0..<width {
+                let xLeft = max(x - 1, 0)
+                let xRight = min(x + 1, width - 1)
+
+                let leftUp = luma[yUp * width + xLeft]
+                let rightUp = luma[yUp * width + xRight]
+                let leftMid = luma[y * width + xLeft]
+                let rightMid = luma[y * width + xRight]
+                let leftDown = luma[yDown * width + xLeft]
+                let rightDown = luma[yDown * width + xRight]
+                let midUp = luma[yUp * width + x]
+                let midDown = luma[yDown * width + x]
+
+                let gx = (rightUp - leftUp) + 2.0 * (rightMid - leftMid) + (rightDown - leftDown)
+                let gy = (leftDown - leftUp) + 2.0 * (midDown - midUp) + (rightDown - rightUp)
+                energy[y * width + x] = abs(gx) + abs(gy)
+            }
+        }
 
         return try EnergyMap(width: width, height: height, values: energy)
     }
@@ -79,15 +72,4 @@ enum AccelerateEnergy {
         return result
     }
 
-    private static func shifted(_ src: [Float], width: Int, height: Int, dx: Int, dy: Int) -> [Float] {
-        var out = [Float](repeating: 0, count: src.count)
-        for y in 0..<height {
-            let sy = min(max(y + dy, 0), height - 1)
-            for x in 0..<width {
-                let sx = min(max(x + dx, 0), width - 1)
-                out[y * width + x] = src[sy * width + sx]
-            }
-        }
-        return out
-    }
 }

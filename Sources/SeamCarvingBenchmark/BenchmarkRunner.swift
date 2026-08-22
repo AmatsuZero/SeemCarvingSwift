@@ -54,7 +54,7 @@ public struct BenchmarkRunner {
         let target = try PixelSize(width: max(1, size.0 - seams), height: max(1, size.1 - seams))
 
         let instrumented: any InstrumentedSeamCarvingBackend = try makeBackend(backend)
-        var options = ResizeOptions(energyMode: energy)
+        let options = ResizeOptions(energyMode: energy)
         let reportBackend = (instrumented as? MetalBackend)?.effectiveIdentifier(
             from: try PixelSize(width: size.0, height: size.1), to: target, options: options
         ) ?? backend

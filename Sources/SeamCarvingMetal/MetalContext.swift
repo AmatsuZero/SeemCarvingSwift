@@ -17,11 +17,7 @@ public actor MetalContext {
 
     public init(device: any MTLDevice) throws {
         self.device = device
-        do {
-            self.library = try MetalShaderLibrary.makeLibrary(on: device)
-        } catch {
-            throw error
-        }
+        self.library = try MetalShaderLibrary.makeLibrary(on: device)
         guard let queue = device.makeCommandQueue() else {
             throw SeamCarvingError.metalExecutionFailed("command queue unavailable")
         }

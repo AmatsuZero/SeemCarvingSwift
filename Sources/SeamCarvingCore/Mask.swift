@@ -49,7 +49,7 @@ extension MaskPair {
         guard !protectionLayers.isEmpty || removal != nil else { return nil }
         try validateDimensions(width: width, height: height)
 
-        let pixelCount = width * height
+        let pixelCount = try checkedMultiply(width, height)
         var values = [Float](repeating: 0, count: pixelCount)
         for i in 0..<pixelCount {
             var v: Float = 0

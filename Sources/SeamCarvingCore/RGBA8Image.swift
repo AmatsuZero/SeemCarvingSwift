@@ -15,7 +15,7 @@ public struct RGBA8: Sendable, Equatable {
 public struct RGBA8Image: Sendable, Equatable {
     public let width: Int
     public let height: Int
-    public var pixels: [UInt8]
+    public private(set) var pixels: [UInt8]
 
     public init(width: Int, height: Int, pixels: [UInt8]) throws {
         guard width > 0, height > 0 else {

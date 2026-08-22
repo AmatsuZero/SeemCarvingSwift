@@ -25,11 +25,27 @@ public struct MetalBackend: Sendable {
     // MARK: - Energy
 
     private func computeEnergy(image: RGBA8Image, masks: MaskPair, recorder: BackendTimingRecorder? = nil) async throws -> EnergyMap {
+        let energyBuffer = try await computeEnergyBuffer(image: image, masks: masks, recorder: recorder)
+        let (pixelCount, overflow) = image.width.multipliedReportingOverflow(by: image.height)
+        guard !overflow else { throw SeamCarvingError.invalidDimensions }
+        return try EnergyMap(
+            width: image.width,
+            height: image.height,
+            values: readFloats(energyBuffer, count: pixelCount)
+        )
+    }
+
+    private func computeEnergyBuffer(
+        image: RGBA8Image,
+        masks: MaskPair,
+        recorder: BackendTimingRecorder? = nil
+    ) async throws -> any MTLBuffer {
         let phaseStart = DispatchTime.now().uptimeNanoseconds
         let device = context.device
         let width = image.width
         let height = image.height
-        let pixelCount = width * height
+        let (pixelCount, overflow) = width.multipliedReportingOverflow(by: height)
+        guard !overflow else { throw SeamCarvingError.invalidDimensions }
         let maskLayers = masks.protectionLayers.count + (masks.removal == nil ? 0 : 1)
         recorder?.recordScratch(bytes: UInt64(pixelCount * (24 + maskLayers * 4) + MemoryLayout<SIMD2<UInt32>>.stride))
 
@@ -62,17 +78,19 @@ public struct MetalBackend: Sendable {
             encoder.endEncoding()
         }
 
-        // Apply masks on GPU when present.
-        var adjusted = readFloats(energyBuffer, count: pixelCount)
         recorder?.record(\.energyNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart)
         if !masks.protectionLayers.isEmpty || masks.removal != nil {
-            adjusted = try await applyMasks(base: adjusted, masks: masks, pixelCount: pixelCount, recorder: recorder)
+            return try await applyMasksBuffer(base: energyBuffer, masks: masks, pixelCount: pixelCount, recorder: recorder)
         }
-
-        return try EnergyMap(width: width, height: height, values: adjusted)
+        return energyBuffer
     }
 
-    private func applyMasks(base: [Float], masks: MaskPair, pixelCount: Int, recorder: BackendTimingRecorder? = nil) async throws -> [Float] {
+    private func applyMasksBuffer(
+        base: any MTLBuffer,
+        masks: MaskPair,
+        pixelCount: Int,
+        recorder: BackendTimingRecorder? = nil
+    ) async throws -> any MTLBuffer {
         let phaseStart = DispatchTime.now().uptimeNanoseconds
         defer { recorder?.record(\.maskNS, elapsed: DispatchTime.now().uptimeNanoseconds - phaseStart) }
         let device = context.device
@@ -94,11 +112,12 @@ public struct MetalBackend: Sendable {
             removalValues = removal.values
         }
         recorder?.recordScratch(bytes: UInt64(
-            base.count * 4 * 3 + (softValues.count + softWeights.count + hardValues.count + removalValues.count) * 4 + 32
+            pixelCount * MemoryLayout<Float>.size * 2
+                + (softValues.count + softWeights.count + hardValues.count + removalValues.count) * MemoryLayout<Float>.size
+                + 32
         ))
 
-        let baseBuffer = try requiredBuffer(bytes: base, device: device)
-        let outBuffer = try requiredBuffer(length: base.count * MemoryLayout<Float>.size, device: device)
+        let outBuffer = try requiredBuffer(length: pixelCount * MemoryLayout<Float>.size, device: device)
         let softMaskBuffer = try requiredBuffer(bytes: softValues, device: device)
         let softWeightBuffer = try requiredBuffer(bytes: softWeights, device: device)
         let hardMaskBuffer = try requiredBuffer(bytes: hardValues, device: device)
@@ -117,7 +136,7 @@ public struct MetalBackend: Sendable {
         try await submit(recorder: recorder) { commandBuffer in
             guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw SeamCarvingError.metalExecutionFailed("compute encoder unavailable") }
             encoder.setComputePipelineState(pipeline)
-            encoder.setBuffer(baseBuffer, offset: 0, index: 0)
+            encoder.setBuffer(base, offset: 0, index: 0)
             encoder.setBuffer(outBuffer, offset: 0, index: 1)
             encoder.setBuffer(softMaskBuffer, offset: 0, index: 2)
             encoder.setBuffer(softWeightBuffer, offset: 0, index: 3)
@@ -127,7 +146,7 @@ public struct MetalBackend: Sendable {
             encoder.dispatchThreads(MTLSizeMake(pixelCount, 1, 1), threadsPerThreadgroup: MTLSizeMake(min(pixelCount, 256), 1, 1))
             encoder.endEncoding()
         }
-        return readFloats(outBuffer, count: pixelCount)
+        return outBuffer
     }
 
     // MARK: - Seam finding
@@ -135,12 +154,18 @@ public struct MetalBackend: Sendable {
     private func findVerticalSeam(in image: RGBA8Image, options: ResizeOptions, recorder: BackendTimingRecorder? = nil) async throws -> SeamPath {
         switch options.energyMode {
         case .backwardSobel:
-            let energy = try await computeEnergy(image: image, masks: options.masks, recorder: recorder)
             if mode == .full {
+                let energyBuffer = try await computeEnergyBuffer(image: image, masks: options.masks, recorder: recorder)
                 let start = DispatchTime.now().uptimeNanoseconds
                 defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
-                return try await findSeamOnGPU(energy: energy, recorder: recorder)
+                return try await findSeamOnGPU(
+                    energyBuffer: energyBuffer,
+                    width: image.width,
+                    height: image.height,
+                    recorder: recorder
+                )
             }
+            let energy = try await computeEnergy(image: image, masks: options.masks, recorder: recorder)
             let start = DispatchTime.now().uptimeNanoseconds
             defer { recorder?.record(\.dynamicProgrammingNS, elapsed: DispatchTime.now().uptimeNanoseconds - start) }
             return try DynamicProgramming.findVerticalSeam(in: energy)
@@ -263,13 +288,15 @@ public struct MetalBackend: Sendable {
 
     /// Full GPU dynamic programming: row-by-row serial dispatches with ping-pong
     /// float rows, an Int8 parent map, single-thread argmin, and one-thread backtrack.
-    private func findSeamOnGPU(energy: EnergyMap, recorder: BackendTimingRecorder? = nil) async throws -> SeamPath {
+    private func findSeamOnGPU(
+        energyBuffer: any MTLBuffer,
+        width: Int,
+        height: Int,
+        recorder: BackendTimingRecorder? = nil
+    ) async throws -> SeamPath {
         let device = context.device
-        let width = energy.width
-        let height = energy.height
         recorder?.recordScratch(bytes: UInt64(width * height * 4 + width * 8 + width * height + height * 4 + 32))
 
-        let energyBuffer = try requiredBuffer(bytes: energy.values, device: device)
         let rowA = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
         let rowB = try requiredBuffer(length: width * MemoryLayout<Float>.size, device: device)
         let parentsBuffer = try requiredBuffer(length: width * height, device: device)
@@ -535,7 +562,6 @@ extension MetalBackend: SeamCarvingBackend {
                 seam = try SeamPath(orientation: .horizontal, coordinates: vs.coordinates, totalCost: vs.totalCost)
             }
 
-            let device = context.device
             if seam.orientation == .vertical {
                 (current, currentMasks) = try await removeVerticalSeam(seam, from: current, masks: currentMasks, recorder: recorder)
             } else {
@@ -555,7 +581,6 @@ extension MetalBackend: SeamCarvingBackend {
                     removalWeight: tMasks.removalWeight
                 )
             }
-            _ = device
         }
 
         while remainingVertical > 0 || remainingHorizontal > 0 {

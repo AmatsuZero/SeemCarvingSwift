@@ -32,10 +32,13 @@ struct BackendFactory: Sendable {
             return try makeMetal(configuration.metalMode)
         case .automatic:
             do {
-                return try makeAccelerate()
+                return try makeMetal(configuration.metalMode)
             } catch {
-                // Accelerate is the only automatic fallback path to CPU.
-                return makeCPU()
+                do {
+                    return try makeAccelerate()
+                } catch {
+                    return makeCPU()
+                }
             }
         }
     }
