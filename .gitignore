@@ -4,6 +4,7 @@
 # Swift Package Manager
 .build/
 .swiftpm/
+Apps/SeamCarvingTestHost/SeamCarvingTestHost.xcodeproj/
 
 # Xcode
 xcuserdata/

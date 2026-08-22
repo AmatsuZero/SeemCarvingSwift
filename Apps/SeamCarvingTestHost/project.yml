@@ -1,0 +1,165 @@
+name: SeamCarvingTestHost
+options:
+  bundleIdPrefix: com.seamcarving
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+packages:
+  SeamCarvingSwift:
+    path: ../..
+targets:
+  SeamCarvingTestHost:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/SeamCarvingTestHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.test-host
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingCoreDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingCoreTests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingBenchmark
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.core-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingAccelerateDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingAccelerateTests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingAccelerate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.accelerate-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingMetalDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingMetalTests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingMetal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.metal-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingAppleDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingAppleTests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingAccelerate
+      - package: SeamCarvingSwift
+        product: SeamCarvingMetal
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.apple-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingVisionDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingVisionTests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingAccelerate
+      - package: SeamCarvingSwift
+        product: SeamCarvingMetal
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.vision-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+  SeamCarvingCLIDeviceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../Tests/SeamCarvingCLITests
+    dependencies:
+      - target: SeamCarvingTestHost
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingAccelerate
+      - package: SeamCarvingSwift
+        product: SeamCarvingMetal
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingCLI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.cli-device-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGN_STYLE: Automatic
+schemes:
+  SeamCarvingDeviceTests:
+    build:
+      targets:
+        SeamCarvingTestHost: all
+        SeamCarvingCoreDeviceTests: [test]
+        SeamCarvingAccelerateDeviceTests: [test]
+        SeamCarvingMetalDeviceTests: [test]
+        SeamCarvingAppleDeviceTests: [test]
+        SeamCarvingVisionDeviceTests: [test]
+        SeamCarvingCLIDeviceTests: [test]
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: SeamCarvingCoreDeviceTests
+        - name: SeamCarvingAccelerateDeviceTests
+        - name: SeamCarvingMetalDeviceTests
+        - name: SeamCarvingAppleDeviceTests
+        - name: SeamCarvingVisionDeviceTests
+        - name: SeamCarvingCLIDeviceTests

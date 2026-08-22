@@ -10,6 +10,10 @@ let package = Package(
         .library(name: "SeamCarvingMetal", targets: ["SeamCarvingMetal"]),
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
+        // Expose the implementation modules so the standalone iOS test host
+        // can link the package's existing XCTest sources.
+        .library(name: "SeamCarvingCLI", targets: ["SeamCarvingCLI"]),
+        .library(name: "SeamCarvingBenchmark", targets: ["SeamCarvingBenchmark"]),
         .executable(name: "seamcarve-cli", targets: ["seamcarve-cli"]),
         .executable(name: "seamcarve-benchmark", targets: ["seamcarve-benchmark"]),
     ],
