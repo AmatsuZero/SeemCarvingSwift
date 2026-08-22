@@ -393,8 +393,11 @@ public struct MetalBackend: Sendable {
         recorder: BackendTimingRecorder?,
         _ encode: @Sendable (any MTLCommandBuffer) throws -> Void
     ) async throws {
+        let start = DispatchTime.now().uptimeNanoseconds
         let encodingNS = try await context.submit(encode)
         recorder?.record(\.commandEncodingNS, elapsed: encodingNS)
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start
+        recorder?.record(\.gpuWaitNS, elapsed: elapsed > encodingNS ? elapsed - encodingNS : 0)
     }
 
     private func requiredBuffer(length: Int, device: any MTLDevice) throws -> any MTLBuffer {
@@ -563,7 +566,6 @@ extension MetalBackend: InstrumentedSeamCarvingBackend {
         let result = try await resize(image, to: target, options: options, recorder: recorder)
         let end = DispatchTime.now().uptimeNanoseconds
         var durations = recorder.snapshot()
-        durations.gpuWaitNS = end - start
         durations.totalNS = end - start
         durations.peakScratchBytes = UInt64(image.width * image.height * (4 + 4 + 1))
         return (result, durations)
