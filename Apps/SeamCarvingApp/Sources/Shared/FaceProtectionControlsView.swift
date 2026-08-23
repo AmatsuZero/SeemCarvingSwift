@@ -16,22 +16,23 @@ struct FaceProtectionControlsView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        Form {
-            Section(A11y.Label.faceControls) {
-                Toggle(A11y.Label.faceEnabled, isOn: faceEnabled)
-                    .accessibilityIdentifier(A11y.ID.faceEnabled)
-                if model.configuration.faceProtection != nil {
-                    policyPicker
-                    cadencePicker
-                    Button(A11y.Label.detectFaces) { Task { await model.detectFaces() } }
-                        .accessibilityIdentifier(A11y.ID.faceDetect)
-                        .disabled(model.document == nil)
-                    cadenceExplanation
-                    confidenceAndExpansion
-                    detectedRegionsList
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(A11y.Label.faceControls).font(.headline)
+            Toggle(A11y.Label.faceEnabled, isOn: faceEnabled)
+                .accessibilityIdentifier(A11y.ID.faceEnabled)
+            if model.configuration.faceProtection != nil {
+                policyPicker
+                cadencePicker
+                Button(A11y.Label.detectFaces) { Task { await model.detectFaces() } }
+                    .accessibilityIdentifier(A11y.ID.faceDetect)
+                    .disabled(model.document == nil)
+                cadenceExplanation
+                confidenceAndExpansion
+                detectedRegionsList
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11y.ID.faceControls)
         .disabled(model.phase.isProcessing)
@@ -181,7 +182,8 @@ struct FaceProtectionControlsView: View {
         let regions = model.configuration.faceProtection?.detectedRegions
         ?? model.document?.faceRegions
         if let regions {
-            Section("Detected regions") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Detected regions").font(.subheadline.weight(.semibold))
                 if regions.isEmpty {
                     Text("No faces detected.").foregroundStyle(.secondary)
                 } else {

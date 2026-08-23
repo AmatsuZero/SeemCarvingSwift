@@ -59,6 +59,8 @@ targets:
         PRODUCT_MODULE_NAME: Shared
         PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios
         TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_CFBundleDisplayName: Seam Carving
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
 
@@ -100,6 +102,28 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/SeamCarving"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  SeamCarvingMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: SeamCarvingMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac-ui-tests
+
+  SeamCarvingIOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: SeamCarvingIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios-ui-tests
+
 schemes:
   SeamCarvingMac:
     build:
@@ -124,3 +148,16 @@ schemes:
       gatherCoverageData: false
       targets:
         - name: SeamCarvingIOSTests
+        - name: SeamCarvingIOSUITests
+
+  SeamCarvingMacGUI:
+    build:
+      targets:
+        SeamCarvingMac: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: SeamCarvingMacUITests

@@ -45,6 +45,7 @@ struct ImageCanvasView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.Label.canvas)
+        .accessibilityIdentifier(A11y.ID.canvas)
     }
 
     @ViewBuilder
@@ -55,6 +56,7 @@ struct ImageCanvasView: View {
             Text("Import an image to begin")
         }
         .foregroundStyle(.secondary)
+        .accessibilityIdentifier(A11y.ID.canvasPlaceholder)
     }
 
     // MARK: - Drawing (aspect preserving)

@@ -22,15 +22,15 @@ struct ResizeControlsView: View {
     }
 
     var body: some View {
-        Form {
-            Section(A11y.Label.controls) {
+        VStack(alignment: .leading, spacing: 14) {
+            controlSection(A11y.Label.controls) {
                 operationModeControls
                 targetSizeFields
                 Toggle(A11y.Label.lockAspect, isOn: $lockAspect)
                     .accessibilityIdentifier(A11y.ID.lockAspect)
                 backendExplanation
             }
-            Section("Algorithm") {
+            controlSection("Algorithm") {
                 Picker(A11y.Label.energyMode, selection: $model.configuration.energyMode) {
                     Text("Backward Sobel").tag(EnergyMode.backwardSobel)
                     Text("Forward Luma").tag(EnergyMode.forwardLuma)
@@ -44,7 +44,7 @@ struct ResizeControlsView: View {
                 }
                 .accessibilityIdentifier(A11y.ID.dimensionOrder)
             }
-            Section("Backend") {
+            controlSection("Backend") {
                 Picker(A11y.Label.backend, selection: $model.configuration.backend) {
                     Text("Automatic").tag(BackendPreference.automatic)
                     Text("CPU").tag(BackendPreference.cpu)
@@ -63,9 +63,21 @@ struct ResizeControlsView: View {
                 .accessibilityIdentifier(A11y.ID.preScale)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11y.ID.controls)
         .disabled(model.phase.isProcessing)
+    }
+
+    private func controlSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.headline)
+            content()
+        }
     }
 
     @ViewBuilder

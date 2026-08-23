@@ -205,6 +205,22 @@ final class EditorUITests: XCTestCase {
         painter.bind(model.document!)
         _ = ImageCanvasView(model: model, painter: painter, mode: .constant(.protect)).body
     }
+
+    // MARK: Layout regressions
+
+    func testRegularLayoutUsesBoundedSidebarAndDetailMinimumWidth() {
+        XCTAssertEqual(EditorLayout.sidebarMinWidth, 280)
+        XCTAssertEqual(EditorLayout.sidebarIdealWidth, 320)
+        XCTAssertEqual(EditorLayout.sidebarMaxWidth, 380)
+        XCTAssertEqual(EditorLayout.detailMinWidth, 420)
+    }
+
+    func testCompactLayoutReservesCanvasSpaceBeforeControls() {
+        XCTAssertGreaterThanOrEqual(EditorLayout.compactCanvasMinHeight, 280)
+        XCTAssertNotEqual(A11y.ID.importButton, A11y.ID.resize)
+        XCTAssertNotEqual(A11y.ID.canvasPlaceholder, A11y.ID.resize)
+    }
+
 }
 
 // MARK: - Test helpers

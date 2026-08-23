@@ -19,6 +19,7 @@ struct MaskToolbarView: View {
             brushControls
             actionRow
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11y.ID.maskToolbar)

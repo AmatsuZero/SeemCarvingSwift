@@ -46,6 +46,8 @@ enum A11y {
         static let cancel = "editor.cancel"
         static let resize = "editor.resize"
         static let exportButton = "editor.exportButton"
+        static let importButton = "editor.importButton"
+        static let canvasPlaceholder = "editor.canvas.placeholder"
     }
 
     /// Human-readable labels kept in one place so translators/copy edits are easy.

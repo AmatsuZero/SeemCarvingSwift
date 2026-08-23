@@ -30,6 +30,7 @@ struct CarveProgressView: View {
                     .accessibilityIdentifier(A11y.ID.cancel)
                     .buttonStyle(.borderedProminent)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .accessibilityElement(children: .contain)
             .accessibilityLabel(A11y.Label.progress)

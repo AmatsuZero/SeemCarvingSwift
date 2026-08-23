@@ -15,6 +15,14 @@ import UIKit
 import UniformTypeIdentifiers
 #endif
 
+enum EditorLayout {
+    static let sidebarMinWidth: CGFloat = 280
+    static let sidebarIdealWidth: CGFloat = 320
+    static let sidebarMaxWidth: CGFloat = 380
+    static let detailMinWidth: CGFloat = 420
+    static let compactCanvasMinHeight: CGFloat = 280
+}
+
 struct ContentView: View {
     @State private var model = AppModel()
     @State private var painter = MaskPaintingController()
@@ -51,8 +59,14 @@ struct ContentView: View {
     private var splitLayout: some View {
         NavigationSplitView {
             sidebar
+                .navigationSplitViewColumnWidth(
+                    min: EditorLayout.sidebarMinWidth,
+                    ideal: EditorLayout.sidebarIdealWidth,
+                    max: EditorLayout.sidebarMaxWidth
+                )
         } detail: {
             detail
+                .frame(minWidth: EditorLayout.detailMinWidth)
         }
     }
 
@@ -98,11 +112,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        VStack {
-            ImageCanvasView(model: model, painter: painter, mode: $maskMode)
-            resizeButton
-                .padding(.bottom)
-        }
+        ImageCanvasView(model: model, painter: painter, mode: $maskMode)
+            .frame(maxWidth: .infinity, minHeight: EditorLayout.compactCanvasMinHeight)
+            .padding(.horizontal)
     }
 
     @ViewBuilder
@@ -121,6 +133,7 @@ struct ContentView: View {
             Task { await model.importImage(source) }
         }
         .buttonStyle(.bordered)
+        .accessibilityIdentifier(A11y.ID.importButton)
 #elseif os(iOS)
         HStack {
             PhotosPicker(selection: $photoItem, matching: .images) {
@@ -130,6 +143,7 @@ struct ContentView: View {
             Button("Files…", systemImage: "folder") { isShowingFileImporter = true }
                 .buttonStyle(.bordered)
         }
+        .accessibilityIdentifier(A11y.ID.importButton)
         .fileImporter(isPresented: $isShowingFileImporter, allowedContentTypes: [.image]) { result in
             guard case .success(let url) = result else { return }
             Task {
