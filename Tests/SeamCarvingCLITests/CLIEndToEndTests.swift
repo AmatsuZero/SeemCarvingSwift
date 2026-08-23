@@ -4,6 +4,7 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
+import SeamCarvingCLI
 
 final class CLIEndToEndTests: XCTestCase {
     func testResizeImageViaExecutable() throws {
@@ -77,6 +78,68 @@ final class CLIEndToEndTests: XCTestCase {
         }
         XCTAssertEqual(image.width, 20)
         XCTAssertEqual(image.height, 18)
+    }
+
+    func testProcessorResizesImageDirectly() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-output-\(UUID().uuidString).png")
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--width", "20", "--height", "18",
+            "--backend", "cpu", "--energy", "backward",
+        ])
+        let result = try await CLIProcessor().process(options)
+
+        XCTAssertEqual(result.width, 20)
+        XCTAssertEqual(result.height, 18)
+        XCTAssertEqual(result.backend, .cpu)
+
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("cannot reopen processor output")
+            return
+        }
+        XCTAssertEqual(image.width, 20)
+        XCTAssertEqual(image.height, 18)
+    }
+
+    func testProcessorRejectsReservedModes() async throws {
+        let options = try CLIOptions.parse(["in.png", "out.png", "--percentage", "50"])
+        do {
+            _ = try await CLIProcessor().process(options)
+            XCTFail("expected reserved mode error")
+        } catch let error as CLIConfigurationError {
+            XCTAssertEqual(error, .reservedResizeModeNotImplemented(.percentage(50)))
+        }
+    }
+
+    func testProcessorRejectsMaskDimensionMismatch() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-mismatch-input-\(UUID().uuidString).png")
+        let maskURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-mismatch-mask-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-mismatch-output-\(UUID().uuidString).png")
+        defer {
+            for url in [inputURL, maskURL, outputURL] { try? FileManager.default.removeItem(at: url) }
+        }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+        try Self.writeMaskPNG(width: 16, height: 12, protectedRect: CGRect(x: 4, y: 4, width: 8, height: 4), to: maskURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--width", "20", "--height", "18",
+            "--protect-mask", maskURL.path, "--protect-strength", "hard",
+        ])
+        do {
+            _ = try await CLIProcessor().process(options)
+            XCTFail("expected mask dimension mismatch")
+        } catch let error as CLIImageIOError {
+            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+        }
     }
 
     private static func writeGradientPNG(width: Int, height: Int, to url: URL) throws {

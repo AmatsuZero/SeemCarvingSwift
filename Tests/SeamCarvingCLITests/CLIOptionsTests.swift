@@ -11,8 +11,7 @@ final class CLIOptionsTests: XCTestCase {
         ])
         XCTAssertEqual(options.inputPath, "input.png")
         XCTAssertEqual(options.outputPath, "output.png")
-        XCTAssertEqual(options.width, 20)
-        XCTAssertEqual(options.height, 18)
+        XCTAssertEqual(options.resizeMode, .exact(width: 20, height: 18))
         XCTAssertEqual(options.backend, .automatic)
         XCTAssertEqual(options.energy, .backwardSobel)
     }
@@ -24,6 +23,11 @@ final class CLIOptionsTests: XCTestCase {
     func testInvalidDimensionsThrow() {
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "0", "--height", "18"]))
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "abc", "--height", "18"]))
+    }
+
+    func testMissingOneDimensionThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--height", "18"]))
     }
 
     func testUnknownBackendThrows() {
@@ -69,5 +73,118 @@ final class CLIOptionsTests: XCTestCase {
         ])
         XCTAssertEqual(options.facePolicy, .visionQuality(try VisionQualityParameters()))
         XCTAssertEqual(options.faceCadence, .redetectEveryPass)
+    }
+
+    // MARK: - Negative: unknown flags and duplicate positionals
+
+    func testUnknownFlagThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--nonsense"]))
+    }
+
+    func testDuplicatePositionalThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "extra", "--width", "20", "--height", "18"]))
+    }
+
+    // MARK: - Negative: illegal floats
+
+    func testIllegalFloatValuesThrow() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--percentage", "abc"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--percentage", "-5"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--blur-radius", "inf"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--sobel-threshold", "nan"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--protect-weight", "abc"]))
+    }
+
+    // MARK: - Negative: conflicting resize modes
+
+    func testSquareConflictsWithExactDimensions() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--square", "--width", "20", "--height", "18"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--square", "--width", "20"]))
+    }
+
+    func testPercentageConflictsWithExactDimensions() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--percentage", "50", "--width", "20", "--height", "18"]))
+    }
+
+    func testSquareConflictsWithPercentage() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--square", "--percentage", "50"]))
+    }
+
+    // MARK: - Reserved typed fields
+
+    func testPercentageModeParses() throws {
+        let options = try CLIOptions.parse(["in", "out", "--percentage", "50"])
+        XCTAssertEqual(options.resizeMode, .percentage(50))
+    }
+
+    func testSquareModeParses() throws {
+        let options = try CLIOptions.parse(["in", "out", "--square"])
+        XCTAssertEqual(options.resizeMode, .square)
+    }
+
+    func testReservedEnergyControlsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--blur-radius", "2.5", "--sobel-threshold", "0.3"
+        ])
+        XCTAssertEqual(options.blurRadius, 2.5)
+        XCTAssertEqual(options.sobelThreshold, 0.3)
+    }
+
+    func testReservedDebugOptionsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--debug", "--debug-directory", "seams",
+            "--seam-color", "#ff0000", "--seam-shape", "points"
+        ])
+        XCTAssertTrue(options.debug)
+        XCTAssertEqual(options.debugDirectory, "seams")
+        XCTAssertEqual(options.seamColor, SeamColor(red: 255, green: 0, blue: 0, alpha: 255))
+        XCTAssertEqual(options.seamShape, .points)
+    }
+
+    func testReservedBatchOptionsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--input-dir", "src", "--output-dir", "dst", "--recursive", "--concurrency", "4"
+        ])
+        XCTAssertEqual(options.inputDirectory, "src")
+        XCTAssertEqual(options.outputDirectory, "dst")
+        XCTAssertTrue(options.recursive)
+        XCTAssertEqual(options.concurrency, 4)
+    }
+
+    func testInvalidConcurrencyThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--concurrency", "0"]))
+    }
+
+    func testInvalidSeamShapeThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--seam-shape", "curves"]))
+    }
+
+    func testInvalidSeamColorThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--seam-color", "red"]))
+    }
+
+    // MARK: - SeamColor hex parsing
+
+    func testSeamColorHexParsing() {
+        XCTAssertEqual(SeamColor(hexString: "ff0000"), SeamColor(red: 255, green: 0, blue: 0, alpha: 255))
+        XCTAssertEqual(SeamColor(hexString: "#00ff00"), SeamColor(red: 0, green: 255, blue: 0, alpha: 255))
+        XCTAssertEqual(SeamColor(hexString: "0000ffff"), SeamColor(red: 0, green: 0, blue: 255, alpha: 255))
+        XCTAssertEqual(SeamColor(hexString: "0000ff80"), SeamColor(red: 0, green: 0, blue: 255, alpha: 128))
+        XCTAssertNil(SeamColor(hexString: "ff00"))
+        XCTAssertNil(SeamColor(hexString: "gg0000"))
+    }
+
+    // MARK: - Exit code mapping
+
+    func testExitCodeMapping() {
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.invalidArguments), .usage)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.conflictingModes), .usage)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIConfigurationError.reservedResizeModeNotImplemented(.square)), .usage)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.cannotDecodeInput), .dataError)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.unsupportedOutputFormat("bmp")), .dataError)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CancellationError()), .cancelled)
     }
 }
