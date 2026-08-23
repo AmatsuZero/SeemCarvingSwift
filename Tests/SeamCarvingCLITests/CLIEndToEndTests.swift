@@ -353,7 +353,58 @@ final class CLIEndToEndTests: XCTestCase {
         XCTAssertEqual(process.terminationStatus, 64)
     }
 
+    func testRemoteURLInputWithInjectedDownloader() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-url-input-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        try Self.writeGradientPNG(width: 8, height: 6, to: inputURL)
+        let inputData = try Data(contentsOf: inputURL)
+
+        let image = try await CLIImageIO.readImage(fromPath: "https://example.invalid/image.png") { url in
+            XCTAssertEqual(url.scheme, "https")
+            XCTAssertEqual(url.host, "example.invalid")
+            return inputData
+        }
+        XCTAssertEqual(image.width, 8)
+        XCTAssertEqual(image.height, 6)
+    }
+
+    func testRemoteURLFailureMapsToNetworkError() async throws {
+        do {
+            _ = try await CLIImageIO.readImage(fromPath: "https://example.invalid/image.png") { _ in
+                throw URLError(.cannotConnectToHost)
+            }
+            XCTFail("expected network failure")
+        } catch let error as CLIImageIOError {
+            guard case .networkFailure = error else {
+                return XCTFail("unexpected image I/O error: \(error)")
+            }
+            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+        }
+    }
+
+    func testOutputWriteFailureMapsToDataError() throws {
+        let image = try Self.makeGradientImage(width: 4, height: 4)
+        do {
+            try CLIImageIO.writeImage(image, toPath: "/nonexistent-directory/output.png", format: .png)
+            XCTFail("expected output write failure")
+        } catch let error as CLIImageIOError {
+            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+            guard case .cannotWriteOutput = error else {
+                return XCTFail("unexpected image I/O error: \(error)")
+            }
+        }
+    }
+
     private static func writeGradientPNG(width: Int, height: Int, to url: URL) throws {
+        let image = try makeGradientImage(width: width, height: height)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+            throw NSError(domain: "CLIEndToEndTests", code: 1)
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+    }
+
+    private static func makeGradientImage(width: Int, height: Int) throws -> CGImage {
         var pixels = [UInt8]()
         for y in 0..<height {
             for x in 0..<width {
@@ -363,17 +414,12 @@ final class CLIEndToEndTests: XCTestCase {
         }
         let data = Data(pixels)
         let provider = CGDataProvider(data: data as CFData)!
-        let image = CGImage(
+        return CGImage(
             width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
             space: CGColorSpace(name: CGColorSpace.sRGB)!,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
             provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
         )!
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "CLIEndToEndTests", code: 1)
-        }
-        CGImageDestinationAddImage(destination, image, nil)
-        CGImageDestinationFinalize(destination)
     }
 
     private static func writeMaskPNG(width: Int, height: Int, protectedRect: CGRect, to url: URL) throws {

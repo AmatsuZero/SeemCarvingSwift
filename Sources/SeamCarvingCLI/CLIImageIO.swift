@@ -54,6 +54,7 @@ public enum CLIImageIOError: Error, Equatable {
     case maskDimensionsMismatch(kind: CLIMaskKind, expected: PixelSize, actual: PixelSize)
     case unsupportedOutputFormat(String)
     case cannotEncodeOutput
+    case cannotWriteOutput(String)
     case networkFailure(String)
 
     public var message: String {
@@ -68,6 +69,8 @@ public enum CLIImageIOError: Error, Equatable {
             return "unsupported output format \(ext)"
         case .cannotEncodeOutput:
             return "cannot encode output"
+        case .cannotWriteOutput(let path):
+            return "cannot write output to \(path)"
         case .networkFailure(let detail):
             return "network failure: \(detail)"
         }
@@ -84,12 +87,31 @@ public enum CLIImageIOError: Error, Equatable {
 public enum CLIImageIO {
     /// Decodes the image at `path`, a remote URL, or standard input (`-`).
     public static func readImage(fromPath path: String) async throws -> CGImage {
+        try await readImage(fromPath: path) { url in
+            try await download(from: url)
+        }
+    }
+
+    /// Decodes an image using an injected remote downloader. The injection
+    /// point keeps URL input deterministic and testable without requiring a
+    /// live network connection.
+    public static func readImage(
+        fromPath path: String,
+        downloader: @escaping @Sendable (URL) async throws -> Data
+    ) async throws -> CGImage {
         if path == "-" {
             let data = FileHandle.standardInput.readDataToEndOfFile()
             return try decodeImage(from: data)
         }
         if let url = remoteURL(from: path) {
-            let data = try await download(from: url)
+            let data: Data
+            do {
+                data = try await downloader(url)
+            } catch let error as CLIImageIOError {
+                throw error
+            } catch {
+                throw CLIImageIOError.networkFailure("\(url.absoluteString): \(error.localizedDescription)")
+            }
             return try decodeImage(from: data)
         }
         return try readLocalImage(fromPath: path)
@@ -117,7 +139,11 @@ public enum CLIImageIO {
         if path == "-" {
             FileHandle.standardOutput.write(data)
         } else {
-            try data.write(to: URL(fileURLWithPath: path))
+            do {
+                try data.write(to: URL(fileURLWithPath: path))
+            } catch {
+                throw CLIImageIOError.cannotWriteOutput(path)
+            }
         }
     }
 

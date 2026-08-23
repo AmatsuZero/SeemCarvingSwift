@@ -58,8 +58,7 @@ enum CLIEntry {
       --remove-mask PATH --removal-weight VALUE
       --face-policy caire|vision --face-cadence once|each-pass
       --blur-radius R --sobel-threshold T   (backward Sobel energy only)
-      --format png|jpeg|bmp                 (output format; required for stdout,
-                                            which defaults to png when omitted)
+      --format png|jpeg|bmp                 (optional for stdout; defaults to png)
 
     Reserved (parsed but not yet implemented; rejected with exit code 64):
       --debug --debug-directory DIR --seam-color HEX --seam-shape line|points
