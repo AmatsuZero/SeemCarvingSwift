@@ -5,6 +5,7 @@
 .build/
 .swiftpm/
 Apps/SeamCarvingTestHost/SeamCarvingTestHost.xcodeproj/
+Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj/
 
 # Xcode
 xcuserdata/
