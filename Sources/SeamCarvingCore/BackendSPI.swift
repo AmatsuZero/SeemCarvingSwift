@@ -144,6 +144,12 @@ public struct CoreResizeEngine: Sendable {
         sobelThreshold: Float,
         recorder: BackendTimingRecorder?
     ) throws -> SeamPath {
+        guard blurRadius >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("blur radius must be nonnegative")
+        }
+        guard sobelThreshold.isFinite, sobelThreshold >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("Sobel threshold must be finite and nonnegative")
+        }
         switch energyMode {
         case .backwardSobel:
             let base = try measure(recorder, phase: \.energyNS) {

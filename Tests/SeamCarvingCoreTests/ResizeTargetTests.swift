@@ -29,6 +29,11 @@ final class ResizeTargetTests: XCTestCase {
         XCTAssertThrowsError(try PixelSize(width: 10, height: 10).scaled(byPercentage: -10))
     }
 
+    func testPercentageTooLargeRejected() {
+        XCTAssertThrowsError(try PixelSize(width: 1000, height: 1000).scaled(byPercentage: 1e38))
+        XCTAssertThrowsError(try PixelSize(width: 1, height: 1).scaled(byPercentage: .greatestFiniteMagnitude))
+    }
+
     func testSquareUsesShorterSide() throws {
         let expected = try PixelSize(width: 24, height: 24)
         XCTAssertEqual(try PixelSize(width: 32, height: 24).squareTarget(), expected)

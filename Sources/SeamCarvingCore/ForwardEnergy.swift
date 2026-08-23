@@ -44,6 +44,9 @@ public extension LuminancePlane {
         guard radius >= 0 else {
             throw SeamCarvingError.invalidConfiguration("blur radius must be nonnegative")
         }
+        guard radius <= (Int.max - 1) / 2 else {
+            throw SeamCarvingError.invalidConfiguration("blur radius is too large")
+        }
         guard radius > 0 else { return self }
         let horizontal = Self.boxBlur1D(values, width: width, height: height, radius: radius, horizontal: true)
         let vertical = Self.boxBlur1D(horizontal, width: width, height: height, radius: radius, horizontal: false)

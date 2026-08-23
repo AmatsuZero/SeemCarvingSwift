@@ -85,14 +85,18 @@ public enum CLIExitCode: Int32, Sendable, Equatable {
 }
 
 /// Configuration errors raised after parsing, when each parsed option is valid
-/// individually but cannot be executed yet (for example a reserved option).
+/// individually but cannot be executed (for example a reserved option or an
+/// incompatible option combination).
 public enum CLIConfigurationError: Error, Equatable {
     case reservedOptionNotImplemented(String)
+    case incompatibleOptions(String)
 
     public var message: String {
         switch self {
         case .reservedOptionNotImplemented(let option):
             return "option \(option) is reserved and not yet implemented"
+        case .incompatibleOptions(let detail):
+            return detail
         }
     }
 }

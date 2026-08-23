@@ -56,6 +56,12 @@ final class BackwardEnergyTests: XCTestCase {
         XCTAssertThrowsError(try BackwardEnergy.compute(for: image, sobelThreshold: -1))
     }
 
+    func testHugeBlurRadiusRejected() {
+        let image = try! RGBA8Image.solid(width: 3, height: 3, color: .init(r: 128, g: 128, b: 128, a: 255))
+        XCTAssertThrowsError(try BackwardEnergy.compute(for: image, blurRadius: Int.max))
+        XCTAssertThrowsError(try BackwardEnergy.compute(for: image, blurRadius: (Int.max - 1) / 2 + 1))
+    }
+
     private static func checkerboard(width: Int, height: Int) throws -> RGBA8Image {
         var pixels = [UInt8]()
         for y in 0..<height {

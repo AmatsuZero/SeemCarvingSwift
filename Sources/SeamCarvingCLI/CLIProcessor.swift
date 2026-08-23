@@ -29,6 +29,7 @@ public struct CLIProcessor: Sendable {
 
     public func process(_ options: CLIOptions) async throws -> CLIProcessResult {
         try validateReservedOptions(options)
+        try validateEnergyControls(options)
 
         let inputImage = try CLIImageIO.readImage(fromPath: options.inputPath)
         let sourceSize = try PixelSize(width: inputImage.width, height: inputImage.height)
@@ -71,6 +72,18 @@ public struct CLIProcessor: Sendable {
         try CLIImageIO.writeImage(result, toPath: options.outputPath)
 
         return CLIProcessResult(width: result.width, height: result.height, backend: options.backend)
+    }
+
+    /// Rejects blur/Sobel threshold combined with forward energy up front so the
+    /// user gets a usage error (exit 64) instead of a backend configuration
+    /// error (exit 70).
+    private func validateEnergyControls(_ options: CLIOptions) throws {
+        if options.energy == .forwardLuma,
+           (options.blurRadius ?? 0) > 0 || (options.sobelThreshold ?? 0) > 0 {
+            throw CLIConfigurationError.incompatibleOptions(
+                "blur radius and Sobel threshold require backward Sobel energy"
+            )
+        }
     }
 
     private func resolveTarget(_ mode: ResizeMode, source: PixelSize) throws -> PixelSize {

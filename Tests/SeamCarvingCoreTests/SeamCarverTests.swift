@@ -71,6 +71,41 @@ final class SeamCarverTests: XCTestCase {
         }
     }
 
+    func testForwardEnergyRejectsInvalidControls() async throws {
+        let image = try Self.gradientImage(width: 4, height: 3)
+        let target = try PixelSize(width: 2, height: 2)
+
+        var negativeBlur = ResizeOptions()
+        negativeBlur.energyMode = .forwardLuma
+        negativeBlur.blurRadius = -1
+        do {
+            _ = try await SeamCarver().resize(image, to: target, options: negativeBlur)
+            XCTFail("expected negative blur radius rejection")
+        } catch let error as SeamCarvingError {
+            XCTAssertEqual(error, .invalidConfiguration("blur radius must be nonnegative"))
+        }
+
+        var nanThreshold = ResizeOptions()
+        nanThreshold.energyMode = .forwardLuma
+        nanThreshold.sobelThreshold = .nan
+        do {
+            _ = try await SeamCarver().resize(image, to: target, options: nanThreshold)
+            XCTFail("expected NaN Sobel threshold rejection")
+        } catch let error as SeamCarvingError {
+            XCTAssertEqual(error, .invalidConfiguration("Sobel threshold must be finite and nonnegative"))
+        }
+
+        var negativeThreshold = ResizeOptions()
+        negativeThreshold.energyMode = .forwardLuma
+        negativeThreshold.sobelThreshold = -0.5
+        do {
+            _ = try await SeamCarver().resize(image, to: target, options: negativeThreshold)
+            XCTFail("expected negative Sobel threshold rejection")
+        } catch let error as SeamCarvingError {
+            XCTAssertEqual(error, .invalidConfiguration("Sobel threshold must be finite and nonnegative"))
+        }
+    }
+
     // MARK: - Helpers
 
     static func gradientImage(width: Int, height: Int) throws -> RGBA8Image {

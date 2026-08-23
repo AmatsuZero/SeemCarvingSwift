@@ -29,8 +29,14 @@ public extension PixelSize {
         guard percentage.isFinite, percentage > 0 else {
             throw SeamCarvingError.invalidConfiguration("percentage must be finite and positive")
         }
-        let width = max(1, Int((Double(self.width) * Double(percentage) / 100.0).rounded()))
-        let height = max(1, Int((Double(self.height) * Double(percentage) / 100.0).rounded()))
+        let scaledWidth = (Double(self.width) * Double(percentage) / 100.0).rounded()
+        let scaledHeight = (Double(self.height) * Double(percentage) / 100.0).rounded()
+        guard let widthExact = Int(exactly: scaledWidth),
+              let heightExact = Int(exactly: scaledHeight) else {
+            throw SeamCarvingError.invalidConfiguration("percentage produces an out-of-range target size")
+        }
+        let width = max(1, widthExact)
+        let height = max(1, heightExact)
         return try PixelSize(width: width, height: height)
     }
 
