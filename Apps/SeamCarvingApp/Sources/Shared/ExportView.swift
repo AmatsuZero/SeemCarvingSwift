@@ -9,15 +9,22 @@ import SwiftUI
 
 struct ExportView: View {
     @Bindable var model: AppModel
-    var onExported: ((Data) -> Void)? = nil
+    var onExported: ((Data, ExportFormat) -> Void)? = nil
+    @State private var format: ExportFormat = .png
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Picker("Format", selection: $format) {
+                ForEach(ExportFormat.allCases, id: \.self) { value in
+                    Text(value.rawValue.uppercased()).tag(value)
+                }
+            }
+            .pickerStyle(.segmented)
             Button(A11y.Label.exportButton) {
                 Task {
-                    await model.export()
+                    await model.export(format: format)
                     if let data = model.document?.exportedData {
-                        onExported?(data)
+                        onExported?(data, format)
                     }
                 }
             }

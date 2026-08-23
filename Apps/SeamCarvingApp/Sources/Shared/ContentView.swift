@@ -82,9 +82,9 @@ struct ContentView: View {
                 MaskToolbarView(model: model, painter: painter, mode: $maskMode)
                 FaceProtectionControlsView(model: model)
                 CarveProgressView(model: model)
-                ExportView(model: model) { data in
+                ExportView(model: model) { data, format in
 #if os(macOS)
-                    _ = MacPlatformServices.savePNG(data)
+                    _ = MacPlatformServices.save(data, format: format)
 #endif
                 }
                 resizeButton

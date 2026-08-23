@@ -14,10 +14,10 @@ enum MacPlatformServices {
         return .nsImage(image)
     }
 
-    static func savePNG(_ data: Data, suggestedName: String = "seam-carved.png") -> Bool {
+    static func save(_ data: Data, format: ExportFormat, suggestedName: String? = nil) -> Bool {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = suggestedName
+        panel.allowedContentTypes = format == .png ? [.png] : [.jpeg]
+        panel.nameFieldStringValue = suggestedName ?? "seam-carved.\(format.rawValue)"
         guard panel.runModal() == .OK, let url = panel.url else { return false }
         do {
             try data.write(to: url, options: .atomic)

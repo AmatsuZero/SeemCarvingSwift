@@ -36,6 +36,11 @@ public protocol SeamCarvingService: Sendable {
     ) async throws -> RGBA8Image
 }
 
+public enum ExportFormat: String, Sendable, CaseIterable {
+    case png
+    case jpeg
+}
+
 public extension SeamCarvingService {
     func resize(
         _ image: RGBA8Image,
@@ -313,7 +318,7 @@ public final class AppModel {
 
     // MARK: Export
 
-    public func export() async {
+    public func export(format: ExportFormat = .png) async {
         guard let document else {
             errorMessage = "No document to export."
             phase = .failed
@@ -331,34 +336,38 @@ public final class AppModel {
             return
         }
         do {
-            let data = try encodePNG(result)
+            let data = try encode(result, format: format)
             document.exportedData = data
-            document.exportMetadata = ExportMetadata(byteCount: data.count, format: "png")
+            document.exportMetadata = ExportMetadata(byteCount: data.count, format: format.rawValue)
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"
             phase = .failed
         }
     }
 
-    private func encodePNG(_ image: RGBA8Image) throws -> Data {
+    private func encode(_ image: RGBA8Image, format: ExportFormat) throws -> Data {
         #if canImport(CoreGraphics)
         let cgImage = try CGImageBridge.encode(image)
         let mutableData = NSMutableData()
+        let type = format == .png ? "public.png" : "public.jpeg"
         guard let destination = CGImageDestinationCreateWithData(
             mutableData,
-            "public.png" as CFString,
+            type as CFString,
             1,
             nil
         ) else {
-            throw AppError.serviceFailure("Could not create PNG destination")
+            throw AppError.serviceFailure("Could not create export destination")
         }
-        CGImageDestinationAddImage(destination, cgImage, nil)
+        let properties: CFDictionary? = format == .jpeg
+            ? [kCGImageDestinationLossyCompressionQuality: 0.92] as CFDictionary
+            : nil
+        CGImageDestinationAddImage(destination, cgImage, properties)
         guard CGImageDestinationFinalize(destination) else {
-            throw AppError.serviceFailure("PNG finalization failed")
+            throw AppError.serviceFailure("Export finalization failed")
         }
         return mutableData as Data
         #else
-        throw AppError.serviceFailure("PNG export requires CoreGraphics")
+        throw AppError.serviceFailure("Image export requires CoreGraphics")
         #endif
     }
 }
