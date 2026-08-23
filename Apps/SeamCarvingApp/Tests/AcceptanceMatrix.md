@@ -6,8 +6,8 @@ actually completed; source inspection alone is not sufficient.
 
 | Capability | macOS | iPhone simulator | iPad simulator | Physical iPad |
 |---|---|---|---|---|
-| App target builds | verified (`SeamCarvingMac`) | verified (`SeamCarvingIOS`) | covered by iOS target; run separately before release | pending device online |
-| Shared XCTest/UI model tests | verified, 26/26 | verified, 26/26 | pending separate simulator run | pending device online |
+| App target builds | verified (`SeamCarvingMac`) | verified (`SeamCarvingIOS`) | verified (`SeamCarvingIOS`) | pending device online |
+| Shared XCTest/UI model tests | verified, 26/26 | verified, 26/26 | verified, 26/26 | pending device online |
 | Core package tests | verified, 100 tests | covered by package/device host | covered by package/device host | previously verified Metal suite; rerun for release |
 | Protect/remove masks | verified by Core + GUI + CLI mask E2E | GUI tests verified | pending simulator run | pending device run |
 | Face protection, both cadences | Vision tests + macOS app compile | app compile/UI model verified | app compile/UI model verified | pending device run |

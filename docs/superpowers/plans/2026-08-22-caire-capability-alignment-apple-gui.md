@@ -17,9 +17,10 @@
   service wiring, and CLI masks/face policy/pre-scale controls.
 - **Verified:** package suite (100 tests), macOS App XCTest (26/26), iPhone
   17 Pro simulator App XCTest (26/26), macOS build, and generic iOS build.
-- **Pending release gate:** separate iPad simulator run and a fresh physical
-  iPad run. The connected iPad is currently offline, so it is not counted as
-  verified. See `Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md`.
+- **Pending release gate:** a fresh physical iPad run. Both iPhone and iPad
+  simulator XCTest suites now pass 26/26. The connected iPad is currently
+  offline, so it is not counted as verified. See
+  `Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md`.
 - **Current completion:** implementation tasks are complete; cross-platform
   acceptance remains open only for device-specific verification.
 
