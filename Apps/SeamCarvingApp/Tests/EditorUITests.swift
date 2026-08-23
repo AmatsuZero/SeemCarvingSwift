@@ -74,7 +74,6 @@ final class EditorUITests: XCTestCase {
         model.phase = .resizing(progress: nil)
         XCTAssertTrue(model.phase.isProcessing, "resizing phase should be processing")
 
-        let controls = ResizeControlsView(model: model)
         // The Form is disabled while processing; we assert the phase-driven flag
         // the view uses, which is the source of truth for the disabled modifier.
         XCTAssertTrue(model.phase.isProcessing)
