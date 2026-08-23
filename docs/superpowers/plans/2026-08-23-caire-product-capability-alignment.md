@@ -393,9 +393,11 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 
 ### Task 2 — 已完成
 
-- **提交：** `f0dc2cd` `feat: add scalar resize and energy controls`
+- **提交：**
+  - `f0dc2cd` `feat: add scalar resize and energy controls`
+  - `efc332b` `fix: validate scalar resize and energy control inputs`（复审修复）
 - **验证：**
-  - `swift test --package-path . --parallel` → 139/139 通过
+  - `swift test --package-path . --parallel` → 143/143 通过
   - `swift test --package-path . --filter 'CLIOptionsTests|CLIEndToEndTests' --parallel` → 通过
   - `xcodebuild -scheme SeamCarvingSwift-Package -workspace . -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build` → BUILD SUCCEEDED
   - `git diff --check` 干净
@@ -410,3 +412,8 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
   - 移除 `CLIConfigurationError.reservedResizeModeNotImplemented`；`--help` 更新为 percentage/square/blur/sobel 已实现。
   - `docs/capability-matrix.md` 新增第 11、12 行并标记 verified。
 - **语义约定：** percentage 以源尺寸为基准（`50`=一半），round half away from zero，每轴最小 1，`>100` enlarge；square 取短边为边长（不 enlarge）；blur/sobel 仅作用于 backward Sobel energy，配合 forward energy 时报错。
+- **复审修复（`efc332b`）：**
+  1. `PixelSize.scaled(byPercentage:)` 改用 `Int(exactly:)`，超出可表达目标尺寸时抛 `invalidConfiguration`（修复超大 percentage 的 runtime trap）。
+  2. `LuminancePlane.blurred(radius:)` 增加 `radius <= (Int.max - 1) / 2` 上限检查，修复超大 radius 的整数溢出。
+  3. `CoreResizeEngine.findSeam` 在 energy mode 分支前统一校验 `blurRadius >= 0`、`sobelThreshold` 有限且非负，forward energy 下非法值不再被忽略。
+  4. CLI 中 forward + blur/sobel 由 `CLIProcessor.validateEnergyControls` 转为 `CLIConfigurationError.incompatibleOptions`（退出码 64），而非 backend 错误（70）。
