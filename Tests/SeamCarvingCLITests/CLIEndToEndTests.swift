@@ -109,20 +109,53 @@ final class CLIEndToEndTests: XCTestCase {
         XCTAssertEqual(image.height, 18)
     }
 
-    func testProcessorRejectsReservedModes() async throws {
-        let options = try CLIOptions.parse(["in.png", "out.png", "--percentage", "50"])
-        do {
-            _ = try await CLIProcessor().process(options)
-            XCTFail("expected reserved mode error")
-        } catch let error as CLIConfigurationError {
-            XCTAssertEqual(error, .reservedResizeModeNotImplemented(.percentage(50)))
+    func testProcessorPercentageResize() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-pct-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-pct-output-\(UUID().uuidString).png")
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
         }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--percentage", "50", "--backend", "cpu",
+        ])
+        let result = try await CLIProcessor().process(options)
+
+        XCTAssertEqual(result.width, 16)
+        XCTAssertEqual(result.height, 12)
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("cannot reopen percentage output")
+            return
+        }
+        XCTAssertEqual(image.width, 16)
+        XCTAssertEqual(image.height, 12)
+    }
+
+    func testProcessorSquareResize() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-sq-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-sq-output-\(UUID().uuidString).png")
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--square", "--backend", "cpu",
+        ])
+        let result = try await CLIProcessor().process(options)
+
+        XCTAssertEqual(result.width, 24)
+        XCTAssertEqual(result.height, 24)
     }
 
     func testProcessorRejectsReservedOptions() async throws {
         let reservedCases: [[String]] = [
-            ["--blur-radius", "2"],
-            ["--sobel-threshold", "0.3"],
             ["--debug"],
             ["--debug-directory", "seams"],
             ["--seam-color", "#ff0000"],

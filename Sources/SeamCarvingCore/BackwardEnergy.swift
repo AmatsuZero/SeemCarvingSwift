@@ -1,7 +1,22 @@
 public enum BackwardEnergy {
     /// Computes a backward Sobel energy map over the linear-luma plane, using
     /// clamp-to-edge sampling and the `abs(gx) + abs(gy)` gradient norm.
-    public static func compute(for image: RGBA8Image) throws -> EnergyMap {
+    ///
+    /// - `blurRadius`: box-blur radius applied to the luma plane first; `0` is
+    ///   the default and skips blur.
+    /// - `sobelThreshold`: gradient magnitudes below this value are zeroed; `0`
+    ///   is the default and skips thresholding.
+    public static func compute(
+        for image: RGBA8Image,
+        blurRadius: Int = 0,
+        sobelThreshold: Float = 0
+    ) throws -> EnergyMap {
+        guard blurRadius >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("blur radius must be nonnegative")
+        }
+        guard sobelThreshold.isFinite, sobelThreshold >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("Sobel threshold must be finite and nonnegative")
+        }
         let width = image.width
         let height = image.height
         let pixelCount = width * height
@@ -14,6 +29,10 @@ public enum BackwardEnergy {
                 g: image.pixels[base + 1],
                 b: image.pixels[base + 2]
             )
+        }
+        if blurRadius > 0 {
+            luma = try LuminancePlane(width: width, height: height, values: luma)
+                .blurred(radius: blurRadius).values
         }
 
         func sample(_ x: Int, _ y: Int) -> Float {
@@ -33,7 +52,8 @@ public enum BackwardEnergy {
                 let gy = (sample(x - 1, y + 1) - sample(x - 1, y - 1))
                     + 2 * (sample(x, y + 1) - sample(x, y - 1))
                     + (sample(x + 1, y + 1) - sample(x + 1, y - 1))
-                values[y * width + x] = abs(gx) + abs(gy)
+                let magnitude = abs(gx) + abs(gy)
+                values[y * width + x] = magnitude >= sobelThreshold ? magnitude : 0
             }
         }
 

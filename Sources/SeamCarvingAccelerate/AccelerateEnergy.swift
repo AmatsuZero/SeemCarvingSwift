@@ -13,7 +13,13 @@ enum AccelerateEnergy {
         return pow((c + 0.055) / 1.055, 2.4)
     }
 
-    static func compute(for image: RGBA8Image) throws -> EnergyMap {
+    static func compute(for image: RGBA8Image, blurRadius: Int = 0, sobelThreshold: Float = 0) throws -> EnergyMap {
+        guard blurRadius >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("blur radius must be nonnegative")
+        }
+        guard sobelThreshold.isFinite, sobelThreshold >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("Sobel threshold must be finite and nonnegative")
+        }
         let width = image.width
         let height = image.height
         let (pixelCount, overflow) = width.multipliedReportingOverflow(by: height)
@@ -35,6 +41,13 @@ enum AccelerateEnergy {
         var luma = scale(lr, by: 0.2126)
         vDSP.add(luma, scale(lg, by: 0.7152), result: &luma)
         vDSP.add(luma, scale(lb, by: 0.0722), result: &luma)
+
+        // 2. Optional box blur, reusing the Core reference so CPU and Accelerate
+        //    stay bit-compatible for the same blur radius.
+        if blurRadius > 0 {
+            luma = try LuminancePlane(width: width, height: height, values: luma)
+                .blurred(radius: blurRadius).values
+        }
 
         var energy = [Float](repeating: 0, count: pixelCount)
         // Directly sample the eight neighbors with clamp-to-edge semantics.
@@ -58,7 +71,8 @@ enum AccelerateEnergy {
 
                 let gx = (rightUp - leftUp) + 2.0 * (rightMid - leftMid) + (rightDown - leftDown)
                 let gy = (leftDown - leftUp) + 2.0 * (midDown - midUp) + (rightDown - rightUp)
-                energy[y * width + x] = abs(gx) + abs(gy)
+                let magnitude = abs(gx) + abs(gy)
+                energy[y * width + x] = magnitude >= sobelThreshold ? magnitude : 0
             }
         }
 

@@ -56,6 +56,28 @@ final class MetalParityTests: XCTestCase {
         XCTAssertEqual(cpuAdaptive.pixels, metalAdaptive.pixels)
     }
 
+    func testBlurAndThresholdFallbackToCPU() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
+        let context = try MetalContext.makeDefault()
+        let cpu = CPUBackend()
+        let metal = MetalBackend(context: context)
+        let image = try Self.gradient(width: 12, height: 10)
+        let source = try PixelSize(width: image.width, height: image.height)
+        let target = try PixelSize(width: 9, height: 8)
+
+        var blur = ResizeOptions(blurRadius: 2)
+        XCTAssertEqual(metal.effectiveIdentifier(from: source, to: target, options: blur), "cpu-fallback")
+        let cpuBlur = try await cpu.resize(image, to: target, options: blur)
+        let metalBlur = try await metal.resize(image, to: target, options: blur)
+        XCTAssertEqual(cpuBlur.pixels, metalBlur.pixels)
+
+        var threshold = ResizeOptions(sobelThreshold: 0.2)
+        XCTAssertEqual(metal.effectiveIdentifier(from: source, to: target, options: threshold), "cpu-fallback")
+        let cpuThreshold = try await cpu.resize(image, to: target, options: threshold)
+        let metalThreshold = try await metal.resize(image, to: target, options: threshold)
+        XCTAssertEqual(cpuThreshold.pixels, metalThreshold.pixels)
+    }
+
     func testForwardDPParity() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("no Metal device") }
         let context = try MetalContext.makeDefault()

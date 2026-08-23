@@ -17,7 +17,9 @@ public struct MetalBackend: Sendable {
     /// horizontal seams. It delegates enlargement and adaptive ordering to the
     /// reference CPU backend so those requests preserve package-wide semantics.
     public func effectiveIdentifier(from source: PixelSize, to target: PixelSize, options: ResizeOptions) -> String {
-        if target.width > source.width || target.height > source.height || options.dimensionOrder == .adaptiveNormalizedCost {
+        if target.width > source.width || target.height > source.height
+            || options.dimensionOrder == .adaptiveNormalizedCost
+            || options.blurRadius > 0 || options.sobelThreshold > 0 {
             return "cpu-fallback"
         }
         return mode == .hybrid ? "metal-hybrid" : "metal-full"
@@ -582,6 +584,12 @@ extension MetalBackend: SeamCarvingBackend {
     public var identifier: String { "metal" }
 
     public func findSeam(in image: RGBA8Image, orientation: SeamOrientation, options: ResizeOptions) async throws -> SeamPath {
+        // The Metal energy kernels do not implement blur or Sobel thresholding;
+        // delegate to the CPU reference so these controls are honored rather than
+        // silently ignored.
+        if options.blurRadius > 0 || options.sobelThreshold > 0 {
+            return try await CPUBackend().findSeam(in: image, orientation: orientation, options: options)
+        }
         switch orientation {
         case .vertical:
             return try await findVerticalSeam(in: image, options: options)
@@ -603,8 +611,11 @@ extension MetalBackend: SeamCarvingBackend {
         // The Metal kernels currently implement the shrink path.  Delegate
         // enlargement and adaptive ordering to the reference backend rather
         // than silently returning the wrong extent or ordering seams by a
-        // different policy.
-        if target.width > image.width || target.height > image.height || options.dimensionOrder == .adaptiveNormalizedCost {
+        // different policy. Blur and Sobel thresholding are also CPU-only, so
+        // requests using them fall back to the reference backend.
+        if target.width > image.width || target.height > image.height
+            || options.dimensionOrder == .adaptiveNormalizedCost
+            || options.blurRadius > 0 || options.sobelThreshold > 0 {
             return try await CPUBackend().resize(image, to: target, options: options)
         }
 

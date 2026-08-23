@@ -39,7 +39,7 @@ enum CLIEntry {
     }
 
     private static let helpText = """
-    Usage: seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS [options]
+    Usage: seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
 
     Implemented options:
       --backend automatic|cpu|accelerate|metal
@@ -50,10 +50,9 @@ enum CLIEntry {
       --protect-mask PATH --protect-strength hard|soft --protect-weight VALUE
       --remove-mask PATH --removal-weight VALUE
       --face-policy caire|vision --face-cadence once|each-pass
+      --blur-radius R --sobel-threshold T   (backward Sobel energy only)
 
     Reserved (parsed but not yet implemented; rejected with exit code 64):
-      --percentage P --square
-      --blur-radius R --sobel-threshold T
       --debug --debug-directory DIR --seam-color HEX --seam-shape line|points
       --input-dir DIR --output-dir DIR --recursive --concurrency N
     """

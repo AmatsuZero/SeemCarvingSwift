@@ -100,6 +100,14 @@ public struct ResizeOptions: Sendable {
     public var dimensionOrder: DimensionOrder
     public var masks: MaskPair
     public var preScaleStrategy: PreScaleStrategy
+    /// Box-blur radius applied to the luma plane before backward (Sobel) energy.
+    /// `0` means no blur and reproduces the default result. Only the backward
+    /// Sobel energy honors this control.
+    public var blurRadius: Int
+    /// Sobel gradient-magnitude threshold for backward energy: magnitudes below
+    /// this value are zeroed. `0` means no threshold and reproduces the default
+    /// result. Only the backward Sobel energy honors this control.
+    public var sobelThreshold: Float
     public var progress: (@Sendable (ResizeProgress) -> Void)?
 
     public init(
@@ -107,12 +115,16 @@ public struct ResizeOptions: Sendable {
         dimensionOrder: DimensionOrder = .widthThenHeight,
         masks: MaskPair = .init(),
         preScaleStrategy: PreScaleStrategy = .none,
+        blurRadius: Int = 0,
+        sobelThreshold: Float = 0,
         progress: (@Sendable (ResizeProgress) -> Void)? = nil
     ) {
         self.energyMode = energyMode
         self.dimensionOrder = dimensionOrder
         self.masks = masks
         self.preScaleStrategy = preScaleStrategy
+        self.blurRadius = blurRadius
+        self.sobelThreshold = sobelThreshold
         self.progress = progress
     }
 }

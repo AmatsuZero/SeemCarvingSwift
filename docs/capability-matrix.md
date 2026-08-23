@@ -23,6 +23,8 @@ Classification legend:
 | 8 | Progress, cancellation, and preview | Core/UI | User can cancel an active resize and retain the source document | implemented |
 | 9 | Image import/export | Platform UI | macOS file URLs, iPhone/iPad Photos/files, and PNG/JPEG export work | verified by build/tests; manual picker smoke test remains recommended |
 | 10 | Shared Apple experience | App | Same feature model works on macOS, iPhone, and iPad with adaptive layouts | verified; macOS/iOS/iPadOS tests and iPad device run pass |
+| 11 | Scalar resize modes (percentage, square) | CLI/Core | `--percentage P` scales from source with round-half-up and min 1; `--square` targets the shorter side; conflicts with explicit dimensions are rejected | verified; Core and CLI tests pass |
+| 12 | Configurable energy controls (blur radius, Sobel threshold) | Core/Apple/CLI | Blur and threshold reach actual backward Sobel energy; zero equals default; CPU and Accelerate match; Metal falls back to CPU | verified; Core, Accelerate, and Metal parity tests pass |
 
 ## Face protection is a capability choice, not Pigo compatibility
 

@@ -85,22 +85,12 @@ public enum CLIExitCode: Int32, Sendable, Equatable {
 }
 
 /// Configuration errors raised after parsing, when each parsed option is valid
-/// individually but cannot be executed yet (for example a reserved resize mode).
+/// individually but cannot be executed yet (for example a reserved option).
 public enum CLIConfigurationError: Error, Equatable {
-    case reservedResizeModeNotImplemented(ResizeMode)
     case reservedOptionNotImplemented(String)
 
     public var message: String {
         switch self {
-        case .reservedResizeModeNotImplemented(let mode):
-            switch mode {
-            case .exact(let width, let height):
-                return "exact resize (\(width)x\(height)) is not applicable"
-            case .percentage(let value):
-                return "percentage resize is reserved and not yet implemented (\(value))"
-            case .square:
-                return "square resize is reserved and not yet implemented"
-            }
         case .reservedOptionNotImplemented(let option):
             return "option \(option) is reserved and not yet implemented"
         }

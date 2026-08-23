@@ -29,16 +29,19 @@ public struct CLIProcessor: Sendable {
 
     public func process(_ options: CLIOptions) async throws -> CLIProcessResult {
         try validateReservedOptions(options)
-        let target = try resolveTarget(options.resizeMode)
 
         let inputImage = try CLIImageIO.readImage(fromPath: options.inputPath)
+        let sourceSize = try PixelSize(width: inputImage.width, height: inputImage.height)
+        let target = try resolveTarget(options.resizeMode, source: sourceSize)
         let masks = try buildMasks(options: options, image: inputImage)
 
         var resizeOptions = ResizeOptions(
             energyMode: options.energy,
             dimensionOrder: options.dimensionOrder,
             masks: masks,
-            preScaleStrategy: options.preScaleStrategy
+            preScaleStrategy: options.preScaleStrategy,
+            blurRadius: options.blurRadius ?? 0,
+            sobelThreshold: options.sobelThreshold ?? 0
         )
         resizeOptions.progress = { progress in
             FileHandle.standardError.write(Data("progress \(progress.completedEdits)/\(progress.totalEdits)\n".utf8))
@@ -70,12 +73,14 @@ public struct CLIProcessor: Sendable {
         return CLIProcessResult(width: result.width, height: result.height, backend: options.backend)
     }
 
-    private func resolveTarget(_ mode: ResizeMode) throws -> PixelSize {
+    private func resolveTarget(_ mode: ResizeMode, source: PixelSize) throws -> PixelSize {
         switch mode {
         case .exact(let width, let height):
             return try PixelSize(width: width, height: height)
-        case .percentage, .square:
-            throw CLIConfigurationError.reservedResizeModeNotImplemented(mode)
+        case .percentage(let percentage):
+            return try source.scaled(byPercentage: percentage)
+        case .square:
+            return source.squareTarget()
         }
     }
 
@@ -83,8 +88,6 @@ public struct CLIProcessor: Sendable {
     /// task. This prevents "flag accepted but silently ignored" behavior: a
     /// reserved flag either does nothing (its default) or fails loudly here.
     private func validateReservedOptions(_ options: CLIOptions) throws {
-        if options.blurRadius != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--blur-radius") }
-        if options.sobelThreshold != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--sobel-threshold") }
         if options.debug { throw CLIConfigurationError.reservedOptionNotImplemented("--debug") }
         if options.debugDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--debug-directory") }
         if options.seamColor != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--seam-color") }

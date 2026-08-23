@@ -85,13 +85,15 @@ final class CLIOptionsTests: XCTestCase {
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "extra", "--width", "20", "--height", "18"]))
     }
 
-    // MARK: - Negative: illegal floats
+    // MARK: - Negative: illegal numeric values
 
     func testIllegalFloatValuesThrow() {
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--percentage", "abc"]))
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--percentage", "-5"]))
-        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--blur-radius", "inf"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--blur-radius", "abc"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--blur-radius", "-1"]))
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--sobel-threshold", "nan"]))
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--sobel-threshold", "-0.5"]))
         XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--protect-weight", "abc"]))
     }
 
@@ -136,12 +138,12 @@ final class CLIOptionsTests: XCTestCase {
         XCTAssertNil(square.height)
     }
 
-    func testReservedEnergyControlsParse() throws {
+    func testEnergyControlsParse() throws {
         let options = try CLIOptions.parse([
             "in", "out", "--width", "20", "--height", "18",
-            "--blur-radius", "2.5", "--sobel-threshold", "0.3"
+            "--blur-radius", "2", "--sobel-threshold", "0.3"
         ])
-        XCTAssertEqual(options.blurRadius, 2.5)
+        XCTAssertEqual(options.blurRadius, 2)
         XCTAssertEqual(options.sobelThreshold, 0.3)
     }
 
@@ -196,7 +198,6 @@ final class CLIOptionsTests: XCTestCase {
     func testExitCodeMapping() {
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.invalidArguments), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.conflictingModes), .usage)
-        XCTAssertEqual(CLIExitCode.exitCode(for: CLIConfigurationError.reservedResizeModeNotImplemented(.square)), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIConfigurationError.reservedOptionNotImplemented("--debug")), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.cannotDecodeInput), .dataError)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.unsupportedOutputFormat("bmp")), .dataError)

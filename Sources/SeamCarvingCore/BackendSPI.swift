@@ -7,7 +7,7 @@ public protocol SeamCarvingBackend: Sendable {
 
 @_spi(Backend)
 public protocol BackwardEnergyProvider: Sendable {
-    func compute(for image: RGBA8Image) throws -> EnergyMap
+    func compute(for image: RGBA8Image, blurRadius: Int, sobelThreshold: Float) throws -> EnergyMap
 }
 
 import Dispatch
@@ -132,7 +132,7 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         options: ResizeOptions
     ) async throws -> SeamPath {
-        try findSeam(in: image, orientation: orientation, energyMode: options.energyMode, masks: options.masks, recorder: nil)
+        try findSeam(in: image, orientation: orientation, energyMode: options.energyMode, masks: options.masks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: nil)
     }
 
     private func findSeam(
@@ -140,12 +140,14 @@ public struct CoreResizeEngine: Sendable {
         orientation: SeamOrientation,
         energyMode: EnergyMode,
         masks: MaskPair,
+        blurRadius: Int,
+        sobelThreshold: Float,
         recorder: BackendTimingRecorder?
     ) throws -> SeamPath {
         switch energyMode {
         case .backwardSobel:
             let base = try measure(recorder, phase: \.energyNS) {
-                try backwardEnergyProvider.compute(for: image)
+                try backwardEnergyProvider.compute(for: image, blurRadius: blurRadius, sobelThreshold: sobelThreshold)
             }
             let adjustment = try measure(recorder, phase: \.maskNS) {
                 try masks.energyAdjustment(forWidth: image.width, height: image.height)
@@ -160,6 +162,11 @@ public struct CoreResizeEngine: Sendable {
                 try DynamicProgramming.findSeam(in: base, orientation: orientation)
             }
         case .forwardLuma:
+            if blurRadius > 0 || sobelThreshold > 0 {
+                throw SeamCarvingError.invalidConfiguration(
+                    "blur radius and Sobel threshold require backward Sobel energy"
+                )
+            }
             let luminance = try measure(recorder, phase: \.energyNS) {
                 try LuminancePlane.luma(of: image)
             }
@@ -245,8 +252,8 @@ public struct CoreResizeEngine: Sendable {
                 } else if remainingHeight == 0 {
                     orientation = .vertical
                 } else {
-                    let vertical = try findSeam(in: current, orientation: .vertical, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
-                    let horizontal = try findSeam(in: current, orientation: .horizontal, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
+                    let vertical = try findSeam(in: current, orientation: .vertical, energyMode: options.energyMode, masks: currentMasks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: recorder)
+                    let horizontal = try findSeam(in: current, orientation: .horizontal, energyMode: options.energyMode, masks: currentMasks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: recorder)
                     let verticalNormalized = vertical.totalCost / Float(current.height)
                     let horizontalNormalized = horizontal.totalCost / Float(current.width)
                     orientation = verticalNormalized <= horizontalNormalized ? .vertical : .horizontal
@@ -303,7 +310,7 @@ public struct CoreResizeEngine: Sendable {
         var completed = completed
         for _ in 0..<count {
             try Task.checkCancellation()
-            let seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks, recorder: recorder)
+            let seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: recorder)
             if let recorder {
                 current = try recorder.measure(\.editNS) { try SeamEditor.remove(seam, from: current) }
                 currentMasks = try recorder.measure(\.maskNS) { try removing(seam, from: currentMasks) }
@@ -383,7 +390,7 @@ public struct CoreResizeEngine: Sendable {
         for _ in 0..<count {
             try Task.checkCancellation()
             let currentWidth = working.width
-            let seam = try findSeam(in: working, orientation: .vertical, energyMode: options.energyMode, masks: workingMasks, recorder: recorder)
+            let seam = try findSeam(in: working, orientation: .vertical, energyMode: options.energyMode, masks: workingMasks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: recorder)
             let mapped = seam.coordinates.enumerated().map { indexMap[$0.offset * currentWidth + Int($0.element)] }
             seams.append(mapped)
             if let recorder {

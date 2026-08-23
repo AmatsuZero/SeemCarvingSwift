@@ -1,8 +1,8 @@
 import Foundation
 
 struct CPUBackwardEnergyProvider: BackwardEnergyProvider {
-    func compute(for image: RGBA8Image) throws -> EnergyMap {
-        try BackwardEnergy.compute(for: image)
+    func compute(for image: RGBA8Image, blurRadius: Int, sobelThreshold: Float) throws -> EnergyMap {
+        try BackwardEnergy.compute(for: image, blurRadius: blurRadius, sobelThreshold: sobelThreshold)
     }
 }
 

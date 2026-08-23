@@ -35,9 +35,9 @@ public struct CLIOptions: Sendable, Equatable {
     public let removalWeight: Float
     public let facePolicy: FaceProtectionPolicy?
     public let faceCadence: FaceDetectionCadence
-    /// Reserved: blur radius applied before energy computation.
-    public let blurRadius: Float?
-    /// Reserved: Sobel threshold for energy computation.
+    /// Box-blur radius applied to luma before backward Sobel energy (`--blur-radius`).
+    public let blurRadius: Int?
+    /// Sobel gradient-magnitude threshold for backward energy (`--sobel-threshold`).
     public let sobelThreshold: Float?
     /// Reserved: enable seam/debug artifacts.
     public let debug: Bool
@@ -93,7 +93,7 @@ public struct CLIOptions: Sendable, Equatable {
         var removalWeight: Float = 1_000
         var facePolicy: FaceProtectionPolicy?
         var faceCadence = FaceDetectionCadence.detectOnceAndTransformMask
-        var blurRadius: Float?
+        var blurRadius: Int?
         var sobelThreshold: Float?
         var debug = false
         var debugDirectory: String?
@@ -190,7 +190,7 @@ public struct CLIOptions: Sendable, Equatable {
                 }
                 index += 2
             case "--blur-radius":
-                guard index + 1 < arguments.count, let value = parseNonNegativeFloat(arguments[index + 1]) else {
+                guard index + 1 < arguments.count, let value = Int(arguments[index + 1]), value >= 0 else {
                     throw CLIParseError.invalidArguments
                 }
                 blurRadius = value

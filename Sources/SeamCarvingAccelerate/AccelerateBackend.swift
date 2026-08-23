@@ -5,8 +5,8 @@ import Foundation
 public struct AccelerateEnergyProvider: Sendable {
     public init() {}
 
-    public func compute(for image: RGBA8Image) throws -> EnergyMap {
-        try AccelerateEnergy.compute(for: image)
+    public func compute(for image: RGBA8Image, blurRadius: Int = 0, sobelThreshold: Float = 0) throws -> EnergyMap {
+        try AccelerateEnergy.compute(for: image, blurRadius: blurRadius, sobelThreshold: sobelThreshold)
     }
 }
 

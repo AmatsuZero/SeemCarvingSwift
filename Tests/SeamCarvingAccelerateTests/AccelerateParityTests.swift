@@ -17,6 +17,19 @@ final class AccelerateParityTests: XCTestCase {
         }
     }
 
+    func testBlurAndThresholdParity() throws {
+        let provider = AccelerateEnergyProvider()
+        for image in try Self.fixtures() {
+            let oracle = try BackwardEnergy.compute(for: image, blurRadius: 2, sobelThreshold: 0.1)
+            let accelerate = try provider.compute(for: image, blurRadius: 2, sobelThreshold: 0.1)
+            XCTAssertEqual(oracle.width, accelerate.width)
+            XCTAssertEqual(oracle.height, accelerate.height)
+            for i in 0..<oracle.values.count {
+                XCTAssertEqual(oracle.values[i], accelerate.values[i], accuracy: 1e-4, "blur/threshold energy mismatch at \(i) in \(image.width)x\(image.height)")
+            }
+        }
+    }
+
     func testSeamParity() async throws {
         let cpu = CPUBackend()
         let accelerate = AccelerateBackend()

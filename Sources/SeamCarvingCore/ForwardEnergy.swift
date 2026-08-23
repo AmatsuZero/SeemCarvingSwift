@@ -35,6 +35,57 @@ public struct LuminancePlane: Sendable, Equatable {
     }
 }
 
+public extension LuminancePlane {
+    /// Applies a separable box blur of the given integer radius with clamp-to-edge
+    /// sampling. Radius `0` returns the plane unchanged; the result is
+    /// deterministic and shared by CPU and Accelerate energy paths so blur keeps
+    /// them bit-compatible.
+    func blurred(radius: Int) throws -> LuminancePlane {
+        guard radius >= 0 else {
+            throw SeamCarvingError.invalidConfiguration("blur radius must be nonnegative")
+        }
+        guard radius > 0 else { return self }
+        let horizontal = Self.boxBlur1D(values, width: width, height: height, radius: radius, horizontal: true)
+        let vertical = Self.boxBlur1D(horizontal, width: width, height: height, radius: radius, horizontal: false)
+        return try LuminancePlane(width: width, height: height, values: vertical)
+    }
+
+    /// One-dimensional separable box blur pass using a sliding window with
+    /// clamp-to-edge index clamping.
+    private static func boxBlur1D(
+        _ values: [Float],
+        width: Int,
+        height: Int,
+        radius: Int,
+        horizontal: Bool
+    ) -> [Float] {
+        let outer = horizontal ? height : width
+        let inner = horizontal ? width : height
+        let window = 2 * radius + 1
+        let divisor = Float(window)
+        var out = [Float](repeating: 0, count: values.count)
+
+        func read(_ o: Int, _ i: Int) -> Float {
+            horizontal ? values[o * width + i] : values[i * width + o]
+        }
+
+        for o in 0..<outer {
+            var sum: Float = 0
+            for i in -radius...radius {
+                sum += read(o, min(max(i, 0), inner - 1))
+            }
+            for i in 0..<inner {
+                let dst = horizontal ? o * width + i : i * width + o
+                out[dst] = sum / divisor
+                let outgoing = read(o, min(max(i - radius, 0), inner - 1))
+                let incoming = read(o, min(max(i + radius + 1, 0), inner - 1))
+                sum = sum - outgoing + incoming
+            }
+        }
+        return out
+    }
+}
+
 public enum ForwardEnergy {
     /// Finds a minimum-cost vertical seam using the forward-luma recurrence with
     /// two-row accumulation and Int8 parents. The base row has zero disruption cost
