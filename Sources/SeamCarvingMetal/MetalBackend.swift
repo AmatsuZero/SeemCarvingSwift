@@ -19,7 +19,8 @@ public struct MetalBackend: Sendable {
     public func effectiveIdentifier(from source: PixelSize, to target: PixelSize, options: ResizeOptions) -> String {
         if target.width > source.width || target.height > source.height
             || options.dimensionOrder == .adaptiveNormalizedCost
-            || options.blurRadius > 0 || options.sobelThreshold > 0 {
+            || options.blurRadius > 0 || options.sobelThreshold > 0
+            || options.seamObserver != nil {
             return "cpu-fallback"
         }
         return mode == .hybrid ? "metal-hybrid" : "metal-full"
@@ -587,7 +588,7 @@ extension MetalBackend: SeamCarvingBackend {
         // The Metal energy kernels do not implement blur or Sobel thresholding;
         // delegate to the CPU reference so these controls are honored rather than
         // silently ignored.
-        if options.blurRadius > 0 || options.sobelThreshold > 0 {
+        if options.blurRadius > 0 || options.sobelThreshold > 0 || options.seamObserver != nil {
             return try await CPUBackend().findSeam(in: image, orientation: orientation, options: options)
         }
         switch orientation {
@@ -615,7 +616,8 @@ extension MetalBackend: SeamCarvingBackend {
         // requests using them fall back to the reference backend.
         if target.width > image.width || target.height > image.height
             || options.dimensionOrder == .adaptiveNormalizedCost
-            || options.blurRadius > 0 || options.sobelThreshold > 0 {
+            || options.blurRadius > 0 || options.sobelThreshold > 0
+            || options.seamObserver != nil {
             return try await CPUBackend().resize(image, to: target, options: options)
         }
 

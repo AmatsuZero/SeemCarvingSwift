@@ -41,13 +41,13 @@ public struct CLIOptions: Sendable, Equatable {
     public let sobelThreshold: Float?
     /// Explicit output format (`--format png|jpeg|bmp`), overriding extension detection.
     public let outputFormat: CLIOutputFormat?
-    /// Reserved: enable seam/debug artifacts.
+    /// Enables seam/debug sidecar artifacts.
     public let debug: Bool
-    /// Reserved: directory for debug artifacts.
+    /// Directory for debug artifacts. Required when `debug` is true.
     public let debugDirectory: String?
-    /// Reserved: seam overlay color.
+    /// Seam overlay color.
     public let seamColor: SeamColor?
-    /// Reserved: seam visualization shape.
+    /// Seam visualization shape.
     public let seamShape: SeamShape?
     /// Reserved: batch input directory.
     public let inputDirectory: String?

@@ -339,14 +339,54 @@ git status --short
 
 **提交：** `docs: document completed Caire capability alignment`
 
+## Task 10 — migrate CLI syntax parsing to swift-argument-parser
+
+**目的：** 用 Apple 官方 `swift-argument-parser` 替换手写 argv switch/index 解析，降低 CLI 参数维护成本；不把业务约束和图像处理逻辑迁移进 parser 类型。
+
+**修改范围：**
+
+- `Package.swift`
+- 新增 `Sources/seamcarve-cli/SeamCarveCommand.swift` 或等价 `AsyncParsableCommand` 根命令
+- `Sources/seamcarve-cli/CLIEntry.swift`（改为 command bootstrap，保留平台不可用分支）
+- `Sources/SeamCarvingCLI/CLIOptions.swift`（保留为 typed domain configuration；必要时增加 parser-to-options initializer）
+- `Sources/SeamCarvingCLI/CLIConfiguration.swift`
+- `Sources/SeamCarvingCLI/CLIProcessor.swift`
+- `Tests/SeamCarvingCLITests/CLIOptionsTests.swift`
+- `Tests/SeamCarvingCLITests/CLIEndToEndTests.swift`
+- CLI README/help 文档
+
+**实现要求：**
+
+1. 依赖 Apple 官方 `swift-argument-parser`，使用 `AsyncParsableCommand`；版本应在 `Package.swift` 中明确锁定范围，并验证当前 Swift 6/Xcode 工具链及 iOS test host 可解析。
+2. 将 positional input/output、width/height、percentage/square、backend、energy、masks、face、format、debug 和 batch 选项声明为 typed parser properties。
+3. 保留 `CLIOptions`/`CLIConfiguration` 作为业务配置层；parser 只负责语法、类型和基础 enum 映射。
+4. 将跨字段约束继续放在配置层：resize mode 互斥、forward energy 与 blur/Sobel 冲突、debug 参数依赖、batch 与 stdin/stdout/URL 冲突、输出格式规则。
+5. 保留一个可测试的 argv-to-`CLIOptions` 入口，避免测试只能启动进程；如果删除 `CLIOptions.parse(_:)`，必须提供等价稳定的 public/internal test seam，并记录 API 变化。
+6. `--help`、非法参数、未知选项、缺失 positional 参数和退出码必须覆盖 E2E；不要依赖 ArgumentParser 自动文案的具体空格/换行作为唯一断言。
+7. 保持 binary stdout 契约：`OUTPUT == "-"` 时 stdout 只能有图像字节，summary/progress/错误仍走 stderr。
+8. 评估 `ArgumentParser` 依赖对 App test host、iOS simulator 和 iPad device 构建的影响；不能因为 CLI parser 迁移破坏 Apple GUI target。
+
+**验证：**
+
+```bash
+swift package resolve
+swift test --package-path . --filter 'CLIOptionsTests|CLIEndToEndTests' --parallel
+swift test --package-path . --parallel
+xcodebuild -scheme SeamCarvingSwift-Package -workspace . -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -scheme SeamCarvingTestHost -project Apps/SeamCarvingTestHost/SeamCarvingTestHost.xcodeproj -destination 'platform=iOS Simulator,name=iPhone 16' test
+```
+
+**提交：** `refactor: migrate CLI parsing to argument parser`
+
 ## Recommended execution order for another Agent
 
-按 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 顺序执行。Task 2–5 是 CLI/Core 主线，Task 6–8 是 GUI 主线；如果使用多个 Agent：
+按 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 顺序执行。Task 2–5 是 CLI/Core 主线，Task 6–8 是 GUI 主线，Task 10 在 Task 4 和最终 CLI 行为稳定后执行；如果使用多个 Agent：
 
 - Agent A：Task 1–4（CLI/I/O/batch）；
 - Agent B：Task 5（debug artifact，需先读 Core seam lifecycle）；
 - Agent C：Task 6–7（GUI object removal + face workflow）；
 - Agent D：Task 8–9（在 A/B/C 合并后做跨平台验收和文档）。
+- Agent E：Task 10（在 CLI 功能和退出码稳定后独立迁移 parser）。
 
 Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 contract review 前并行修改同一文件。每个 Agent 完成后先提交，再由独立 reviewer 检查测试和是否存在“flag 被接受但没有生效”的实现。
 
@@ -357,6 +397,7 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 - object removal restoration 和 face detection 都能在 GUI 中真实触发，且有 fake-service/fake-detector 测试。
 - macOS、iPhone、iPad 的宿主测试通过；可用时 iPad 真机 App XCTest 和 Metal screening 通过。
 - `docs/capability-matrix.md`、README/help 文本与实际行为一致。
+- CLI parser 使用 `swift-argument-parser`，且不改变既有业务配置、binary stdout 和跨平台构建契约。
 - 所有任务均有独立提交，工作树只保留用户已有的未跟踪文件或明确记录的变更。
 
 ## 执行记录（Execution Record）

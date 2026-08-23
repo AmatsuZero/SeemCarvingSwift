@@ -109,6 +109,12 @@ public struct ResizeOptions: Sendable {
     /// result. Only the backward Sobel energy honors this control.
     public var sobelThreshold: Float
     public var progress: (@Sendable (ResizeProgress) -> Void)?
+    /// Optional seam observation hook for debug artifact generation.
+    ///
+    /// Default is `nil`. Core emits observations only when this hook is set,
+    /// and an error thrown by the hook (including `CancellationError`) stops the
+    /// resize before the observed seam is applied.
+    public var seamObserver: (@Sendable (SeamObservation) throws -> Void)?
 
     public init(
         energyMode: EnergyMode = .backwardSobel,
@@ -117,7 +123,8 @@ public struct ResizeOptions: Sendable {
         preScaleStrategy: PreScaleStrategy = .none,
         blurRadius: Int = 0,
         sobelThreshold: Float = 0,
-        progress: (@Sendable (ResizeProgress) -> Void)? = nil
+        progress: (@Sendable (ResizeProgress) -> Void)? = nil,
+        seamObserver: (@Sendable (SeamObservation) throws -> Void)? = nil
     ) {
         self.energyMode = energyMode
         self.dimensionOrder = dimensionOrder
@@ -126,5 +133,6 @@ public struct ResizeOptions: Sendable {
         self.blurRadius = blurRadius
         self.sobelThreshold = sobelThreshold
         self.progress = progress
+        self.seamObserver = seamObserver
     }
 }

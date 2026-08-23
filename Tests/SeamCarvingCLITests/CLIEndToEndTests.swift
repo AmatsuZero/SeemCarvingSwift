@@ -154,12 +154,74 @@ final class CLIEndToEndTests: XCTestCase {
         XCTAssertEqual(result.height, 24)
     }
 
-    func testProcessorRejectsReservedOptions() async throws {
-        let reservedCases: [[String]] = [
-            ["--debug"],
+    func testProcessorWritesSeamDebugManifestAndOverlay() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-output-\(UUID().uuidString).png")
+        let debugURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-artifacts-\(UUID().uuidString)")
+        defer {
+            for url in [inputURL, outputURL, debugURL] { try? FileManager.default.removeItem(at: url) }
+        }
+        try Self.writeGradientPNG(width: 5, height: 5, to: inputURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--width", "4", "--height", "5", "--backend", "cpu",
+            "--debug", "--debug-directory", debugURL.path,
+            "--seam-color", "#ff000080", "--seam-shape", "points",
+        ])
+
+        let result = try await CLIProcessor(progressSink: { _ in }).process(options)
+
+        XCTAssertEqual(result.width, 4)
+        XCTAssertEqual(result.height, 5)
+
+        let manifestURL = debugURL.appendingPathComponent("manifest.json")
+        let overlayURL = debugURL.appendingPathComponent("seam-0001.png")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifestURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: overlayURL.path))
+
+        let manifestData = try Data(contentsOf: manifestURL)
+        let manifestObject = try XCTUnwrap(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+        XCTAssertEqual(manifestObject["schemaVersion"] as? Int, 1)
+        XCTAssertEqual(manifestObject["coordinateSpace"] as? String, "current-image-before-edit-top-left")
+        XCTAssertEqual(manifestObject["seamColor"] as? String, "#ff000080")
+        XCTAssertEqual(manifestObject["seamShape"] as? String, "points")
+
+        let seams = try XCTUnwrap(manifestObject["seams"] as? [[String: Any]])
+        XCTAssertEqual(seams.count, 1)
+        XCTAssertEqual(seams[0]["index"] as? Int, 1)
+        XCTAssertEqual(seams[0]["orientation"] as? String, "vertical")
+        XCTAssertEqual(seams[0]["kind"] as? String, "remove")
+        XCTAssertEqual(seams[0]["imageWidth"] as? Int, 5)
+        XCTAssertEqual(seams[0]["imageHeight"] as? Int, 5)
+        XCTAssertEqual(seams[0]["overlay"] as? String, "seam-0001.png")
+
+        guard let source = CGImageSourceCreateWithURL(overlayURL as CFURL, nil),
+              let overlay = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return XCTFail("cannot reopen seam overlay")
+        }
+        XCTAssertEqual(overlay.width, 5)
+        XCTAssertEqual(overlay.height, 5)
+    }
+
+    func testProcessorRejectsDebugModifiersWithoutDebug() async throws {
+        for extra in [
             ["--debug-directory", "seams"],
             ["--seam-color", "#ff0000"],
             ["--seam-shape", "line"],
+        ] {
+            let options = try CLIOptions.parse(["in", "out", "--width", "4", "--height", "5"] + extra)
+            do {
+                _ = try await CLIProcessor(progressSink: { _ in }).process(options)
+                XCTFail("expected \(extra) to require --debug")
+            } catch let error as CLIConfigurationError {
+                XCTAssertEqual(CLIExitCode.exitCode(for: error), .usage)
+            }
+        }
+    }
+
+    func testProcessorRejectsReservedBatchOptions() async throws {
+        let reservedCases: [[String]] = [
             ["--input-dir", "src"],
             ["--output-dir", "dst"],
             ["--recursive"],
@@ -176,6 +238,36 @@ final class CLIEndToEndTests: XCTestCase {
                 XCTAssertEqual(CLIExitCode.exitCode(for: error), .usage)
             }
         }
+    }
+
+    func testDebugWithMetalBackendFallsBackToCPUAndReportsDiagnostic() async throws {
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-metal-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-metal-output-\(UUID().uuidString).png")
+        let debugURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-debug-metal-artifacts-\(UUID().uuidString)")
+        let diagnostics = StringRecorder()
+        defer {
+            for url in [inputURL, outputURL, debugURL] { try? FileManager.default.removeItem(at: url) }
+        }
+        try Self.writeGradientPNG(width: 5, height: 5, to: inputURL)
+
+        let options = try CLIOptions.parse([
+            inputURL.path, outputURL.path,
+            "--width", "4", "--height", "5", "--backend", "metal",
+            "--debug", "--debug-directory", debugURL.path,
+        ])
+
+        let result = try await CLIProcessor(
+            progressSink: { _ in },
+            diagnosticSink: { diagnostics.append($0) }
+        ).process(options)
+
+        XCTAssertEqual(result.backend, .cpu)
+        XCTAssertTrue(diagnostics.value.contains("debug artifacts require CPU seam observation"))
+        let manifestData = try Data(contentsOf: debugURL.appendingPathComponent("manifest.json"))
+        let manifestObject = try XCTUnwrap(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+        XCTAssertEqual(manifestObject["requestedBackend"] as? String, "metal")
+        XCTAssertEqual(manifestObject["effectiveBackend"] as? String, "cpu")
+        XCTAssertEqual(manifestObject["backendDowngradeReason"] as? String, "debug artifacts require CPU seam observation")
     }
 
     func testProcessorRejectsForwardEnergyWithControls() async throws {
@@ -443,6 +535,23 @@ final class CLIEndToEndTests: XCTestCase {
         let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { throw NSError(domain: "CLIEndToEndTests", code: 2) }
+    }
+}
+
+private final class StringRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var text = ""
+
+    func append(_ value: String) {
+        lock.lock()
+        text += value
+        lock.unlock()
+    }
+
+    var value: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return text
     }
 }
 #else

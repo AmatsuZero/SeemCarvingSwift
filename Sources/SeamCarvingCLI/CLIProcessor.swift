@@ -26,16 +26,22 @@ public struct CLIProcessResult: Sendable, Equatable {
 /// thrown errors to `CLIExitCode`.
 public struct CLIProcessor: Sendable {
     private let progressSink: @Sendable (ResizeProgress) -> Void
+    private let diagnosticSink: @Sendable (String) -> Void
 
     public init(
         progressSink: @escaping @Sendable (ResizeProgress) -> Void = { progress in
             FileHandle.standardError.write(Data("progress \(progress.completedEdits)/\(progress.totalEdits)\n".utf8))
+        },
+        diagnosticSink: @escaping @Sendable (String) -> Void = { message in
+            FileHandle.standardError.write(Data(message.utf8))
         }
     ) {
         self.progressSink = progressSink
+        self.diagnosticSink = diagnosticSink
     }
 
     public func process(_ options: CLIOptions) async throws -> CLIProcessResult {
+        try validateDebugOptions(options)
         try validateReservedOptions(options)
         try validateEnergyControls(options)
 
@@ -43,6 +49,11 @@ public struct CLIProcessor: Sendable {
         let sourceSize = try PixelSize(width: inputImage.width, height: inputImage.height)
         let target = try resolveTarget(options.resizeMode, source: sourceSize)
         let masks = try buildMasks(options: options, image: inputImage)
+        let debugCollector = options.debug ? SeamObservationCollector() : nil
+        let backendPlan = effectiveBackend(for: options)
+        if let reason = backendPlan.downgradeReason {
+            diagnosticSink("warning: \(reason); using CPU for debug artifacts\n")
+        }
 
         var resizeOptions = ResizeOptions(
             energyMode: options.energy,
@@ -53,14 +64,17 @@ public struct CLIProcessor: Sendable {
             sobelThreshold: options.sobelThreshold ?? 0
         )
         resizeOptions.progress = progressSink
+        if let debugCollector {
+            resizeOptions.seamObserver = { observation in debugCollector.append(observation) }
+        }
 
         let result: CGImage
         if let policy = options.facePolicy {
             let faceCarver = try FaceAwareSeamCarver(
                 configuration: AppleSeamCarverConfiguration(
-                    backend: options.backend,
+                    backend: backendPlan.effectiveBackend,
                     metalMode: .full,
-                    deterministic: options.deterministic
+                    deterministic: options.deterministic || options.debug
                 ),
                 detector: try VisionFaceDetector(),
                 policy: policy,
@@ -69,8 +83,8 @@ public struct CLIProcessor: Sendable {
             result = try await faceCarver.resize(inputImage, orientation: .up, toPixelSize: target, options: resizeOptions)
         } else {
             let carver = try AppleSeamCarver(configuration: AppleSeamCarverConfiguration(
-                backend: options.backend,
-                deterministic: options.deterministic
+                backend: backendPlan.effectiveBackend,
+                deterministic: options.deterministic || options.debug
             ))
             result = try await carver.resize(inputImage, toPixelSize: target, options: resizeOptions)
         }
@@ -78,7 +92,17 @@ public struct CLIProcessor: Sendable {
         let format = try resolveOutputFormat(options)
         try CLIImageIO.writeImage(result, toPath: options.outputPath, format: format)
 
-        return CLIProcessResult(width: result.width, height: result.height, backend: options.backend)
+        if let debugCollector {
+            let configuration = try debugConfiguration(options: options, backendPlan: backendPlan)
+            try CLIDebugArtifactWriter.write(
+                observations: debugCollector.values,
+                sourceSize: sourceSize,
+                targetSize: target,
+                configuration: configuration
+            )
+        }
+
+        return CLIProcessResult(width: result.width, height: result.height, backend: backendPlan.effectiveBackend)
     }
 
     /// Rejects blur/Sobel threshold combined with forward energy up front so the
@@ -120,14 +144,51 @@ public struct CLIProcessor: Sendable {
         return .png
     }
 
+    private func validateDebugOptions(_ options: CLIOptions) throws {
+        if options.debug {
+            guard options.debugDirectory != nil else {
+                throw CLIConfigurationError.missingRequiredOption("--debug requires --debug-directory")
+            }
+        } else if options.debugDirectory != nil || options.seamColor != nil || options.seamShape != nil {
+            throw CLIConfigurationError.missingRequiredOption(
+                "--debug-directory, --seam-color, and --seam-shape require --debug"
+            )
+        }
+    }
+
+    private func effectiveBackend(for options: CLIOptions) -> (effectiveBackend: BackendPreference, downgradeReason: String?) {
+        guard options.debug else {
+            return (options.backend, nil)
+        }
+        switch options.backend {
+        case .automatic, .metal:
+            return (.cpu, "debug artifacts require CPU seam observation")
+        case .cpu, .accelerate:
+            return (options.backend, nil)
+        }
+    }
+
+    private func debugConfiguration(
+        options: CLIOptions,
+        backendPlan: (effectiveBackend: BackendPreference, downgradeReason: String?)
+    ) throws -> SeamDebugArtifactConfiguration {
+        guard let debugDirectory = options.debugDirectory else {
+            throw CLIConfigurationError.missingRequiredOption("--debug requires --debug-directory")
+        }
+        return SeamDebugArtifactConfiguration(
+            directory: URL(fileURLWithPath: debugDirectory),
+            color: options.seamColor ?? SeamColor(red: 255, green: 0, blue: 0, alpha: 255),
+            shape: options.seamShape ?? .line,
+            requestedBackend: options.backend,
+            effectiveBackend: backendPlan.effectiveBackend,
+            backendDowngradeReason: backendPlan.downgradeReason
+        )
+    }
+
     /// Rejects options that are parsed but whose behavior is owned by a later
     /// task. This prevents "flag accepted but silently ignored" behavior: a
     /// reserved flag either does nothing (its default) or fails loudly here.
     private func validateReservedOptions(_ options: CLIOptions) throws {
-        if options.debug { throw CLIConfigurationError.reservedOptionNotImplemented("--debug") }
-        if options.debugDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--debug-directory") }
-        if options.seamColor != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--seam-color") }
-        if options.seamShape != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--seam-shape") }
         if options.inputDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--input-dir") }
         if options.outputDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--output-dir") }
         if options.recursive { throw CLIConfigurationError.reservedOptionNotImplemented("--recursive") }

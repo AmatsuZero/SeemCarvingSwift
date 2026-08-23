@@ -317,6 +317,14 @@ public struct CoreResizeEngine: Sendable {
         for _ in 0..<count {
             try Task.checkCancellation()
             let seam = try findSeam(in: current, orientation: orientation, energyMode: options.energyMode, masks: currentMasks, blurRadius: options.blurRadius, sobelThreshold: options.sobelThreshold, recorder: recorder)
+            try Task.checkCancellation()
+            try options.seamObserver?(SeamObservation(
+                index: completed + 1,
+                totalCount: totalEdits,
+                kind: .remove,
+                seam: seam,
+                imageBeforeEdit: current
+            ))
             if let recorder {
                 current = try recorder.measure(\.editNS) { try SeamEditor.remove(seam, from: current) }
                 currentMasks = try recorder.measure(\.maskNS) { try removing(seam, from: currentMasks) }
@@ -359,6 +367,20 @@ public struct CoreResizeEngine: Sendable {
             }
 
             let inserted: (image: RGBA8Image, masks: MaskPair)
+            if let seamObserver = options.seamObserver {
+                for coordinates in set.coordinatesBySeam {
+                    try Task.checkCancellation()
+                    let seam = try SeamPath(orientation: set.orientation, coordinates: coordinates, totalCost: 0)
+                    try seamObserver(SeamObservation(
+                        index: completed + 1,
+                        totalCount: totalEdits,
+                        kind: .insert,
+                        seam: seam,
+                        imageBeforeEdit: current
+                    ))
+                    completed += 1
+                }
+            }
             if let recorder {
                 inserted = try recorder.measure(\.editNS) { try insertMapped(set, into: current, masks: currentMasks) }
             } else {
@@ -367,7 +389,9 @@ public struct CoreResizeEngine: Sendable {
             current = inserted.image
             currentMasks = inserted.masks
             remaining -= set.coordinatesBySeam.count
-            completed += set.coordinatesBySeam.count
+            if options.seamObserver == nil {
+                completed += set.coordinatesBySeam.count
+            }
             options.progress?(ResizeProgress(completedEdits: completed, totalEdits: totalEdits, size: try PixelSize(width: current.width, height: current.height)))
         }
         return (current, currentMasks, completed)
