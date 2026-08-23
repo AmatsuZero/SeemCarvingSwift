@@ -46,6 +46,11 @@ measurements.
 
 ## Production decision matrix (iPad, 2026-08-22)
 
+The benchmark numbers below are the last successful physical-iPad run. The
+device is currently offline, so this result remains historical evidence rather
+than a fresh release-gate run. The app acceptance matrix is maintained in
+`Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md`.
+
 Device: iPad (id `00008122-0009185E26DA801C`), iPadOS 17+. One sample per case,
 direct resize, deterministic seeded image, 1280x720, 8-seam removal.
 
