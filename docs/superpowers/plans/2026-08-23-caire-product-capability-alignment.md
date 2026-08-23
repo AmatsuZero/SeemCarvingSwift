@@ -361,7 +361,9 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 
 ## 执行记录（Execution Record）
 
-### Task 1 — 已完成
+### Task 1 — 条件通过
+
+> **条件通过：** 预留参数已禁止静默忽略；公开 API 兼容性和 progress sink 仍需后续明确/修改。可以开始执行 Task 2。
 
 - **提交：**
   - `d03b126` `refactor: split CLI processing pipeline`
@@ -380,3 +382,11 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 - **已知预留（未实现，属后续任务）：** `percentage`/`square` 已解析并校验，但 `CLIProcessor` 抛出 usage 错误（退出码 64）而非静默忽略；`blur`/`sobel`/`debug`/`seam`/batch 字段已类型化预留，engine 接线在 Task 2–5。
 - **复审修复（`d796766`）：** 所有已解析但未实现的 reserved 选项（`--blur-radius`、`--sobel-threshold`、`--debug`、`--debug-directory`、`--seam-color`、`--seam-shape`、`--input-dir`、`--output-dir`、`--recursive`、`--concurrency`）在 `CLIProcessor.validateReservedOptions` 中显式拒绝（`CLIConfigurationError.reservedOptionNotImplemented`，退出码 64），不再静默忽略；补充 rejection tests 与 exit-code 测试；`--help` 更新为「Implemented / Reserved」两段；`CLIOptions` 恢复 `width`/`height` 兼容访问器（`Int?`，仅 `.exact` 模式非 nil）。
 - **未改动：** 用户未提交的 `CODE_REVIEW.md`（保持未跟踪，未纳入提交）。
+
+### Task 1 — 遗留问题（非阻塞，需后续处理）
+
+1. **`width`/`height` 未真正保持 source compatibility。** 新增访问器为 `Int?`，原 API 为 `Int`，旧代码 `let width: Int = options.width` 仍会编译失败。当前只能称为“保留字段名称”。二选一：
+   - 明确记录为公开 API breaking change；或
+   - 保留旧 `Int` 语义，另增新的 `resizeMode` 配置接口。
+   （建议在 Task 2 定义最终 `ResizeMode` 时一并决策并落实，避免二次破坏。）
+2. **`CLIProcessor` 仍直接写 stderr。** 内部直接 `FileHandle.standardError.write(...)` 输出 progress，处理层仍耦合进程 I/O。建议在 Task 3（stdin/stdout binary mode）之前改为注入 progress sink，由 `CLIEntry` 负责输出。
