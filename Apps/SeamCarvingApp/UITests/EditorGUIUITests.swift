@@ -18,4 +18,17 @@ final class EditorGUIUITests: XCTestCase {
         XCTAssertFalse(resize.frame.isEmpty)
         XCTAssertFalse(canvas.frame.intersects(resize.frame))
     }
+
+    func testDisabledActionsRemainVisibleInDarkMode() {
+        let app = XCUIApplication(bundleIdentifier: "com.seamcarving.ios")
+        app.launchArguments += ["-AppleInterfaceStyle", "Dark"]
+        app.launch()
+
+        let export = app.buttons["Export image"]
+        let resize = app.buttons["Resize"]
+        XCTAssertTrue(export.waitForExistence(timeout: 10))
+        XCTAssertTrue(resize.waitForExistence(timeout: 10))
+        XCTAssertFalse(export.frame.isEmpty)
+        XCTAssertFalse(resize.frame.isEmpty)
+    }
 }

@@ -30,7 +30,7 @@ struct ExportView: View {
             }
                 .accessibilityIdentifier(A11y.ID.exportButton)
                 .disabled(!canExport)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(EditorActionButtonStyle())
 
             if let meta = model.document?.exportMetadata {
                 Text("Exported \(meta.format.uppercased()) · \(meta.byteCount) bytes")

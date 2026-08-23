@@ -118,7 +118,7 @@ struct ContentView: View {
         Button(A11y.Label.resize) { model.resize() }
             .accessibilityIdentifier(A11y.ID.resize)
             .disabled(model.phase.isProcessing || model.document == nil)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(EditorActionButtonStyle())
     }
 
     @ViewBuilder

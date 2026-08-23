@@ -28,7 +28,7 @@ struct CarveProgressView: View {
                     .foregroundStyle(.secondary)
                 Button(A11y.Label.cancel) { model.cancelResize() }
                     .accessibilityIdentifier(A11y.ID.cancel)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(EditorActionButtonStyle())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()

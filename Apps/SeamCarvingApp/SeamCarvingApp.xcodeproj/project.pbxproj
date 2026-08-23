@@ -22,6 +22,7 @@
 		820134D62BDEAF9E3A4C08C7 /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 0E1C90B525AF3D592EFA1B68 /* SeamCarvingVision */; };
 		A76E8981F73A15BF5D302D01 /* AcceptanceMatrix.md in Resources */ = {isa = PBXBuildFile; fileRef = 582DB63952E28ADAF6DB904A /* AcceptanceMatrix.md */; };
 		AA0A8CF9C471EDD0C28FD7CA /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = 080339A7DA805BBAC0B17D7B /* SeamCarvingApple */; };
+		AE374E8B25F397F7D9786189 /* EditorActionButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5DA41BAE81560E7AF2907D /* EditorActionButtonStyle.swift */; };
 		AECE4679F2DD277D6B90788B /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 6D4291298A82F8F87C4B1746 /* SeamCarvingVision */; };
 		C6059C8FB5BEF8B28B81F7A2 /* MaskToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */; };
 		CC11A30C5E2303D798BE6DEC /* PlatformImageServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63A9112CDA64D8E932CA42C /* PlatformImageServices.swift */; };
@@ -59,6 +60,7 @@
 		1D116582298645AAACF50678 /* EditorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorUITests.swift; sourceTree = "<group>"; };
 		2928F8D2C19EC1B51F0873B5 /* SeemCarvingSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeemCarvingSwift; path = ../..; sourceTree = SOURCE_ROOT; };
 		3778929F0933F841B0B4B252 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		3F5DA41BAE81560E7AF2907D /* EditorActionButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorActionButtonStyle.swift; sourceTree = "<group>"; };
 		46DC13845A32CF0775FDEA51 /* SeamCarvingAppUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeamCarvingAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CD971511CF60BBDC4938708 /* EditorGUIUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorGUIUITests.swift; sourceTree = "<group>"; };
 		542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCanvasView.swift; sourceTree = "<group>"; };
@@ -151,6 +153,7 @@
 				3778929F0933F841B0B4B252 /* AppModel.swift */,
 				E077EEF62CA83A558BF3B743 /* CarveProgressView.swift */,
 				F75E4EFDA047EC29DF29DBEF /* ContentView.swift */,
+				3F5DA41BAE81560E7AF2907D /* EditorActionButtonStyle.swift */,
 				DAF60E55CFCECC2C6BB29510 /* ExportView.swift */,
 				7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */,
 				542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */,
@@ -316,6 +319,7 @@
 				F937DDF7E8E1370BF0E4C4CE /* AppModel.swift in Sources */,
 				676CC8C6D1DB6B7B41888C07 /* CarveProgressView.swift in Sources */,
 				E7C135C5CFA4AC678D824586 /* ContentView.swift in Sources */,
+				AE374E8B25F397F7D9786189 /* EditorActionButtonStyle.swift in Sources */,
 				F610D70B3F5CAE01B5E7393B /* ExportView.swift in Sources */,
 				1F05DE92745213E722C7D1D6 /* FaceProtectionControlsView.swift in Sources */,
 				E7516AC15708A4686726CA82 /* ImageCanvasView.swift in Sources */,

@@ -66,16 +66,32 @@ struct MaskToolbarView: View {
     @ViewBuilder
     private var actionRow: some View {
         HStack {
-            Button(A11y.Label.undo) { painter.undo() }
+            Button {
+                painter.undo()
+            } label: {
+                Text(A11y.Label.undo).lineLimit(1).minimumScaleFactor(0.8)
+            }
                 .accessibilityIdentifier(A11y.ID.undo)
                 .disabled(!painter.canUndo)
-            Button(A11y.Label.redo) { painter.redo() }
+            Button {
+                painter.redo()
+            } label: {
+                Text(A11y.Label.redo).lineLimit(1).minimumScaleFactor(0.8)
+            }
                 .accessibilityIdentifier(A11y.ID.redo)
                 .disabled(!painter.canRedo)
             Spacer()
-            Button(A11y.Label.clear) { painter.clear() }
+            Button {
+                painter.clear()
+            } label: {
+                Text(A11y.Label.clear).lineLimit(1).minimumScaleFactor(0.8)
+            }
                 .accessibilityIdentifier(A11y.ID.clearMasks)
-            Button(A11y.Label.reset) { painter.reset() }
+            Button {
+                painter.reset()
+            } label: {
+                Text(A11y.Label.reset).lineLimit(1).minimumScaleFactor(0.8)
+            }
                 .accessibilityIdentifier(A11y.ID.resetMasks)
         }
     }
