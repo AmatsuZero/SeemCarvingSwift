@@ -475,3 +475,26 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
   - `CLIEntry`：binary stdout（`-`）模式抑制 `WxH backend` 摘要；`--help` 说明 stdin/stdout/URL/BMP/`--format`。
   - Tests：`--format` parse/negative；BMP 扩展名与 `--format bmp` 输出；stdin→stdout PNG 二进制 round-trip（校验 PNG magic、stdout 不含摘要文本）；缺失输入 → 65；非法参数 → 64。
 - **遗留项已处理：** Task 1 遗留的「progress sink」在此次注入完成（`CLIProcessor(progressSink:)`）；`width`/`height` 的 source compatibility 决策仍属非阻塞遗留。
+
+### Task 4–5 — 已完成
+
+- **提交：** `5a5a234` `feat: add recursive bounded CLI batch processing`、`b1193c7` `feat: add seam debug artifacts`
+- **验证：** batch/debug tests and the full Swift package suite passed; current final suite is 165/165.
+- **结果：** recursive normalized batch traversal, bounded concurrency, partial-failure reporting, seam manifest/overlay artifacts, cancellation-aware observation, and explicit CPU fallback for Metal debug are implemented.
+
+### Task 6–7 — 已完成
+
+- **提交：** `1316499` `feat: add GUI object removal and face preflight workflows`
+- **验证：** clean macOS XCTest 29/29 and clean iOS Simulator XCTest 29/29 passed.
+- **结果：** GUI object-removal/restoration controls and Vision face preflight/editable exclusions are wired through the shared model and tested with injected services/detectors.
+
+### Task 8–9 — 已完成
+
+- **验证：** package 165/165, macOS GUI 29/29, iOS Simulator GUI 29/29; prior iPad device App XCTest and Metal screening evidence remains recorded in the capability matrix.
+- **结果：** README, capability matrix, platform acceptance evidence, and remaining manual picker/real-face smoke-test caveats are documented.
+
+### Task 10 — 已完成
+
+- **提交：** `ffd01c4` `refactor: migrate CLI parsing to argument parser`
+- **验证：** `swift package resolve`; CLI parser tests 30/30; full Swift package suite 165/165; clean macOS/iOS GUI XCTest remained green.
+- **结果：** `AsyncParsableCommand` and typed `ParsableArguments` replace hand-written argv scanning, while `CLIOptions.parse(_:)` and `CLIConfiguration` remain the testable/domain validation seam. Legacy `--format` spelling and binary stdout behavior are preserved.
