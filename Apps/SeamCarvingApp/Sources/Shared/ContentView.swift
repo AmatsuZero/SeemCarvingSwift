@@ -123,14 +123,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var importButton: some View {
-#if os(macOS)
-        Button("Import Image…") {
-            guard let source = MacPlatformServices.openImage() else { return }
-            Task { await model.importImage(source) }
-        }
-        .buttonStyle(.bordered)
-        .accessibilityIdentifier(A11y.ID.importButton)
-#elseif os(iOS)
+#if os(iOS)
         HStack {
             PhotosPicker(selection: $photoItem, matching: .images) {
                 Label("Photos", systemImage: "photo.badge.plus")
