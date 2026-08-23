@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SeamCarvingSwift project documentation">
+  <title>SeamCarvingSwift Documentation</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">SeamCarvingSwift</a>
+      <nav aria-label="Primary navigation">
+        <a class="active" aria-current="page" href="index.html">Overview</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="principles.html">Principles</a>
+        <a href="api.html">Swift API</a>
+        <a href="cli.html">CLI</a>
+        <a href="app.html">App</a>
+        <a href="capability-matrix.html">Capabilities</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" class="container">
+    <section class="hero">
+      <p class="eyebrow">Swift 6 · iOS 17+ · macOS 14+</p>
+      <h1>Content-aware image resizing for Apple platforms</h1>
+      <p class="lead">SeamCarvingSwift is a modular seam-carving package with a platform-independent Core engine, optional Accelerate and Metal backends, Apple image bridges, Vision face protection, a command-line tool, and one SwiftUI app target for iPhone, iPad, and Mac Catalyst.</p>
+      <div class="button-row">
+        <a class="button primary" href="api.html">Use the Swift API</a>
+        <a class="button" href="cli.html">Run the CLI</a>
+        <a class="button" href="app.html">Build the app</a>
+      </div>
+    </section>
+
+    <section class="grid cards" aria-label="Documentation guides">
+      <a class="card" href="architecture.html">
+        <h2>Architecture</h2>
+        <p>See how Core, Accelerate, Metal, Apple, Vision, CLI, and the shared SwiftUI app fit together.</p>
+      </a>
+      <a class="card" href="principles.html">
+        <h2>Algorithm principles</h2>
+        <p>Learn the energy functions, dynamic programming loop, mask semantics, enlargement, and backend policy.</p>
+      </a>
+      <a class="card" href="api.html">
+        <h2>Swift API</h2>
+        <p>Start with canonical RGBA8 data, then add Apple image conversion, masks, progress, cancellation, or Vision.</p>
+      </a>
+      <a class="card" href="cli.html">
+        <h2>Command line</h2>
+        <p>Resize local files, URLs, stdin, or batches with the actual <code>seamcarve-cli</code> options.</p>
+      </a>
+      <a class="card" href="app.html">
+        <h2>Apple app</h2>
+        <p>Use the shared SwiftUI editor on iPhone, iPad, and Mac Catalyst, including masks and face protection.</p>
+      </a>
+      <a class="card" href="capability-matrix.html">
+        <h2>Capability matrix</h2>
+        <p>Review the current Caire-aligned capability contract and its acceptance status.</p>
+      </a>
+    </section>
+
+    <section class="callout">
+      <h2>Quick start</h2>
+      <pre><code>git clone &lt;repository-url&gt;
+cd SeemCarvingSwift
+swift test
+swift run seamcarve-cli --help</code></pre>
+      <p>The package has no documentation build dependency. GitHub Pages can serve this committed <code>docs/</code> directory directly.</p>
+    </section>
+
+    <section>
+      <h2>What is implemented</h2>
+      <p>The engine supports shrink and enlarge operations, backward Sobel and forward-luma energy, sequential seam edits, protection and removal masks, object removal with optional restoration, progress and cancellation, optional Lanczos residual pre-scaling, and CPU/Accelerate/Metal selection through the Apple facade.</p>
+      <p>Vision face protection and Metal are optional platform adapters. Automatic backend selection tries Metal, then Accelerate, then CPU. Debug seam artifacts intentionally use CPU observation. See <a href="principles.html#limitations">limitations</a> before assuming every backend has identical performance characteristics.</p>
+    </section>
+
+    <section class="callout warning">
+      <h2>Verification status</h2>
+      <p>The repository records package, simulator, Catalyst, and signed iPad unit-test results in the <a href="capability-matrix.html">capability matrix</a>. Physical iPad UI XCTest currently times out while enabling automation mode before a UI test method runs; iPad Simulator is the passing UI-automation environment. Physical Metal screening is recorded separately and should be rerun with a dedicated signed Metal host when release evidence is required.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container"><p>SeamCarvingSwift · static documentation for GitHub Pages · <a href="../README.md">Repository README</a></p></div>
+  </footer>
+</body>
+</html>
