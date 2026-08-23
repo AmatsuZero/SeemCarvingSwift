@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 import SeamCarvingCore
 import SeamCarvingCLI
 import SeamCarvingApple
+import SeamCarvingVision
 
 @main
 enum CLIEntry {
@@ -13,7 +14,7 @@ enum CLIEntry {
         let arguments = Array(CommandLine.arguments.dropFirst())
 
         if arguments.contains("--help") || arguments.contains("-h") {
-            print("Usage: seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS [--backend automatic|cpu|accelerate|metal] [--energy backward|forward]")
+            print("Usage: seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS [--backend automatic|cpu|accelerate|metal] [--energy backward|forward] [--order width-first|height-first|adaptive] [--pre-scale none|lanczos-residual] [--deterministic] [--protect-mask PATH --protect-strength hard|soft --protect-weight VALUE] [--remove-mask PATH --removal-weight VALUE] [--face-policy caire|vision --face-cadence once|each-pass]")
             exit(0)
         }
 
@@ -33,24 +34,69 @@ enum CLIEntry {
 
         let carver: AppleSeamCarver
         do {
-            carver = try AppleSeamCarver(configuration: AppleSeamCarverConfiguration(backend: options.backend))
+            carver = try AppleSeamCarver(configuration: AppleSeamCarverConfiguration(backend: options.backend, deterministic: options.deterministic))
         } catch {
             FileHandle.standardError.write(Data("error: \(error)\n".utf8))
             exit(70)
         }
 
-        var resizeOptions = ResizeOptions(energyMode: options.energy)
+        var masks = MaskPair()
+        do {
+            if let path = options.protectMaskPath {
+                let mask = try loadMask(path: path)
+                guard mask.width == inputImage.width, mask.height == inputImage.height else {
+                    throw SeamCarvingError.invalidConfiguration("protection mask dimensions must match input")
+                }
+                masks = try MaskPair(
+                    protectionLayers: [try ProtectionLayer(mask: mask, strength: options.protectStrength)],
+                    removal: nil,
+                    removalWeight: options.removalWeight
+                )
+            }
+            if let path = options.removeMaskPath {
+                let mask = try loadMask(path: path)
+                guard mask.width == inputImage.width, mask.height == inputImage.height else {
+                    throw SeamCarvingError.invalidConfiguration("removal mask dimensions must match input")
+                }
+                masks = try MaskPair(
+                    protectionLayers: masks.protectionLayers,
+                    removal: mask,
+                    removalWeight: options.removalWeight
+                )
+            }
+        } catch {
+            FileHandle.standardError.write(Data("error: invalid mask: \(error)\n".utf8))
+            exit(65)
+        }
+
+        var resizeOptions = ResizeOptions(
+            energyMode: options.energy,
+            dimensionOrder: options.dimensionOrder,
+            masks: masks,
+            preScaleStrategy: options.preScaleStrategy
+        )
         resizeOptions.progress = { (progress: ResizeProgress) in
             FileHandle.standardError.write(Data("progress \(progress.completedEdits)/\(progress.totalEdits)\n".utf8))
         }
 
         let result: CGImage
         do {
-            result = try await carver.resize(
-                inputImage,
-                toPixelSize: try PixelSize(width: options.width, height: options.height),
-                options: resizeOptions
-            )
+            let target = try PixelSize(width: options.width, height: options.height)
+            if let policy = options.facePolicy {
+                let faceCarver = try FaceAwareSeamCarver(
+                    configuration: AppleSeamCarverConfiguration(
+                        backend: options.backend,
+                        metalMode: .full,
+                        deterministic: options.deterministic
+                    ),
+                    detector: try VisionFaceDetector(),
+                    policy: policy,
+                    cadence: options.faceCadence
+                )
+                result = try await faceCarver.resize(inputImage, orientation: .up, toPixelSize: target, options: resizeOptions)
+            } else {
+                result = try await carver.resize(inputImage, toPixelSize: target, options: resizeOptions)
+            }
         } catch is CancellationError {
             exit(130)
         } catch {
@@ -79,6 +125,21 @@ enum CLIEntry {
         case "jpg", "jpeg": return UTType.jpeg.identifier as CFString
         default: return nil
         }
+    }
+
+    private static func loadMask(path: String) throws -> Mask {
+        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw SeamCarvingError.invalidConfiguration("cannot decode mask at \(path)")
+        }
+        let rgba = try CGImageBridge.decode(image)
+        var values = [Float](repeating: 0, count: rgba.width * rgba.height)
+        for index in values.indices {
+            let base = index * 4
+            let intensity = max(rgba.pixels[base], max(rgba.pixels[base + 1], rgba.pixels[base + 2]))
+            values[index] = Float(intensity) / 255
+        }
+        return try Mask(width: rgba.width, height: rgba.height, values: values)
     }
 }
 

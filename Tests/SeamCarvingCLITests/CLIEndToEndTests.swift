@@ -43,6 +43,42 @@ final class CLIEndToEndTests: XCTestCase {
         XCTAssertEqual(image.height, 18)
     }
 
+    func testResizeImageWithProtectMask() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-mask-input-\(UUID().uuidString).png")
+        let maskURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-mask-protect-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-mask-output-\(UUID().uuidString).png")
+        defer {
+            for url in [inputURL, maskURL, outputURL] { try? FileManager.default.removeItem(at: url) }
+        }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+        try Self.writeMaskPNG(width: 32, height: 24, protectedRect: CGRect(x: 12, y: 8, width: 8, height: 8), to: maskURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = [
+            inputURL.path, outputURL.path,
+            "--width", "20", "--height", "18",
+            "--backend", "cpu", "--protect-mask", maskURL.path,
+            "--protect-strength", "hard",
+        ]
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "stderr: \(String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")")
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("cannot reopen masked output")
+            return
+        }
+        XCTAssertEqual(image.width, 20)
+        XCTAssertEqual(image.height, 18)
+    }
+
     private static func writeGradientPNG(width: Int, height: Int, to url: URL) throws {
         var pixels = [UInt8]()
         for y in 0..<height {
@@ -64,6 +100,29 @@ final class CLIEndToEndTests: XCTestCase {
         }
         CGImageDestinationAddImage(destination, image, nil)
         CGImageDestinationFinalize(destination)
+    }
+
+    private static func writeMaskPNG(width: Int, height: Int, protectedRect: CGRect, to url: URL) throws {
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        for y in 0..<height where protectedRect.contains(CGPoint(x: width / 2, y: y)) {
+            for x in 0..<width where protectedRect.contains(CGPoint(x: x, y: y)) {
+                let base = (y * width + x) * 4
+                pixels[base] = 255
+                pixels[base + 1] = 255
+                pixels[base + 2] = 255
+                pixels[base + 3] = 255
+            }
+        }
+        let provider = CGDataProvider(data: Data(pixels) as CFData)!
+        let image = CGImage(
+            width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+        )!
+        let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { throw NSError(domain: "CLIEndToEndTests", code: 2) }
     }
 }
 #else

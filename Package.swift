@@ -37,7 +37,7 @@ let package = Package(
         .target(name: "SeamCarvingCLI", dependencies: ["SeamCarvingCore"]),
         .executableTarget(
             name: "seamcarve-cli",
-            dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]
+            dependencies: ["SeamCarvingCLI", "SeamCarvingApple", "SeamCarvingVision"]
         ),
         .target(
             name: "SeamCarvingBenchmark",

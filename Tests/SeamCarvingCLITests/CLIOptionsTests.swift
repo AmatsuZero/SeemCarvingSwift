@@ -1,5 +1,6 @@
 import XCTest
 @testable import SeamCarvingCLI
+import SeamCarvingVision
 
 final class CLIOptionsTests: XCTestCase {
     func testDocumentedExample() throws {
@@ -37,5 +38,36 @@ final class CLIOptionsTests: XCTestCase {
         let options = try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--energy", "forward", "--backend", "metal"])
         XCTAssertEqual(options.energy, .forwardLuma)
         XCTAssertEqual(options.backend, .metal)
+    }
+
+    func testAdvancedOptionsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--order", "adaptive", "--pre-scale", "lanczos-residual", "--deterministic"
+        ])
+        XCTAssertEqual(options.dimensionOrder, .adaptiveNormalizedCost)
+        XCTAssertEqual(options.preScaleStrategy, .lanczosThenExactResidual)
+        XCTAssertTrue(options.deterministic)
+    }
+
+    func testMaskOptionsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--protect-mask", "protect.png", "--protect-strength", "hard",
+            "--remove-mask", "remove.png", "--removal-weight", "2500"
+        ])
+        XCTAssertEqual(options.protectMaskPath, "protect.png")
+        XCTAssertEqual(options.removeMaskPath, "remove.png")
+        XCTAssertEqual(options.protectStrength, .hard)
+        XCTAssertEqual(options.removalWeight, 2500)
+    }
+
+    func testFaceOptionsParse() throws {
+        let options = try CLIOptions.parse([
+            "in", "out", "--width", "20", "--height", "18",
+            "--face-policy", "vision", "--face-cadence", "each-pass"
+        ])
+        XCTAssertEqual(options.facePolicy, .visionQuality(try VisionQualityParameters()))
+        XCTAssertEqual(options.faceCadence, .redetectEveryPass)
     }
 }
