@@ -8,7 +8,7 @@ enum CLIEntry {
         let arguments = Array(CommandLine.arguments.dropFirst())
 
         if arguments.contains("--help") || arguments.contains("-h") {
-            print("Usage: seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS [--backend automatic|cpu|accelerate|metal] [--energy backward|forward] [--order width-first|height-first|adaptive] [--pre-scale none|lanczos-residual] [--deterministic] [--protect-mask PATH --protect-strength hard|soft --protect-weight VALUE] [--remove-mask PATH --removal-weight VALUE] [--face-policy caire|vision --face-cadence once|each-pass]")
+            print(Self.helpText)
             exit(CLIExitCode.success.rawValue)
         }
 
@@ -37,6 +37,26 @@ enum CLIEntry {
             return "\(error)"
         }
     }
+
+    private static let helpText = """
+    Usage: seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS [options]
+
+    Implemented options:
+      --backend automatic|cpu|accelerate|metal
+      --energy backward|forward
+      --order width-first|height-first|adaptive
+      --pre-scale none|lanczos-residual
+      --deterministic
+      --protect-mask PATH --protect-strength hard|soft --protect-weight VALUE
+      --remove-mask PATH --removal-weight VALUE
+      --face-policy caire|vision --face-cadence once|each-pass
+
+    Reserved (parsed but not yet implemented; rejected with exit code 64):
+      --percentage P --square
+      --blur-radius R --sobel-threshold T
+      --debug --debug-directory DIR --seam-color HEX --seam-shape line|points
+      --input-dir DIR --output-dir DIR --recursive --concurrency N
+    """
 }
 
 #else

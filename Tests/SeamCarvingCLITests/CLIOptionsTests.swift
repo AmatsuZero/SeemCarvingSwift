@@ -122,6 +122,20 @@ final class CLIOptionsTests: XCTestCase {
         XCTAssertEqual(options.resizeMode, .square)
     }
 
+    func testWidthHeightCompatibility() throws {
+        let exact = try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18"])
+        XCTAssertEqual(exact.width, 20)
+        XCTAssertEqual(exact.height, 18)
+
+        let percentage = try CLIOptions.parse(["in", "out", "--percentage", "50"])
+        XCTAssertNil(percentage.width)
+        XCTAssertNil(percentage.height)
+
+        let square = try CLIOptions.parse(["in", "out", "--square"])
+        XCTAssertNil(square.width)
+        XCTAssertNil(square.height)
+    }
+
     func testReservedEnergyControlsParse() throws {
         let options = try CLIOptions.parse([
             "in", "out", "--width", "20", "--height", "18",
@@ -183,6 +197,7 @@ final class CLIOptionsTests: XCTestCase {
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.invalidArguments), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIParseError.conflictingModes), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIConfigurationError.reservedResizeModeNotImplemented(.square)), .usage)
+        XCTAssertEqual(CLIExitCode.exitCode(for: CLIConfigurationError.reservedOptionNotImplemented("--debug")), .usage)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.cannotDecodeInput), .dataError)
         XCTAssertEqual(CLIExitCode.exitCode(for: CLIImageIOError.unsupportedOutputFormat("bmp")), .dataError)
         XCTAssertEqual(CLIExitCode.exitCode(for: CancellationError()), .cancelled)

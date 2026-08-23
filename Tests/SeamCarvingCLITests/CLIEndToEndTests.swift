@@ -119,6 +119,32 @@ final class CLIEndToEndTests: XCTestCase {
         }
     }
 
+    func testProcessorRejectsReservedOptions() async throws {
+        let reservedCases: [[String]] = [
+            ["--blur-radius", "2"],
+            ["--sobel-threshold", "0.3"],
+            ["--debug"],
+            ["--debug-directory", "seams"],
+            ["--seam-color", "#ff0000"],
+            ["--seam-shape", "line"],
+            ["--input-dir", "src"],
+            ["--output-dir", "dst"],
+            ["--recursive"],
+            ["--concurrency", "4"],
+        ]
+        for extra in reservedCases {
+            var args = ["in.png", "out.png", "--width", "20", "--height", "18"]
+            args.append(contentsOf: extra)
+            let options = try CLIOptions.parse(args)
+            do {
+                _ = try await CLIProcessor().process(options)
+                XCTFail("expected reserved option rejection for \(extra.joined(separator: " "))")
+            } catch let error as CLIConfigurationError {
+                XCTAssertEqual(CLIExitCode.exitCode(for: error), .usage)
+            }
+        }
+    }
+
     func testProcessorRejectsMaskDimensionMismatch() async throws {
         let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-mismatch-input-\(UUID().uuidString).png")
         let maskURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-proc-mismatch-mask-\(UUID().uuidString).png")

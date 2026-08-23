@@ -56,6 +56,24 @@ public struct CLIOptions: Sendable, Equatable {
     /// Reserved: batch concurrency limit.
     public let concurrency: Int?
 
+    /// Target width for the `exact` resize mode, or `nil` for other modes.
+    ///
+    /// Provided for source compatibility with the pre-`ResizeMode` API. New
+    /// callers should read `resizeMode` directly.
+    public var width: Int? {
+        if case .exact(let width, _) = resizeMode { return width }
+        return nil
+    }
+
+    /// Target height for the `exact` resize mode, or `nil` for other modes.
+    ///
+    /// Provided for source compatibility with the pre-`ResizeMode` API. New
+    /// callers should read `resizeMode` directly.
+    public var height: Int? {
+        if case .exact(_, let height) = resizeMode { return height }
+        return nil
+    }
+
     public static func parse(_ arguments: [String]) throws -> CLIOptions {
         var inputPath: String?
         var outputPath: String?

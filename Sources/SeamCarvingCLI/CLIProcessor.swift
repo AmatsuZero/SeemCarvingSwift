@@ -28,6 +28,7 @@ public struct CLIProcessor: Sendable {
     public init() {}
 
     public func process(_ options: CLIOptions) async throws -> CLIProcessResult {
+        try validateReservedOptions(options)
         let target = try resolveTarget(options.resizeMode)
 
         let inputImage = try CLIImageIO.readImage(fromPath: options.inputPath)
@@ -76,6 +77,22 @@ public struct CLIProcessor: Sendable {
         case .percentage, .square:
             throw CLIConfigurationError.reservedResizeModeNotImplemented(mode)
         }
+    }
+
+    /// Rejects options that are parsed but whose behavior is owned by a later
+    /// task. This prevents "flag accepted but silently ignored" behavior: a
+    /// reserved flag either does nothing (its default) or fails loudly here.
+    private func validateReservedOptions(_ options: CLIOptions) throws {
+        if options.blurRadius != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--blur-radius") }
+        if options.sobelThreshold != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--sobel-threshold") }
+        if options.debug { throw CLIConfigurationError.reservedOptionNotImplemented("--debug") }
+        if options.debugDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--debug-directory") }
+        if options.seamColor != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--seam-color") }
+        if options.seamShape != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--seam-shape") }
+        if options.inputDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--input-dir") }
+        if options.outputDirectory != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--output-dir") }
+        if options.recursive { throw CLIConfigurationError.reservedOptionNotImplemented("--recursive") }
+        if options.concurrency != nil { throw CLIConfigurationError.reservedOptionNotImplemented("--concurrency") }
     }
 
     private func buildMasks(options: CLIOptions, image: CGImage) throws -> MaskPair {

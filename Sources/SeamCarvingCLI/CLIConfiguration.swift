@@ -88,6 +88,7 @@ public enum CLIExitCode: Int32, Sendable, Equatable {
 /// individually but cannot be executed yet (for example a reserved resize mode).
 public enum CLIConfigurationError: Error, Equatable {
     case reservedResizeModeNotImplemented(ResizeMode)
+    case reservedOptionNotImplemented(String)
 
     public var message: String {
         switch self {
@@ -100,6 +101,8 @@ public enum CLIConfigurationError: Error, Equatable {
             case .square:
                 return "square resize is reserved and not yet implemented"
             }
+        case .reservedOptionNotImplemented(let option):
+            return "option \(option) is reserved and not yet implemented"
         }
     }
 }
