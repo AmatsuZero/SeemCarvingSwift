@@ -160,3 +160,12 @@
 - Native AppKit open/save code and duplicate native macOS target are removed from the product path.
 - Startup diagnostics have been classified; app-owned causes are fixed, and unavoidable system/Xcode warnings are documented rather than hidden.
 - Package tests, Mac Catalyst GUI tests, iOS/iPadOS tests, and available iPad device/Metal tests pass.
+
+## Execution record (2026-08-23)
+
+- Completed in `28fbbb4`: cross-platform layout/orientation fixes and GUI regression coverage.
+- Completed in `69f0394`: replaced the native macOS application/test/UI-test targets with one iOS target supporting iPhone, iPad, and Mac Catalyst.
+- Completed in `92d7eae`, `79c8a33`, and `b5527a1`: unified UIKit platform services, removed AppKit services and stale native-macOS paths, and added Catalyst-specific availability guards.
+- Catalyst build passed with `xcodebuild ... -destination 'platform=macOS,variant=Mac Catalyst' build CODE_SIGNING_ALLOWED=NO`.
+- iPhone 17 Simulator passed the unified scheme: 31 app unit tests plus 1 GUI UI test (`** TEST SUCCEEDED **`). The prior `BackendTimingRecorder` duplicate was not present in the rebuilt app; only one `SeamCarving.debug.dylib` runtime image is linked.
+- The remaining `UIAccessibilityLoaderWebShared`, `appintentsmetadataprocessor`, and Metal toolchain search-path messages are simulator/Xcode/system diagnostics, not app-owned startup registrations. Physical iPad validation and final capability-matrix acceptance remain.
