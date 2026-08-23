@@ -24,7 +24,7 @@
 		AA0A8CF9C471EDD0C28FD7CA /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = 080339A7DA805BBAC0B17D7B /* SeamCarvingApple */; };
 		AECE4679F2DD277D6B90788B /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 6D4291298A82F8F87C4B1746 /* SeamCarvingVision */; };
 		C6059C8FB5BEF8B28B81F7A2 /* MaskToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */; };
-		C955D4C500648EF051FFABA2 /* IOSPlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */; };
+		CC11A30C5E2303D798BE6DEC /* PlatformImageServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63A9112CDA64D8E932CA42C /* PlatformImageServices.swift */; };
 		CFDB49C35532FCAA031B22EE /* EditorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D116582298645AAACF50678 /* EditorUITests.swift */; };
 		D071B4BB56FE2DDCFC560E8D /* SeamCarvingCore in Frameworks */ = {isa = PBXBuildFile; productRef = 02901447C73792F3B57DF862 /* SeamCarvingCore */; };
 		E7516AC15708A4686726CA82 /* ImageCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */; };
@@ -52,7 +52,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSPlatformServices.swift; sourceTree = "<group>"; };
 		0FF6465605613391BF32F51B /* MaskPaintingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskPaintingController.swift; sourceTree = "<group>"; };
 		150529A85B5A26250F2DD13D /* SeamCarvingAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeamCarvingAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskToolbarView.swift; sourceTree = "<group>"; };
@@ -68,6 +67,7 @@
 		767C665B027667E72901BF47 /* ResizeDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeDocument.swift; sourceTree = "<group>"; };
 		7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceProtectionControlsView.swift; sourceTree = "<group>"; };
 		8FDCC72EF3D15846BAE9CC56 /* SeamCarving.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeamCarving.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B63A9112CDA64D8E932CA42C /* PlatformImageServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformImageServices.swift; sourceTree = "<group>"; };
 		CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeamCarvingApp.swift; sourceTree = "<group>"; };
 		DAF60E55CFCECC2C6BB29510 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
@@ -140,7 +140,6 @@
 		B387577BB32E2C1AACE155CA /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -157,6 +156,7 @@
 				542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */,
 				0FF6465605613391BF32F51B /* MaskPaintingController.swift */,
 				1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */,
+				B63A9112CDA64D8E932CA42C /* PlatformImageServices.swift */,
 				EEFA169BC723551B65481E7F /* ResizeConfiguration.swift */,
 				1CDBE36C3E1A9C31741B292A /* ResizeControlsView.swift */,
 				767C665B027667E72901BF47 /* ResizeDocument.swift */,
@@ -318,10 +318,10 @@
 				E7C135C5CFA4AC678D824586 /* ContentView.swift in Sources */,
 				F610D70B3F5CAE01B5E7393B /* ExportView.swift in Sources */,
 				1F05DE92745213E722C7D1D6 /* FaceProtectionControlsView.swift in Sources */,
-				C955D4C500648EF051FFABA2 /* IOSPlatformServices.swift in Sources */,
 				E7516AC15708A4686726CA82 /* ImageCanvasView.swift in Sources */,
 				6426F439A851E9308A110881 /* MaskPaintingController.swift in Sources */,
 				C6059C8FB5BEF8B28B81F7A2 /* MaskToolbarView.swift in Sources */,
+				CC11A30C5E2303D798BE6DEC /* PlatformImageServices.swift in Sources */,
 				65DCAF4CD14CCF728FC3717B /* ResizeConfiguration.swift in Sources */,
 				1FFCFBE826C1020F0CA38E0C /* ResizeControlsView.swift in Sources */,
 				2111ECE8FE2E00B55FC55B72 /* ResizeDocument.swift in Sources */,

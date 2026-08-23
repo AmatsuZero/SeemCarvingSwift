@@ -139,7 +139,7 @@ struct ContentView: View {
                 guard url.startAccessingSecurityScopedResource() else { return }
                 defer { url.stopAccessingSecurityScopedResource() }
                 guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else { return }
-                await model.importImage(ApplePlatformServices.imageSource(from: image))
+                await model.importImage(PlatformImageServices.imageSource(from: image))
             }
         }
         .onChange(of: photoItem) { _, item in
@@ -147,7 +147,7 @@ struct ContentView: View {
             Task {
                 guard let data = try? await item.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else { return }
-                await model.importImage(ApplePlatformServices.imageSource(from: image))
+                await model.importImage(PlatformImageServices.imageSource(from: image))
             }
         }
 #else
