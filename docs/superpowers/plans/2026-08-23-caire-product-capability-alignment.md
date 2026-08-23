@@ -417,3 +417,20 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
   2. `LuminancePlane.blurred(radius:)` 增加 `radius <= (Int.max - 1) / 2` 上限检查，修复超大 radius 的整数溢出。
   3. `CoreResizeEngine.findSeam` 在 energy mode 分支前统一校验 `blurRadius >= 0`、`sobelThreshold` 有限且非负，forward energy 下非法值不再被忽略。
   4. CLI 中 forward + blur/sobel 由 `CLIProcessor.validateEnergyControls` 转为 `CLIConfigurationError.incompatibleOptions`（退出码 64），而非 backend 错误（70）。
+
+### Task 3 — 已完成
+
+- **提交：** `ee598ea` `feat: add CLI stream URL and BMP I/O`
+- **验证：**
+  - `swift test --package-path . --filter CLIEndToEndTests --parallel` → 通过（13 测试）
+  - `swift run --package-path . seamcarve-cli --help` → 正常
+  - `swift test --package-path . --parallel` → 150/150 通过
+  - `xcodebuild -scheme SeamCarvingSwift-Package -workspace . -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build` → BUILD SUCCEEDED
+  - `git diff --check` 干净
+- **改动摘要：**
+  - `CLIImageIO`：`-` input 读 stdin、`-` output 写 stdout（仅图像字节）；http/https URL 用 `URLSession` 下载（非 http/https 一律按本地路径处理）；新增 `CLIOutputFormat`（png/jpeg/bmp）与 `networkFailure`；encode 改为 `CGImageDestinationCreateWithData` 统一生成 Data。
+  - `CLIOptions`：新增 `--format png|jpeg|bmp`。
+  - `CLIProcessor`：注入 `progressSink`（默认写 stderr，解耦进程 I/O）；`readImage` 改 async；`resolveOutputFormat`（显式 `--format` > 扩展名 > stdout 默认 png）。
+  - `CLIEntry`：binary stdout（`-`）模式抑制 `WxH backend` 摘要；`--help` 说明 stdin/stdout/URL/BMP/`--format`。
+  - Tests：`--format` parse/negative；BMP 扩展名与 `--format bmp` 输出；stdin→stdout PNG 二进制 round-trip（校验 PNG magic、stdout 不含摘要文本）；缺失输入 → 65；非法参数 → 64。
+- **遗留项已处理：** Task 1 遗留的「progress sink」在此次注入完成（`CLIProcessor(progressSink:)`）；`width`/`height` 的 source compatibility 决策仍属非阻塞遗留。
