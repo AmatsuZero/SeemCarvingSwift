@@ -23,6 +23,7 @@ targets:
   SeamCarvingApp:
     type: application
     platform: iOS
+    productName: SeamCarving
     sources:
       - path: Sources/Shared
       - path: Sources/iOS
