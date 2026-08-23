@@ -137,6 +137,8 @@ targets:
         product: SeamCarvingApple
       - package: SeamCarvingSwift
         product: SeamCarvingCLI
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.cli-device-tests

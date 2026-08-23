@@ -17,12 +17,12 @@
   service wiring, and CLI masks/face policy/pre-scale controls.
 - **Verified:** package suite (100 tests), macOS App XCTest (26/26), iPhone
   17 Pro simulator App XCTest (26/26), macOS build, and generic iOS build.
-- **Pending release gate:** a fresh physical iPad run. Both iPhone and iPad
-  simulator XCTest suites now pass 26/26. The connected iPad is currently
-  offline, so it is not counted as verified. See
+- **Verified:** the physical iPad is online; signed App XCTest passes 26/26 and
+  the Metal orientation screening passes 16/16. Fresh measurements are in
   `Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md`.
-- **Current completion:** implementation tasks are complete; cross-platform
-  acceptance remains open only for device-specific verification.
+- **Current completion:** implementation and planned cross-platform acceptance
+  gates are complete. The only remaining recommendation is a manual visual
+  import/export smoke test on the installed app; automated gates are green.
 
 ## Global Constraints
 
@@ -301,7 +301,7 @@ Implement PhotosPicker, UIDocumentPicker, share/export sheet, touch and Pencil
 input for mask painting, and state restoration. Use the same shared model and
 views as macOS.
 
-- [ ] **Step 4: Verify all three destinations**
+- [x] **Step 4: Verify all three destinations**
 
 Build and run:
 
@@ -383,12 +383,12 @@ Assert dimensions, mask alignment, cancellation, export readability, and no
 main-thread stalls. Compare pixels only between backends where exact parity is
 promised; compare dimensions and protection invariants for pre-scale mode.
 
-- [ ] **Step 3: Record device-specific performance**
+- [x] **Step 3: Record device-specific performance**
 
 Keep iPad Metal full as the production signal. Record Mac, iPhone, and iPad
 results separately; do not let a Mac result change the iOS backend policy.
 
-- [ ] **Step 4: Complete the matrix and commit documentation**
+- [x] **Step 4: Complete the matrix and commit documentation**
 
 ```bash
 git add Benchmarks/README.md Apps/SeamCarvingApp/Tests docs/capability-matrix.md
@@ -397,13 +397,13 @@ git commit -m "docs: add multiplatform capability acceptance matrix"
 
 ## Final Review Checklist
 
-- [ ] Core library has no UI-framework imports.
-- [ ] Caire core capabilities are represented in the capability matrix.
-- [ ] Pre-scale is explicit opt-in and independently benchmarked.
-- [ ] Protect/remove/object restoration work from both API and GUI.
-- [ ] Vision face protection is available on iPhone, iPad, and macOS where Vision supports the target.
-- [ ] Shared SwiftUI UI runs on macOS, iPhone, and iPad.
-- [ ] macOS file workflows and iOS/iPadOS Photos/files workflows are both covered.
-- [ ] Metal full remains the preferred supported shrink backend on iOS/iPadOS after device validation.
-- [ ] CLI and GUI use the same typed configuration model.
-- [ ] All tests and platform build gates pass before declaring alignment complete.
+- [x] Core library has no UI-framework imports.
+- [x] Caire core capabilities are represented in the capability matrix.
+- [x] Pre-scale is explicit opt-in and independently benchmarked.
+- [x] Protect/remove/object restoration work from both API and GUI.
+- [x] Vision face protection is available on iPhone, iPad, and macOS where Vision supports the target.
+- [x] Shared SwiftUI UI runs on macOS, iPhone, and iPad.
+- [x] macOS file workflows and iOS/iPadOS Photos/files workflows are both covered.
+- [x] Metal full remains the preferred supported shrink backend on iOS/iPadOS after device validation.
+- [x] CLI and GUI use the same typed configuration model.
+- [x] All tests and platform build gates pass before declaring alignment complete.
