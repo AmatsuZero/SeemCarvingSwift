@@ -6,6 +6,7 @@
 
 import CoreGraphics
 import Foundation
+import ImageIO
 import Observation
 import SeamCarvingApple
 import SeamCarvingCore
@@ -24,6 +25,26 @@ import AppKit
 /// can inject a fake and so the model stays UI-framework-free of carving details.
 public protocol SeamCarvingService: Sendable {
     func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> RGBA8Image
+
+    /// Optional face-aware entry point. Existing test services retain their
+    /// simple implementation through this default forwarding behavior.
+    func resize(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions,
+        faceProtection: FaceProtectionConfiguration?
+    ) async throws -> RGBA8Image
+}
+
+public extension SeamCarvingService {
+    func resize(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions,
+        faceProtection: FaceProtectionConfiguration?
+    ) async throws -> RGBA8Image {
+        try await resize(image, to: target, options: options)
+    }
 }
 
 /// Default service wrapping `AppleSeamCarver` (the product's real backend
@@ -50,6 +71,53 @@ public struct AppleSeamCarverService: SeamCarvingService {
         let sourceCG = try CGImageBridge.encode(image)
         let resultCG = try await carver.resize(sourceCG, toPixelSize: target, options: options)
         return try CGImageBridge.decode(resultCG)
+    }
+
+    public func resize(
+        _ image: RGBA8Image,
+        to target: PixelSize,
+        options: ResizeOptions,
+        faceProtection: FaceProtectionConfiguration?
+    ) async throws -> RGBA8Image {
+        guard let faceProtection else {
+            return try await resize(image, to: target, options: options)
+        }
+
+        let sourceCG = try CGImageBridge.encode(image)
+        let detector = try VisionFaceDetector()
+        let filteredDetector = ExcludingFaceDetector(
+            base: detector,
+            excludedRegionIndices: faceProtection.excludedRegionIndices
+        )
+        let carver = try FaceAwareSeamCarver(
+            configuration: AppleSeamCarverConfiguration(
+                backend: backend,
+                metalMode: .full,
+                deterministic: deterministic
+            ),
+            detector: filteredDetector,
+            policy: faceProtection.policy,
+            cadence: faceProtection.cadence
+        )
+        let resultCG = try await carver.resize(
+            sourceCG,
+            orientation: .up,
+            toPixelSize: target,
+            options: options
+        )
+        return try CGImageBridge.decode(resultCG)
+    }
+}
+
+private struct ExcludingFaceDetector: FaceDetecting, Sendable {
+    let base: any FaceDetecting
+    let excludedRegionIndices: Set<Int>
+
+    func detectFaces(inUpright image: CGImage) async throws -> [FaceRegion] {
+        let regions = try await base.detectFaces(inUpright: image)
+        return regions.enumerated().compactMap { index, region in
+            excludedRegionIndices.contains(index) ? nil : region
+        }
     }
 }
 
@@ -163,6 +231,7 @@ public final class AppModel {
 
         let source = document.sourceImage
         let target = configuration.targetSize
+        let faceProtection = configuration.faceProtection
         let options = ResizeOptions(
             energyMode: configuration.energyMode,
             dimensionOrder: configuration.dimensionOrder,
@@ -189,7 +258,12 @@ public final class AppModel {
 
         resizeTask = Task { [weak self] in
             do {
-                let result = try await activeService.resize(source, to: target, options: options)
+                let result = try await activeService.resize(
+                    source,
+                    to: target,
+                    options: options,
+                    faceProtection: faceProtection
+                )
                 try Task.checkCancellation()
                 await self?.applyResult(result, generation: myGeneration)
             } catch is CancellationError {
@@ -245,9 +319,6 @@ public final class AppModel {
             phase = .failed
             return
         }
-        // Export is delegated to a platform encoder (Task 4). Here we validate
-        // that a completed result exists and record metadata; a real encoder
-        // would convert `document.workingImage` (the carve result) to PNG/data.
         // The immutable `sourceImage` is NOT the export artifact.
         guard phase == .completed else {
             errorMessage = "Nothing to export; run a resize first."
@@ -260,9 +331,9 @@ public final class AppModel {
             return
         }
         do {
-            // Placeholder: encodes to PNG bytes via CGImage bridge when available.
-            let _ = try encodePNG(result)
-            document.exportMetadata = ExportMetadata(byteCount: 0, format: "png")
+            let data = try encodePNG(result)
+            document.exportedData = data
+            document.exportMetadata = ExportMetadata(byteCount: data.count, format: "png")
         } catch {
             errorMessage = "Export failed: \(error.localizedDescription)"
             phase = .failed
@@ -272,8 +343,9 @@ public final class AppModel {
     private func encodePNG(_ image: RGBA8Image) throws -> Data {
         #if canImport(CoreGraphics)
         let cgImage = try CGImageBridge.encode(image)
+        let mutableData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
-            NSMutableData() as CFMutableData,
+            mutableData,
             "public.png" as CFString,
             1,
             nil
@@ -284,7 +356,7 @@ public final class AppModel {
         guard CGImageDestinationFinalize(destination) else {
             throw AppError.serviceFailure("PNG finalization failed")
         }
-        return Data()
+        return mutableData as Data
         #else
         throw AppError.serviceFailure("PNG export requires CoreGraphics")
         #endif

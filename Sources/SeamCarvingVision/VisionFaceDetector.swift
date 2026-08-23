@@ -15,6 +15,16 @@ func uprightRect(from box: CGRect, imageWidth: Int, imageHeight: Int) -> (x: Int
 public struct VisionFaceDetector: FaceDetecting, Sendable {
     private let revision: Int
 
+    /// Uses the newest face-rectangle revision available on the running OS.
+    /// This keeps the app portable across Apple platforms while still allowing
+    /// callers to pin a revision for reproducible tests.
+    public init() throws {
+        guard let revision = VNDetectFaceRectanglesRequest.supportedRevisions.max() else {
+            throw SeamCarvingError.invalidConfiguration("Vision face detection is unavailable")
+        }
+        self.revision = revision
+    }
+
     public init(revision: Int) throws {
         guard VNDetectFaceRectanglesRequest.supportedRevisions.contains(revision) else {
             throw SeamCarvingError.invalidConfiguration("unsupported Vision revision \(revision)")

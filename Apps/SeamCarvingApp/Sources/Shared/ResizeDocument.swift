@@ -79,13 +79,18 @@ public final class ResizeDocument {
     public var sourceSize: PixelSize
     public var targetSize: PixelSize
     public var exportMetadata: ExportMetadata?
+    /// The most recent encoded export payload. Platform views may hand this
+    /// data to a file exporter or share sheet without coupling the document to
+    /// AppKit/UIKit APIs.
+    public var exportedData: Data?
 
     public init(
         sourceImage: RGBA8Image,
         currentMasks: MaskPair = .init(),
         faceRegions: [FaceRegion]? = nil,
         targetSize: PixelSize? = nil,
-        exportMetadata: ExportMetadata? = nil
+        exportMetadata: ExportMetadata? = nil,
+        exportedData: Data? = nil
     ) {
         self.sourceImage = sourceImage
         self.currentMasks = currentMasks
@@ -93,6 +98,7 @@ public final class ResizeDocument {
         self.sourceSize = try! PixelSize(width: sourceImage.width, height: sourceImage.height)
         self.targetSize = targetSize ?? (try! PixelSize(width: sourceImage.width, height: sourceImage.height))
         self.exportMetadata = exportMetadata
+        self.exportedData = exportedData
     }
 
     /// Stores a completed carve result into `workingImage` without touching the
