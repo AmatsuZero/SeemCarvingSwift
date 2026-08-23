@@ -363,11 +363,13 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 
 ### Task 1 — 已完成
 
-- **提交：** `d03b126` `refactor: split CLI processing pipeline`
+- **提交：**
+  - `d03b126` `refactor: split CLI processing pipeline`
+  - `d796766` `fix: reject reserved CLI options instead of ignoring them`（复审修复）
 - **验证：**
-  - `swift test --package-path . --filter CLIOptionsTests --parallel` → 通过（26 测试）
-  - `swift test --package-path . --filter CLIEndToEndTests --parallel` → 通过（5 测试，需 `SEAMCARVE_CLI_PATH`）
-  - `swift test --package-path . --parallel` → 123/123 通过，`git diff --check` 干净
+  - `swift test --package-path . --filter CLIOptionsTests --parallel` → 通过（27 测试）
+  - `swift test --package-path . --filter CLIEndToEndTests --parallel` → 通过（6 测试，需 `SEAMCARVE_CLI_PATH`）
+  - `swift test --package-path . --parallel` → 125/125 通过，`git diff --check` 干净
 - **改动摘要：**
   - `Sources/SeamCarvingCLI/CLIConfiguration.swift`（新增）：`ResizeMode`、`SeamColor`、`SeamShape`、`CLIExitCode`（sysexits 64/65/70/130）、`CLIConfigurationError`，stdout/stderr 契约写入 doc comment。
   - `Sources/SeamCarvingCLI/CLIImageIO.swift`（新增）：`readImage`/`loadMask`/`writeImage` 与 `CLIImageIOError`（decode、unsupported format、mask size mismatch、encode）。
@@ -376,4 +378,5 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
   - `CLIEntry.swift`：变薄，只负责解析→调用 processor→stdout 摘要→stderr 诊断与退出码。
   - `Package.swift`：`SeamCarvingCLI` 增加 `SeamCarvingApple` 依赖。
 - **已知预留（未实现，属后续任务）：** `percentage`/`square` 已解析并校验，但 `CLIProcessor` 抛出 usage 错误（退出码 64）而非静默忽略；`blur`/`sobel`/`debug`/`seam`/batch 字段已类型化预留，engine 接线在 Task 2–5。
+- **复审修复（`d796766`）：** 所有已解析但未实现的 reserved 选项（`--blur-radius`、`--sobel-threshold`、`--debug`、`--debug-directory`、`--seam-color`、`--seam-shape`、`--input-dir`、`--output-dir`、`--recursive`、`--concurrency`）在 `CLIProcessor.validateReservedOptions` 中显式拒绝（`CLIConfigurationError.reservedOptionNotImplemented`，退出码 64），不再静默忽略；补充 rejection tests 与 exit-code 测试；`--help` 更新为「Implemented / Reserved」两段；`CLIOptions` 恢复 `width`/`height` 兼容访问器（`Int?`，仅 `.exact` 模式非 nil）。
 - **未改动：** 用户未提交的 `CODE_REVIEW.md`（保持未跟踪，未纳入提交）。
