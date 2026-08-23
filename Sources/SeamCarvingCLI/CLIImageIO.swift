@@ -18,16 +18,43 @@ public enum CLIMaskKind: Sendable, Equatable {
     }
 }
 
+/// Output image format selectable via `--format` or the output path extension.
+public enum CLIOutputFormat: String, Sendable, Equatable {
+    case png
+    case jpeg
+    case bmp
+
+    var utType: UTType {
+        switch self {
+        case .png: return .png
+        case .jpeg: return .jpeg
+        case .bmp: return .bmp
+        }
+    }
+
+    /// Parses a user-facing format name (`png`, `jpg`/`jpeg`, `bmp`).
+    static func parse(_ string: String) -> CLIOutputFormat? {
+        switch string.lowercased() {
+        case "png": return .png
+        case "jpg", "jpeg": return .jpeg
+        case "bmp": return .bmp
+        default: return nil
+        }
+    }
+}
+
 /// Input/output errors surfaced by the CLI pipeline.
 ///
 /// These map to `CLIExitCode.dataError` (65) so decode failures, unsupported
-/// formats, mask dimension mismatches and encode failures share one stable code.
+/// formats, mask dimension mismatches, encode failures and network errors share
+/// one stable code.
 public enum CLIImageIOError: Error, Equatable {
     case cannotDecodeInput
     case cannotDecodeMask(String)
     case maskDimensionsMismatch(kind: CLIMaskKind, expected: PixelSize, actual: PixelSize)
     case unsupportedOutputFormat(String)
     case cannotEncodeOutput
+    case networkFailure(String)
 
     public var message: String {
         switch self {
@@ -41,19 +68,31 @@ public enum CLIImageIOError: Error, Equatable {
             return "unsupported output format \(ext)"
         case .cannotEncodeOutput:
             return "cannot encode output"
+        case .networkFailure(let detail):
+            return "network failure: \(detail)"
         }
     }
 }
 
 /// Image decoding, mask loading and output encoding for the CLI.
+///
+/// Input and output honor a `-` convention: `-` as input reads the complete
+/// binary payload from standard input, and `-` as output writes only the encoded
+/// image bytes to standard output (no summary, progress, or diagnostics). All
+/// diagnostics go to stderr. Remote inputs are accepted only for explicit
+/// `http`/`https` URLs; any other string is treated as a local path.
 public enum CLIImageIO {
-    /// Decodes the image at `path` into a `CGImage`.
-    public static func readImage(fromPath path: String) throws -> CGImage {
-        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            throw CLIImageIOError.cannotDecodeInput
+    /// Decodes the image at `path`, a remote URL, or standard input (`-`).
+    public static func readImage(fromPath path: String) async throws -> CGImage {
+        if path == "-" {
+            let data = FileHandle.standardInput.readDataToEndOfFile()
+            return try decodeImage(from: data)
         }
-        return image
+        if let url = remoteURL(from: path) {
+            let data = try await download(from: url)
+            return try decodeImage(from: data)
+        }
+        return try readLocalImage(fromPath: path)
     }
 
     /// Loads a mask image as a grayscale `Mask` using per-pixel max channel.
@@ -72,27 +111,70 @@ public enum CLIImageIO {
         return try Mask(width: rgba.width, height: rgba.height, values: values)
     }
 
-    /// Encodes `image` to `path`, choosing the format from the path extension.
-    public static func writeImage(_ image: CGImage, toPath path: String) throws {
-        let url = URL(fileURLWithPath: path)
-        guard let type = outputUTType(forExtension: url.pathExtension) else {
-            throw CLIImageIOError.unsupportedOutputFormat(url.pathExtension)
+    /// Encodes `image` with `format` and writes it to `path` or standard output (`-`).
+    public static func writeImage(_ image: CGImage, toPath path: String, format: CLIOutputFormat) throws {
+        let data = try encodeImage(image, format: format)
+        if path == "-" {
+            FileHandle.standardOutput.write(data)
+        } else {
+            try data.write(to: URL(fileURLWithPath: path))
         }
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil) else {
-            throw CLIImageIOError.unsupportedOutputFormat(url.pathExtension)
+    }
+
+    // MARK: - Input helpers
+
+    private static func remoteURL(from path: String) -> URL? {
+        guard let url = URL(string: path),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func download(from url: URL) async throws -> Data {
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if let http = response as? HTTPURLResponse {
+                guard (200..<300).contains(http.statusCode) else {
+                    throw CLIImageIOError.networkFailure("\(url.absoluteString) returned HTTP \(http.statusCode)")
+                }
+            }
+            return data
+        } catch let error as CLIImageIOError {
+            throw error
+        } catch {
+            throw CLIImageIOError.networkFailure("\(url.absoluteString): \(error.localizedDescription)")
+        }
+    }
+
+    private static func decodeImage(from data: Data) throws -> CGImage {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw CLIImageIOError.cannotDecodeInput
+        }
+        return image
+    }
+
+    private static func readLocalImage(fromPath path: String) throws -> CGImage {
+        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw CLIImageIOError.cannotDecodeInput
+        }
+        return image
+    }
+
+    // MARK: - Output helpers
+
+    private static func encodeImage(_ image: CGImage, format: CLIOutputFormat) throws -> Data {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, format.utType.identifier as CFString, 1, nil) else {
+            throw CLIImageIOError.cannotEncodeOutput
         }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else {
             throw CLIImageIOError.cannotEncodeOutput
         }
-    }
-
-    /// Maps a lowercased extension to its output `UTType`, or `nil` if unsupported.
-    public static func outputUTType(forExtension ext: String) -> UTType? {
-        switch ext.lowercased() {
-        case "png": return .png
-        case "jpg", "jpeg": return .jpeg
-        default: return nil
-        }
+        return data as Data
     }
 }

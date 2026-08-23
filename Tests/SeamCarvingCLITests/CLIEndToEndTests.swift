@@ -219,6 +219,140 @@ final class CLIEndToEndTests: XCTestCase {
         }
     }
 
+    func testBMPOutputViaExtension() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-bmp-input-\(UUID().uuidString).png")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-bmp-output-\(UUID().uuidString).bmp")
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = [
+            inputURL.path, outputURL.path,
+            "--width", "20", "--height", "18", "--backend", "cpu",
+        ]
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "stderr: \(String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")")
+
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("cannot reopen BMP output")
+            return
+        }
+        XCTAssertEqual(image.width, 20)
+        XCTAssertEqual(image.height, 18)
+    }
+
+    func testBMPOutputViaFormatFlagToStdout() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-bmpfmt-input-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+        let inputData = try Data(contentsOf: inputURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["-", "-", "--width", "20", "--height", "18", "--backend", "cpu", "--format", "bmp"]
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        try process.run()
+        stdinPipe.fileHandleForWriting.write(inputData)
+        try stdinPipe.fileHandleForWriting.close()
+        process.waitUntilExit()
+
+        XCTAssertEqual(process.terminationStatus, 0, "stderr: \(String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "")")
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        XCTAssertEqual(Array(stdoutData.prefix(2)), [0x42, 0x4D])
+        guard let source = CGImageSourceCreateWithData(stdoutData as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("stdout is not a decodable BMP")
+            return
+        }
+        XCTAssertEqual(image.width, 20)
+        XCTAssertEqual(image.height, 18)
+    }
+
+    func testStdinStdoutBinaryRoundTrip() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+        let inputURL = FileManager.default.temporaryDirectory.appendingPathComponent("cli-stream-input-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
+        let inputData = try Data(contentsOf: inputURL)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["-", "-", "--width", "20", "--height", "18", "--backend", "cpu"]
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        try process.run()
+        stdinPipe.fileHandleForWriting.write(inputData)
+        try stdinPipe.fileHandleForWriting.close()
+        process.waitUntilExit()
+
+        XCTAssertEqual(process.terminationStatus, 0)
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        XCTAssertEqual(Array(stdoutData.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        XCTAssertFalse(String(data: stdoutData, encoding: .utf8)?.contains("20x18") ?? false)
+        guard let source = CGImageSourceCreateWithData(stdoutData as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            XCTFail("stdout is not a decodable PNG")
+            return
+        }
+        XCTAssertEqual(image.width, 20)
+        XCTAssertEqual(image.height, 18)
+    }
+
+    func testMissingInputExitsDataError() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["/nonexistent/input.png", "/tmp/out.png", "--width", "20", "--height", "18"]
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 65)
+        let stderr = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertTrue(stderr.contains("cannot decode input"))
+    }
+
+    func testInvalidArgumentsExitUsage() throws {
+        guard let cliPath = ProcessInfo.processInfo.environment["SEAMCARVE_CLI_PATH"] else {
+            throw XCTSkip("SEAMCARVE_CLI_PATH not set")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["in.png", "out.png", "--width", "abc", "--height", "18"]
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 64)
+    }
+
     private static func writeGradientPNG(width: Int, height: Int, to url: URL) throws {
         var pixels = [UInt8]()
         for y in 0..<height {

@@ -15,7 +15,11 @@ enum CLIEntry {
         do {
             let options = try CLIOptions.parse(arguments)
             let result = try await CLIProcessor().process(options)
-            print("\(result.width)x\(result.height) \(result.backend)")
+            // Binary stdout mode (`-` output) writes only image bytes; the summary
+            // is suppressed so it cannot pollute stdout.
+            if options.outputPath != "-" {
+                print("\(result.width)x\(result.height) \(result.backend)")
+            }
             exit(CLIExitCode.success.rawValue)
         } catch {
             FileHandle.standardError.write(Data("error: \(message(for: error))\n".utf8))
@@ -41,6 +45,9 @@ enum CLIEntry {
     private static let helpText = """
     Usage: seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
 
+    INPUT may be a local path, an http(s) URL, or `-` (read binary from stdin).
+    OUTPUT may be a local path or `-` (write only image bytes to stdout).
+
     Implemented options:
       --backend automatic|cpu|accelerate|metal
       --energy backward|forward
@@ -51,6 +58,8 @@ enum CLIEntry {
       --remove-mask PATH --removal-weight VALUE
       --face-policy caire|vision --face-cadence once|each-pass
       --blur-radius R --sobel-threshold T   (backward Sobel energy only)
+      --format png|jpeg|bmp                 (output format; required for stdout,
+                                            which defaults to png when omitted)
 
     Reserved (parsed but not yet implemented; rejected with exit code 64):
       --debug --debug-directory DIR --seam-color HEX --seam-shape line|points

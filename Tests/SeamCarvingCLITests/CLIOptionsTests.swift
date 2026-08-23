@@ -147,6 +147,17 @@ final class CLIOptionsTests: XCTestCase {
         XCTAssertEqual(options.sobelThreshold, 0.3)
     }
 
+    func testFormatFlagParses() throws {
+        XCTAssertEqual(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--format", "png"]).outputFormat, .png)
+        XCTAssertEqual(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--format", "jpeg"]).outputFormat, .jpeg)
+        XCTAssertEqual(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--format", "jpg"]).outputFormat, .jpeg)
+        XCTAssertEqual(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--format", "BMP"]).outputFormat, .bmp)
+    }
+
+    func testInvalidFormatThrows() {
+        XCTAssertThrowsError(try CLIOptions.parse(["in", "out", "--width", "20", "--height", "18", "--format", "tiff"]))
+    }
+
     func testReservedDebugOptionsParse() throws {
         let options = try CLIOptions.parse([
             "in", "out", "--width", "20", "--height", "18",

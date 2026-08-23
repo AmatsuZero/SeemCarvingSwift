@@ -20,18 +20,26 @@ public struct CLIProcessResult: Sendable, Equatable {
 /// Executes the single-image pipeline: read input, build masks, resize via the
 /// Apple or face-aware service, then write the result.
 ///
-/// Diagnostics (progress and errors) go to stderr. The result summary is
-/// returned to the caller so a future binary stdout mode can keep stdout clean;
-/// the caller is responsible for printing the summary and mapping thrown errors
-/// to `CLIExitCode`.
+/// Diagnostics (progress and errors) go to stderr via the injected `progressSink`.
+/// The result summary is returned to the caller so binary stdout mode can keep
+/// stdout clean; the caller is responsible for printing the summary and mapping
+/// thrown errors to `CLIExitCode`.
 public struct CLIProcessor: Sendable {
-    public init() {}
+    private let progressSink: @Sendable (ResizeProgress) -> Void
+
+    public init(
+        progressSink: @escaping @Sendable (ResizeProgress) -> Void = { progress in
+            FileHandle.standardError.write(Data("progress \(progress.completedEdits)/\(progress.totalEdits)\n".utf8))
+        }
+    ) {
+        self.progressSink = progressSink
+    }
 
     public func process(_ options: CLIOptions) async throws -> CLIProcessResult {
         try validateReservedOptions(options)
         try validateEnergyControls(options)
 
-        let inputImage = try CLIImageIO.readImage(fromPath: options.inputPath)
+        let inputImage = try await CLIImageIO.readImage(fromPath: options.inputPath)
         let sourceSize = try PixelSize(width: inputImage.width, height: inputImage.height)
         let target = try resolveTarget(options.resizeMode, source: sourceSize)
         let masks = try buildMasks(options: options, image: inputImage)
@@ -44,9 +52,7 @@ public struct CLIProcessor: Sendable {
             blurRadius: options.blurRadius ?? 0,
             sobelThreshold: options.sobelThreshold ?? 0
         )
-        resizeOptions.progress = { progress in
-            FileHandle.standardError.write(Data("progress \(progress.completedEdits)/\(progress.totalEdits)\n".utf8))
-        }
+        resizeOptions.progress = progressSink
 
         let result: CGImage
         if let policy = options.facePolicy {
@@ -69,7 +75,8 @@ public struct CLIProcessor: Sendable {
             result = try await carver.resize(inputImage, toPixelSize: target, options: resizeOptions)
         }
 
-        try CLIImageIO.writeImage(result, toPath: options.outputPath)
+        let format = try resolveOutputFormat(options)
+        try CLIImageIO.writeImage(result, toPath: options.outputPath, format: format)
 
         return CLIProcessResult(width: result.width, height: result.height, backend: options.backend)
     }
@@ -95,6 +102,22 @@ public struct CLIProcessor: Sendable {
         case .square:
             return source.squareTarget()
         }
+    }
+
+    /// Resolves the effective output format: explicit `--format`, otherwise the
+    /// output path extension; standard output (`-`) defaults to PNG.
+    private func resolveOutputFormat(_ options: CLIOptions) throws -> CLIOutputFormat {
+        if let explicit = options.outputFormat {
+            return explicit
+        }
+        if options.outputPath != "-" {
+            let ext = (options.outputPath as NSString).pathExtension
+            guard let format = CLIOutputFormat.parse(ext) else {
+                throw CLIImageIOError.unsupportedOutputFormat(ext)
+            }
+            return format
+        }
+        return .png
     }
 
     /// Rejects options that are parsed but whose behavior is owned by a later

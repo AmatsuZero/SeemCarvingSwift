@@ -39,6 +39,8 @@ public struct CLIOptions: Sendable, Equatable {
     public let blurRadius: Int?
     /// Sobel gradient-magnitude threshold for backward energy (`--sobel-threshold`).
     public let sobelThreshold: Float?
+    /// Explicit output format (`--format png|jpeg|bmp`), overriding extension detection.
+    public let outputFormat: CLIOutputFormat?
     /// Reserved: enable seam/debug artifacts.
     public let debug: Bool
     /// Reserved: directory for debug artifacts.
@@ -95,6 +97,7 @@ public struct CLIOptions: Sendable, Equatable {
         var faceCadence = FaceDetectionCadence.detectOnceAndTransformMask
         var blurRadius: Int?
         var sobelThreshold: Float?
+        var outputFormat: CLIOutputFormat?
         var debug = false
         var debugDirectory: String?
         var seamColor: SeamColor?
@@ -201,6 +204,12 @@ public struct CLIOptions: Sendable, Equatable {
                 }
                 sobelThreshold = value
                 index += 2
+            case "--format":
+                guard index + 1 < arguments.count, let value = CLIOutputFormat.parse(arguments[index + 1]) else {
+                    throw CLIParseError.invalidArguments
+                }
+                outputFormat = value
+                index += 2
             case "--debug":
                 debug = true
                 index += 1
@@ -279,6 +288,7 @@ public struct CLIOptions: Sendable, Equatable {
             faceCadence: faceCadence,
             blurRadius: blurRadius,
             sobelThreshold: sobelThreshold,
+            outputFormat: outputFormat,
             debug: debug,
             debugDirectory: debugDirectory,
             seamColor: seamColor,
