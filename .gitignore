@@ -29,3 +29,6 @@ worktrees/
 # Coverage / profiling artifacts
 *.profraw
 default.profraw
+
+# Local review artifacts
+CODE_REVIEW.md
