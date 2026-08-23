@@ -23,9 +23,10 @@
 ## Current findings
 
 - `SeamCarvingApp.xcodeproj` has separate `SeamCarvingIOS` and `SeamCarvingMac` application targets, plus separate platform test targets.
-- `ContentView` selects layout using `horizontalSizeClass`, but macOS uses a nested `NavigationSplitView`/`ScrollView`/`Form` structure without explicit sidebar/detail sizing.
+- `ContentView` selects layout using `horizontalSizeClass`, but macOS uses a nested `NavigationSplitView`/`ScrollView`/`Form` structure without explicit sidebar/detail sizing. On compact iPhone layout, `ImageCanvasView` contains an unconstrained `GeometryReader` inside the outer `ScrollView`, so the placeholder and Resize button collapse into the same region.
 - `MacPlatformServices.swift` uses `NSOpenPanel`/`NSSavePanel`; Catalyst cannot use this native AppKit flow as the shared desktop path.
 - The project has no AppIntents or shortcut declarations. `com.apple.linkd.autoShortcut`, `FSFindFolder`, and related XPC messages must therefore be verified as system/Xcode diagnostics before changing application code.
+- `SeamCarvingCore` is directly linked by every app/test target while `SeamCarvingApple` and `SeamCarvingVision` also depend on it. The duplicate `BackendTimingRecorder` warning must be investigated from the resolved link graph and link map rather than fixed by renaming the class.
 
 ---
 
@@ -47,9 +48,10 @@
 - [ ] **Step 1: Add an XCUITest regression** that launches the macOS target, asserts the import control and canvas placeholder exist, and records non-zero/intersecting frames for sidebar controls and detail content.
 - [ ] **Step 2: Run the test against the current macOS target** and capture the failing frame/visibility behavior.
 - [ ] **Step 3: Refactor the regular layout** to use explicit `NavigationSplitView` column sizing, one sidebar scroll container, and bounded control sections.
-- [ ] **Step 4: Remove duplicate resize buttons** from the sidebar/detail composition unless both are intentionally visible and independently labeled.
-- [ ] **Step 5: Run macOS GUI XCTest** with clean DerivedData and verify the placeholder, import button, controls, and resize button are visible without clipping.
-- [ ] **Step 6: Commit** with `fix: stabilize desktop editor layout`.
+- [ ] **Step 4: Refactor compact layout** so the canvas has an explicit aspect-ratio/minimum height, the outer scroll view does not offer an unbounded `GeometryReader`, and the placeholder cannot overlap the Resize button.
+- [ ] **Step 5: Remove duplicate resize buttons** from the sidebar/detail composition unless both are intentionally visible and independently labeled.
+- [ ] **Step 6: Run macOS and iPhone GUI XCTest** with clean DerivedData and verify the placeholder, import button, controls, and resize button are visible without clipping or overlap.
+- [ ] **Step 7: Commit** with `fix: stabilize cross-platform editor layout`.
 
 ## Task 2: Consolidate application targets into iOS + Mac Catalyst
 
@@ -96,7 +98,26 @@
 - [ ] **Step 4: Run Mac Catalyst, iPhone, and iPad tests** and verify file/photo import and export/share paths.
 - [ ] **Step 5: Commit** with `feat: use unified catalyst platform services`.
 
-## Task 4: Audit and reduce startup warnings without hiding failures
+## Task 4: Remove duplicate package symbols from the app link graph
+
+**Files:**
+- Modify: `Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj/project.pbxproj`
+- Modify: `Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj/xcshareddata/xcschemes/*`
+- Inspect: generated link maps and `Build/Products/*/PackageFrameworks`
+- Test: package/app build and launch diagnostics
+
+**Interfaces:**
+- Each package module must have one runtime ownership path. The app must not load a `SeamCarvingCore` framework while also embedding a second copy of `BackendTimingRecorder` in its debug dylib.
+- Keep direct package dependencies only where source import resolution requires them; avoid linking the same implementation both directly and through a higher-level package product.
+
+- [ ] **Step 1: Reproduce the duplicate-class warning** with a clean Catalyst/iOS build and save the link map plus loaded image list.
+- [ ] **Step 2: Inspect package product types and target link phases** to determine whether the duplicate comes from direct Core + transitive Apple/Vision links, static/dynamic package mixing, or Xcode debug-dylib embedding.
+- [ ] **Step 3: Make the smallest project-graph change** that produces one Core runtime image; do not rename `BackendTimingRecorder` to hide a real duplicate.
+- [ ] **Step 4: Verify module imports still compile** for AppModel/tests and run the full package suite.
+- [ ] **Step 5: Launch on iPhone Simulator, Mac Catalyst, and iPad** and confirm the duplicate-class warning is gone without disabling debug dylibs globally.
+- [ ] **Step 6: Commit** with `fix: remove duplicate package runtime symbols`.
+
+## Task 5: Audit and reduce startup warnings without hiding failures
 
 **Files:**
 - Inspect/modify: `Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj/project.pbxproj`
@@ -116,7 +137,7 @@
 - [ ] **Step 5: Document unavoidable system/Xcode warnings** with exact OS/Xcode context instead of suppressing all logs.
 - [ ] **Step 6: Commit** with `chore: audit catalyst startup diagnostics`.
 
-## Task 5: Final cross-platform acceptance
+## Task 6: Final cross-platform acceptance
 
 **Files:**
 - Modify: `docs/capability-matrix.md`
