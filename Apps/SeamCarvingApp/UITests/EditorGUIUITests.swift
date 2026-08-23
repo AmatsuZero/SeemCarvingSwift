@@ -3,13 +3,8 @@ import XCTest
 @MainActor
 final class EditorGUIUITests: XCTestCase {
     func testEditorControlsHaveUsableNonOverlappingFrames() {
-        #if os(macOS)
-        let app = XCUIApplication(bundleIdentifier: "com.seamcarving.mac")
-        let importControl = app.buttons["Import Image…"]
-        #else
         let app = XCUIApplication(bundleIdentifier: "com.seamcarving.ios")
         let importControl = app.buttons["editor.importButton"].firstMatch
-        #endif
         app.launch()
 
         let canvas = app.otherElements["editor.canvas"]

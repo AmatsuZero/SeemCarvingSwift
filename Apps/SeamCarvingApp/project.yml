@@ -4,7 +4,6 @@ options:
   bundleIdPrefix: com.seamcarving
   deploymentTarget:
     iOS: "17.0"
-    macOS: "14.0"
   developmentLanguage: en
   createIntermediateGroups: true
 
@@ -19,28 +18,7 @@ settings:
     GENERATE_INFOPLIST_FILE: YES
 
 targets:
-  SeamCarvingMac:
-    type: application
-    platform: macOS
-    sources:
-      - path: Sources/Shared
-      - path: Sources/macOS
-    dependencies:
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
-      - package: SeamCarvingSwift
-        product: SeamCarvingCore
-      - package: SeamCarvingSwift
-        product: SeamCarvingVision
-    settings:
-      base:
-        PRODUCT_NAME: SeamCarving
-        PRODUCT_MODULE_NAME: Shared
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac
-        INFOPLIST_KEY_CFBundleDisplayName: Seam Carving
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
-
-  SeamCarvingIOS:
+  SeamCarvingApp:
     type: application
     platform: iOS
     sources:
@@ -58,38 +36,21 @@ targets:
         PRODUCT_NAME: SeamCarving
         PRODUCT_MODULE_NAME: Shared
         PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios
+        SUPPORTS_MACCATALYST: YES
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: YES
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_CFBundleDisplayName: Seam Carving
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
 
-  SeamCarvingMacTests:
-    type: bundle.unit-test
-    platform: macOS
-    sources:
-      - path: Tests
-    dependencies:
-      - target: SeamCarvingMac
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
-      - package: SeamCarvingSwift
-        product: SeamCarvingCore
-      - package: SeamCarvingSwift
-        product: SeamCarvingVision
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac-tests
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/Contents/MacOS/SeamCarving"
-        BUNDLE_LOADER: "$(TEST_HOST)"
-
-  SeamCarvingIOSTests:
+  SeamCarvingAppTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: Tests
     dependencies:
-      - target: SeamCarvingIOS
+      - target: SeamCarvingApp
       - package: SeamCarvingSwift
         product: SeamCarvingApple
       - package: SeamCarvingSwift
@@ -98,66 +59,31 @@ targets:
         product: SeamCarvingVision
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios-tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.app-tests
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/SeamCarving"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
-  SeamCarvingMacUITests:
-    type: bundle.ui-testing
-    platform: macOS
-    sources:
-      - path: UITests
-    dependencies:
-      - target: SeamCarvingMac
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac-ui-tests
-
-  SeamCarvingIOSUITests:
+  SeamCarvingAppUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
       - path: UITests
     dependencies:
-      - target: SeamCarvingIOS
+      - target: SeamCarvingApp
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios-ui-tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.app-ui-tests
 
 schemes:
-  SeamCarvingMac:
+  SeamCarvingApp:
     build:
       targets:
-        SeamCarvingMac: all
+        SeamCarvingApp: all
     run:
       config: Debug
     test:
       config: Debug
       gatherCoverageData: false
       targets:
-        - name: SeamCarvingMacTests
-
-  SeamCarvingIOS:
-    build:
-      targets:
-        SeamCarvingIOS: all
-    run:
-      config: Debug
-    test:
-      config: Debug
-      gatherCoverageData: false
-      targets:
-        - name: SeamCarvingIOSTests
-        - name: SeamCarvingIOSUITests
-
-  SeamCarvingMacGUI:
-    build:
-      targets:
-        SeamCarvingMac: all
-    run:
-      config: Debug
-    test:
-      config: Debug
-      gatherCoverageData: false
-      targets:
-        - name: SeamCarvingMacUITests
+        - name: SeamCarvingAppTests
+        - name: SeamCarvingAppUITests

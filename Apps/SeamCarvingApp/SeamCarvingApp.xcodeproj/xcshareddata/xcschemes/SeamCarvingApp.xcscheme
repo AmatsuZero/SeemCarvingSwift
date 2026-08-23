@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "9C2A4832C8016AB58F3C4A7B"
-               BuildableName = "SeamCarvingMac.app"
-               BlueprintName = "SeamCarvingMac"
+               BlueprintIdentifier = "30F47E93D7FA598A69143DAB"
+               BuildableName = "SeamCarvingApp.app"
+               BlueprintName = "SeamCarvingApp"
                ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -32,9 +32,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9C2A4832C8016AB58F3C4A7B"
-            BuildableName = "SeamCarvingMac.app"
-            BlueprintName = "SeamCarvingMac"
+            BlueprintIdentifier = "30F47E93D7FA598A69143DAB"
+            BuildableName = "SeamCarvingApp.app"
+            BlueprintName = "SeamCarvingApp"
             ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -44,9 +44,20 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2FF3A7C4651FF00051F108A7"
-               BuildableName = "SeamCarvingMacUITests.xctest"
-               BlueprintName = "SeamCarvingMacUITests"
+               BlueprintIdentifier = "186224EDF9E6F392DAFD517C"
+               BuildableName = "SeamCarvingAppTests.xctest"
+               BlueprintName = "SeamCarvingAppTests"
+               ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "B247EE86F6CD918C398DB3BE"
+               BuildableName = "SeamCarvingAppUITests.xctest"
+               BlueprintName = "SeamCarvingAppUITests"
                ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -68,9 +79,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9C2A4832C8016AB58F3C4A7B"
-            BuildableName = "SeamCarvingMac.app"
-            BlueprintName = "SeamCarvingMac"
+            BlueprintIdentifier = "30F47E93D7FA598A69143DAB"
+            BuildableName = "SeamCarvingApp.app"
+            BlueprintName = "SeamCarvingApp"
             ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -87,9 +98,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9C2A4832C8016AB58F3C4A7B"
-            BuildableName = "SeamCarvingMac.app"
-            BlueprintName = "SeamCarvingMac"
+            BlueprintIdentifier = "30F47E93D7FA598A69143DAB"
+            BuildableName = "SeamCarvingApp.app"
+            BlueprintName = "SeamCarvingApp"
             ReferencedContainer = "container:SeamCarvingApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
