@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SeamCarvingSwift architecture">
+  <title>Architecture · SeamCarvingSwift</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="index.html">SeamCarvingSwift</a>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Overview</a><a class="active" aria-current="page" href="architecture.html">Architecture</a><a href="principles.html">Principles</a><a href="api.html">Swift API</a><a href="cli.html">CLI</a><a href="app.html">App</a><a href="capability-matrix.html">Capabilities</a>
+    </nav>
+  </div></header>
+  <main id="main-content" class="container"><article>
+    <header><p class="eyebrow">Project map</p><h1>Architecture</h1><p class="lead">The package keeps image semantics in Core and puts platform concerns at the edges. This lets the CPU reference implementation define behavior while Accelerate, Metal, Apple image bridges, Vision, the CLI, and the shared app consume that contract.</p></header>
+
+    <h2>Dependency flow</h2>
+    <p>The dependency direction is intentionally one-way. Core does not import Apple frameworks; the Apple facade owns backend selection and image conversion; Vision is an optional adapter; CLI and App are consumers.</p>
+    <div class="callout" role="img" aria-label="Dependency flow: Core is consumed by Accelerate and Metal; Apple consumes all three; Vision consumes Apple and Core; CLI consumes Apple, Vision and Core; the app consumes Apple, Vision and Core.">
+      <svg viewBox="0 0 800 250" width="100%" height="auto" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>
+        <g fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)">
+          <path d="M400 55 V100 M180 145 H350 M400 145 H350 M620 145 H450 M400 190 V225 M620 190 V225"/>
+        </g>
+        <g fill="var(--surface)" stroke="var(--border)" stroke-width="2">
+          <rect x="330" y="15" width="140" height="42" rx="8"/><rect x="105" y="100" width="150" height="45" rx="8"/><rect x="325" y="100" width="150" height="45" rx="8"/><rect x="545" y="100" width="150" height="45" rx="8"/><rect x="325" y="205" width="150" height="35" rx="8"/><rect x="545" y="205" width="150" height="35" rx="8"/>
+        </g>
+        <g fill="currentColor" font-family="sans-serif" font-size="16" text-anchor="middle"><text x="400" y="42">Core</text><text x="180" y="128">Accelerate</text><text x="400" y="128">Metal</text><text x="620" y="128">Apple</text><text x="400" y="228">Vision</text><text x="620" y="228">CLI / App</text></g>
+      </svg>
+      <p class="meta">The existing <a href="architecture.md">architecture notes</a> contain the locked pixel and backend semantics.</p>
+    </div>
+
+    <h2>Module responsibilities</h2>
+    <table>
+      <thead><tr><th>Module / product</th><th>Responsibility</th><th>Important boundary</th></tr></thead>
+      <tbody>
+        <tr><td><code>SeamCarvingCore</code></td><td><code>RGBA8Image</code>, <code>Mask</code>, energy maps, dynamic programming, seam editing, resize planning, progress, cancellation, and the CPU backend.</td><td>Platform-independent; canonical input is upright, origin-zero, straight-alpha RGBA8.</td></tr>
+        <tr><td><code>SeamCarvingAccelerate</code></td><td>Accelerate-backed energy and seam operations.</td><td>Must match Core semantics; selected through the Apple layer.</td></tr>
+        <tr><td><code>SeamCarvingMetal</code></td><td>Optional asynchronous GPU backend for supported shrink paths.</td><td>Horizontal edits use CPU transposition; enlargement and adaptive ordering use the CPU reference path.</td></tr>
+        <tr><td><code>SeamCarvingApple</code></td><td>Decodes/encodes <code>CGImage</code>, <code>CIImage</code>, <code>CVPixelBuffer</code>, <code>UIImage</code>, and native <code>NSImage</code> where available; selects backends.</td><td>Apple-platform only. <code>.automatic</code> falls back Metal → Accelerate → CPU.</td></tr>
+        <tr><td><code>SeamCarvingVision</code></td><td>Uses Apple Vision face observations to produce Core masks and policy-driven face protection.</td><td>Optional; Core never imports Vision. The policy is Caire-inspired, not detector compatibility.</td></tr>
+        <tr><td><code>SeamCarvingCLI</code> / <code>seamcarve-cli</code></td><td>Argument parsing, image I/O, single-file and batch orchestration, debug artifacts, and exit-code mapping.</td><td>Uses <code>swift-argument-parser</code> for syntax; domain validation remains in the CLI configuration layer.</td></tr>
+        <tr><td>SwiftUI app</td><td>One <code>SeamCarvingApp</code> target with shared editor state and adaptive layouts for iPhone, iPad, and Mac Catalyst.</td><td>UI delegates image processing to the Apple service; the generated Xcode project is recreated from <code>project.yml</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Image data flow</h2>
+    <ol>
+      <li>An Apple image bridge decodes an external image and applies orientation into the canonical upright coordinate space.</li>
+      <li>The Core engine receives RGBA8 bytes, a positive <code>PixelSize</code>, <code>ResizeOptions</code>, and optional masks.</li>
+      <li>The resize planner chooses width/height order and builds the energy plus mask adjustment for each current image.</li>
+      <li>A backend finds and edits seams one at a time. Progress is emitted after committed edits, and cancellation is checked between edits.</li>
+      <li>The Apple bridge encodes the resulting canonical image back to the requested image representation. The CLI then writes PNG, JPEG, or BMP.</li>
+    </ol>
+
+    <h2>Concurrency and memory</h2>
+    <p>Core APIs are <code>async</code> and <code>Sendable</code>-oriented. The CPU implementation uses compact Float32 rows and parent/index buffers rather than a full cost matrix. Metal completion is awaited through a checked continuation and does not block the main actor. The app owns one resize task and cancels a previous task when a new resize starts.</p>
+    <p>Backend SPI types are internal-facing and marked with the <code>Backend</code> SPI. Ordinary clients should use <code>SeamCarver</code> or <code>AppleSeamCarver</code>, not implement the backend protocol directly.</p>
+
+    <h2>Build products</h2>
+    <pre><code>SeamCarvingCore          library
+SeamCarvingAccelerate    library
+SeamCarvingMetal         library
+SeamCarvingApple         library
+SeamCarvingVision        library
+SeamCarvingCLI           library
+seamcarve-cli            executable
+seamcarve-benchmark      executable</code></pre>
+    <p>See the <a href="api.html">Swift API guide</a> for consumer-facing entry points and the <a href="app.html">app guide</a> for the XcodeGen/Xcode workflow.</p>
+  </article></main>
+  <footer class="site-footer"><div class="container"><p><a href="../README.md">README</a> · <a href="index.html">Documentation home</a></p></div></footer>
+</body>
+</html>

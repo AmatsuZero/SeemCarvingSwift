@@ -1,88 +1,182 @@
 # SeamCarvingSwift
 
-SeamCarvingSwift is a Swift 6 package for deterministic content-aware resizing
-on iOS 17+ and macOS 14+. The Core module is platform-independent and operates
-on upright, origin-zero, straight-alpha RGBA8 images.
+SeamCarvingSwift is a Swift 6 package for content-aware image resizing on
+iOS 17+ and macOS 14+. It provides a platform-independent RGBA8 seam-carving
+engine, optional Accelerate and Metal backends, Apple image bridges, Vision
+face protection, a CLI, and one SwiftUI app target shared by iPhone, iPad, and
+Mac Catalyst.
+
+## Choose a starting point
+
+| You want to... | Start here |
+|---|---|
+| Understand the module boundaries and data flow | [Architecture](docs/architecture.html) |
+| Understand energy, seams, masks, enlargement, and Metal | [Algorithm principles](docs/principles.html) |
+| Integrate the Swift libraries | [Swift API guide](docs/api.html) |
+| Resize files from a shell or in a batch | [CLI guide](docs/cli.html) |
+| Run the iPhone/iPad/Catalyst editor | [App guide](docs/app.html) |
+| Review the implemented capability contract | [Capability matrix](docs/capability-matrix.md) |
+| Browse the hosted documentation | [GitHub Pages site](docs/index.html) |
 
 ## Quick start
+
+### Build the package
+
+```sh
+swift build
+swift test
+swift run seamcarve-cli --help
+```
+
+The package declares Swift tools version 6.0 and platform floors of iOS 17 and
+macOS 14. Its only external package dependency is Apple's
+[`swift-argument-parser`](https://github.com/apple/swift-argument-parser), used
+by the CLI syntax layer.
+
+### Use the Core API
+
+Core accepts upright, origin-zero, straight-alpha RGBA8 bytes. It does not
+import UIKit, AppKit, Core Image, Vision, Metal, or Accelerate.
 
 ```swift
 import SeamCarvingCore
 
 let image = try RGBA8Image(width: 4, height: 4, pixels: pixels)
 let target = try PixelSize(width: 3, height: 4)
-let resized = try await SeamCarver().resize(image, to: target)
+let result = try await SeamCarver().resize(image, to: target)
 ```
 
-`SeamCarver` supports shrink and enlargement, backward Sobel or forward-luma
-energy, protection/removal masks, cancellation, progress callbacks, and
-explicit CPU/Accelerate/Metal selection through the Apple facade. `CGImage`,
-`CIImage`, `CVPixelBuffer`, `UIImage`, and `NSImage` bridges normalize input
-before carving and restore the requested platform representation.
+See the [API guide](docs/api.html) for masks, progress, cancellation,
+enlargement, and the Apple facade.
 
-```swift
-let carver = try AppleSeamCarver(configuration: .init(backend: .automatic))
-let output = try await carver.resize(inputCGImage, toPixelSize: target)
+### Run the CLI
+
+```sh
+swift run seamcarve-cli input.jpg output.png --width 1200 --height 800
+swift run seamcarve-cli input.jpg output.jpg --percentage 75 --backend automatic
+swift run seamcarve-cli --input-dir photos --output-dir resized \
+  --width 1200 --height 800 --recursive --concurrency 2
 ```
 
-For object removal, provide a removal mask and optionally request restoration
-of the removed width. Protection has precedence over removal. Vision face
-protection is an optional adapter: choose an explicit Vision request revision,
-`.caireInspired` or `.visionQuality`, and `.detectOnce` or `.redetectEachPass`.
-All face rectangles use the same upright canonical coordinates as Core masks.
+`seamcarve-cli` accepts local paths, explicit `http(s)` URLs, and `-` for
+stdin/stdout. Exact dimensions, percentage, square, backend, energy, order,
+pre-scale, masks, face protection, debug artifacts, output format, and batch
+options are documented in the [CLI guide](docs/cli.html). The examples there
+are derived from `swift run seamcarve-cli --help` and the parser sources.
 
+### Build the Apple app
 
-## Command-line tool
+The app uses a single SwiftUI target for iPhone, iPad, and Mac Catalyst. The
+Xcode project is generated locally from `Apps/SeamCarvingApp/project.yml` and
+is intentionally ignored by Git.
 
-`seamcarve-cli` uses Apple `swift-argument-parser` for argv syntax while
-keeping `CLIOptions` and `CLIConfiguration` as the business configuration
-layer. The argv-to-options seam remains available as `CLIOptions.parse(_:)` for
-unit tests and embedders.
-
-```bash
-seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
-seamcarve-cli --input-dir DIR --output-dir DIR (--width PIXELS --height PIXELS | --percentage P | --square) [options]
+```sh
+cd Apps/SeamCarvingApp
+xcodegen generate
+xcodebuild -project SeamCarvingApp.xcodeproj -scheme SeamCarvingApp \
+  -destination 'generic/platform=iOS' build
+xcodebuild -project SeamCarvingApp.xcodeproj -scheme SeamCarvingApp \
+  -destination 'platform=macOS,variant=Mac Catalyst' \
+  CODE_SIGNING_ALLOWED=NO build
 ```
 
-Inputs can be local paths, `http(s)` URLs, or `-` for stdin. Outputs can be
-local paths or `-` for binary stdout; in stdout mode summaries stay off stdout
-so image bytes are not polluted. Supported options include backend/energy/order
-selection, masks, face protection, `--format png|jpeg|bmp`, debug seam artifacts,
-and batch `--recursive`/`--concurrency`.
+Follow the [app guide](docs/app.html) for import, target dimensions, masks,
+face protection, export, signing, and platform-specific testing.
 
-## Capability alignment
+## What the engine does
 
-The package's user-facing capabilities are tracked against a Caire-inspired
-checklist in [`docs/capability-matrix.md`](docs/capability-matrix.md). That
-document classifies each capability as existing, requiring API exposure, or
-requiring new implementation, and freezes the public product contract — the
-GUI only consumes the existing `ResizeOptions` (energy mode, dimension order,
-masks, progress) and `AppleSeamCarver` facade; no new library APIs are needed
-for the current capability set.
+The Core engine removes or inserts one connected seam at a time. It supports:
 
-## Scope and limitations
+- backward Sobel and forward-luma energy;
+- width-first, height-first, or adaptive normalized-cost ordering;
+- hard and weighted soft protection masks plus weighted removal masks;
+- dedicated object removal with optional restoration of the original size;
+- progress callbacks, cooperative cancellation, and seam observation hooks;
+- exact sequential resize semantics by default;
+- explicit Apple-only Lanczos pre-scaling followed by exact residual carving;
+- CPU, Accelerate, and optional Metal backend selection through
+  `AppleSeamCarver`;
+- optional Vision face protection with Caire-inspired or Vision-quality policy
+  and detect-once or re-detect-each-pass cadence.
 
-The package does not provide video temporal coherence, learned saliency,
-transport maps, approximate multi-seam batches, HDR/extended-range input,
-MLX, or Core ML. Conventional automatic Lanczos pre-scaling is NOT performed:
-exact sequential seam semantics are the default and the `none` pre-scale
-strategy never pre-scales implicitly. An explicit, opt-in
-`.lanczosThenExactResidual` pre-scale strategy IS available
-(`ResizeOptions.preScaleStrategy`); it Lanczos-scales the image and every
-protection/removal mask to an intermediate size before the residual seam
-carving reaches the exact target dimensions. This is an approximation and is
-Apple-platform only (it requires Core Image). Caire is reference material only;
-`.caireInspired` is not equivalent to Caire. The Vision module is optional and
-never imported by Core. A project license is intentionally not selected by this
-plan.
+The [capability matrix](docs/capability-matrix.md) is the authoritative product
+status record. Caire is reference material for capability alignment; this
+project does not claim Caire compatibility or use Caire's detector.
 
-Metal is an optional, asynchronous acceleration backend for shrink requests.
-Its full path accelerates energy, dynamic programming, and vertical seam
-editing, while horizontal edits still use CPU transposition. Enlargement and
-adaptive dimension ordering intentionally use the CPU reference backend to
-preserve package-wide semantics. `.automatic` tries Metal first, then
-Accelerate, and finally CPU; use `.deterministic` or `.cpu` when reproducible
-reference behavior is required.
+## Architecture at a glance
 
-Run the tests with `swift test`. See `Benchmarks/README.md` for reproducible
-Release measurements and the explicit rule for changing `.automatic` policy.
+```text
+SeamCarvingCore
+    ├── SeamCarvingAccelerate
+    ├── SeamCarvingMetal
+    └── SeamCarvingApple ──┬── SeamCarvingVision
+                           ├── SeamCarvingCLI / seamcarve-cli
+                           └── shared SwiftUI app
+```
+
+Core owns image and mask semantics, energy, dynamic programming, seam editing,
+planning, and the CPU oracle. Apple bridges normalize external images and
+select the backend. Vision turns face observations into Core masks. See the
+[architecture guide](docs/architecture.html) for the full data flow.
+
+## Backend and algorithm notes
+
+`.automatic` tries Metal, then Accelerate, then CPU. Use `.deterministic` or
+`.cpu` when reproducible reference behavior is more important than speed.
+Metal is an optional asynchronous backend: it accelerates supported shrink
+paths, while horizontal edits use CPU transposition and enlargement/adaptive
+ordering intentionally use the CPU reference path. CLI debug artifacts also
+force CPU because seam observation is not available on the Metal path.
+
+The default pre-scale strategy is `.none`; the engine does not silently
+Lanczos-scale conventional resizes. `.lanczosThenExactResidual` is an explicit,
+Apple-platform-only approximation that scales the image and masks first.
+
+The project does not implement video temporal coherence, learned saliency,
+transport maps, MLX, Core ML, HDR/extended-range input, or a GPU-only contract.
+
+## Testing and verification
+
+Package tests:
+
+```sh
+swift test --package-path . --parallel
+```
+
+The latest recorded regression has 165 package tests passing, including Metal
+parity and shrink smoke tests. The Apple app acceptance record also contains:
+
+- iPhone and iPad Simulator: 31 unit tests plus 2 UI tests passing;
+- Mac Catalyst: clean build and 31 unit tests passing;
+- connected physical iPad: signed app/test host and 31 unit tests passing;
+- physical iPad UI XCTest: **not passing** because the runner times out while
+  enabling automation mode before any UI test method runs;
+- physical Metal: an earlier signed 16/16 screening is recorded, but a fresh
+  release run requires a dedicated signed Metal test host.
+
+See [`Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md`](Apps/SeamCarvingApp/Tests/AcceptanceMatrix.md)
+for commands, dates, and the exact limitations. System messages such as
+LaunchServices `LSPrefs`, `FSFindFolder`, `ViewBridge`, or task-port warnings
+are Xcode/macOS diagnostics when the app otherwise launches; they are not
+application API guarantees or errors to suppress with entitlements.
+
+## GitHub Pages
+
+The site is dependency-free static HTML/CSS. To publish it, open repository
+**Settings → Pages**, choose **Deploy from a branch**, select the desired branch,
+and set the folder to **`/docs`**. No Jekyll, Node, Python, or documentation
+build step is required.
+
+## Repository layout
+
+```text
+Sources/SeamCarvingCore/        platform-independent engine
+Sources/SeamCarvingAccelerate/  Accelerate backend
+Sources/SeamCarvingMetal/       Metal backend and shader
+Sources/SeamCarvingApple/       Apple image bridges and backend selection
+Sources/SeamCarvingVision/      Vision face-protection adapter
+Sources/SeamCarvingCLI/         CLI options, I/O, batching, artifacts
+Sources/seamcarve-cli/          executable entry point
+Apps/SeamCarvingApp/            shared SwiftUI editor and acceptance tests
+docs/                           Markdown records and GitHub Pages HTML
+```

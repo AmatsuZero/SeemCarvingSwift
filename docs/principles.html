@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Seam carving algorithm principles in SeamCarvingSwift">
+  <title>Principles · SeamCarvingSwift</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="index.html">SeamCarvingSwift</a>
+    <nav aria-label="Primary navigation"><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a class="active" aria-current="page" href="principles.html">Principles</a><a href="api.html">Swift API</a><a href="cli.html">CLI</a><a href="app.html">App</a><a href="capability-matrix.html">Capabilities</a></nav>
+  </div></header>
+  <main id="main-content" class="container"><article>
+    <header><p class="eyebrow">How it works</p><h1>Seam-carving principles</h1><p class="lead">A seam is a connected path of one pixel per row or column. Removing low-energy seams changes image dimensions while attempting to preserve visually important structure.</p></header>
+
+    <h2>The edit loop</h2>
+    <ol>
+      <li><strong>Build luma and energy.</strong> Backward Sobel uses clamp-to-edge 3×3 gradients with <code>abs(gx) + abs(gy)</code>. Forward luma evaluates the cost introduced by joining neighboring pixels after an edit.</li>
+      <li><strong>Run dynamic programming.</strong> For each row/column, accumulate the cheapest predecessor cost. Ties choose the smallest predecessor x so the reference result is deterministic.</li>
+      <li><strong>Select a seam.</strong> Trace the minimum-cost endpoint backward to construct a <code>SeamPath</code> with orientation, coordinates, and total cost.</li>
+      <li><strong>Apply mask adjustments.</strong> Hard protection contributes infinite cost, soft protection adds a weighted cost, and removal subtracts a weighted cost. Hard protection wins when protection and removal overlap.</li>
+      <li><strong>Edit the image and masks.</strong> Remove or insert one seam, preserving mask alignment. For a normal resize, repeat until the target width/height is reached.</li>
+      <li><strong>Report or cancel.</strong> Emit <code>ResizeProgress</code> after a committed edit and check task cancellation between edits. A seam observer can stop the operation before the observed seam is applied.</li>
+    </ol>
+
+    <h2>Dimension order</h2>
+    <p><code>.widthThenHeight</code> removes/inserts vertical seams before horizontal seams. <code>.heightThenWidth</code> reverses that order. <code>.adaptiveNormalizedCost</code> compares the normalized cost of the available vertical and horizontal seams at each decision. The CLI spells these as <code>width-first</code>, <code>height-first</code>, and <code>adaptive</code>; the app labels them “Width then Height”, “Height then Width”, and “Adaptive”.</p>
+
+    <h2>Energy and masks</h2>
+    <h3>Backward Sobel</h3>
+    <p>Input bytes are decoded from sRGB to linear light before BT.709 luma is computed with <code>0.2126R + 0.7152G + 0.0722B</code>. Optional box blur and Sobel threshold controls apply only to this energy mode.</p>
+    <h3>Forward luma</h3>
+    <p>Forward luma accounts for the neighboring-pixel discontinuity created by joining pixels after a seam is removed. It is useful when the cost of the edit itself matters more than only the current gradient.</p>
+    <h3>Protect and remove</h3>
+    <p>Each <code>Mask</code> stores values in <code>0...1</code>. Multiple protection layers can be hard or soft. A removal mask makes marked pixels attractive to cross. The dedicated <code>removeObject</code> workflow keeps selecting seams that cross the removal mask and can resize back to the original dimensions afterward.</p>
+
+    <h2>Enlargement and residual pre-scaling</h2>
+    <p>Seam insertion can enlarge either dimension. The default <code>PreScaleStrategy.none</code> performs exact sequential seam operations without an implicit resize. The explicit Apple-only <code>.lanczosThenExactResidual</code> strategy first uses Core Image to pre-scale the image and every mask, then uses exact residual seam carving to reach the requested target. This is an opt-in approximation, not a replacement for exact semantics.</p>
+
+    <h2>Face protection</h2>
+    <p><code>SeamCarvingVision</code> turns Vision face rectangles into ordinary Core protection masks. The <code>.caireInspired</code> policy uses a default 0.10 expansion fraction; <code>.visionQuality</code> uses a default 0.20 expansion and 0.30 feather fraction. Both have a protection weight and minimum confidence. <code>.detectOnceAndTransformMask</code> detects once and transforms the generated mask; <code>.redetectEveryPass</code> detects again for each pass and currently supports seam removal only, not enlargement.</p>
+    <p>This is a Caire-inspired protection policy, not compatibility with Caire or its face detector. The actual detector is Apple Vision and remains optional.</p>
+
+    <h2>Backend policy</h2>
+    <table><thead><tr><th>Preference</th><th>Behavior</th></tr></thead><tbody>
+      <tr><td><code>.cpu</code></td><td>Reference implementation; useful for reproducible results and debug seam observations.</td></tr>
+      <tr><td><code>.accelerate</code></td><td>Apple Accelerate implementation with parity tests against Core.</td></tr>
+      <tr><td><code>.metal</code></td><td>Optional GPU path. It accelerates supported shrink work; horizontal edits use CPU transposition, while enlargement and adaptive ordering intentionally use the CPU reference path to preserve semantics.</td></tr>
+      <tr><td><code>.automatic</code></td><td>Try Metal, then Accelerate, then CPU. <code>deterministic: true</code> selects CPU behavior.</td></tr>
+    </tbody></table>
+    <p>The CLI forces CPU when <code>--debug</code> is enabled because seam observation is a CPU-only artifact path. Metal availability and performance are device/toolchain dependent; package parity is not a promise of equal timing.</p>
+
+    <h2 id="limitations">Limitations and non-goals</h2>
+    <ul>
+      <li>No temporal coherence for video, learned saliency, transport maps, MLX, or Core ML.</li>
+      <li>No HDR or extended-range input in the canonical RGBA8 path.</li>
+      <li>Vision is an optional Apple adapter; Core remains platform independent.</li>
+      <li>Face redetection cadence does not support enlargement.</li>
+      <li>Metal does not make every operation GPU-only; CPU fallback is intentional.</li>
+    </ul>
+    <p>For the product-level status of these capabilities, use the <a href="capability-matrix.html">capability matrix</a>.</p>
+  </article></main>
+  <footer class="site-footer"><div class="container"><p><a href="architecture.html">Architecture</a> · <a href="index.html">Documentation home</a></p></div></footer>
+</body>
+</html>
