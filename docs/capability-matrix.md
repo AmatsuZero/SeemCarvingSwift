@@ -15,14 +15,14 @@ Classification legend:
 |---|-----------|-------|----------------------|--------|
 | 1 | Shrink and enlarge in both dimensions | Core/Apple | Output reaches requested pixel dimensions | existing |
 | 2 | Backward and forward energy | Core | Existing parity tests remain green | existing |
-| 3 | Protect and remove masks | Core/UI/CLI | Painted or loaded masks affect seam selection and remain aligned after edits | implemented; platform gate pending |
+| 3 | Protect and remove masks | Core/UI/CLI | Painted or loaded masks affect seam selection and remain aligned after edits | verified; Core, CLI, simulator, and iPad App XCTest pass |
 | 4 | Object removal and optional restoration | Core/UI | Removal mask can be applied and original dimension restored | implemented in Core; GUI restoration workflow pending |
-| 5 | Face-aware protection | Vision/UI/CLI | Vision face regions become editable protection policy with explicit cadence | implemented; platform gate pending |
+| 5 | Face-aware protection | Vision/UI/CLI | Vision face regions become editable protection policy with explicit cadence | verified at API/build/test level; manual face-image smoke test recommended |
 | 6 | Caire-style large resize optimization | Planner/UI/CLI | Explicit opt-in pre-scale mode, never implicit in exact mode | implemented |
-| 7 | CPU/Accelerate/Metal selection | Apple/UI/CLI | Backend and deterministic mode are visible and explainable | implemented; device gate pending |
+| 7 | CPU/Accelerate/Metal selection | Apple/UI/CLI | Backend and deterministic mode are visible and explainable | verified; iPad Metal screening passed 16/16 |
 | 8 | Progress, cancellation, and preview | Core/UI | User can cancel an active resize and retain the source document | implemented |
-| 9 | Image import/export | Platform UI | macOS file URLs, iPhone/iPad Photos/files, and PNG/JPEG export work | implemented; physical-device gate pending |
-| 10 | Shared Apple experience | App | Same feature model works on macOS, iPhone, and iPad with adaptive layouts | implemented; physical-device gate pending |
+| 9 | Image import/export | Platform UI | macOS file URLs, iPhone/iPad Photos/files, and PNG/JPEG export work | verified by build/tests; manual picker smoke test remains recommended |
+| 10 | Shared Apple experience | App | Same feature model works on macOS, iPhone, and iPad with adaptive layouts | verified; macOS/iOS/iPadOS tests and iPad device run pass |
 
 ## Face protection is a capability choice, not Pigo compatibility
 
