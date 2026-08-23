@@ -17,6 +17,9 @@ let package = Package(
         .executable(name: "seamcarve-cli", targets: ["seamcarve-cli"]),
         .executable(name: "seamcarve-benchmark", targets: ["seamcarve-benchmark"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.0"),
+    ],
     targets: [
         .target(name: "SeamCarvingCore"),
         .target(name: "SeamCarvingAccelerate", dependencies: ["SeamCarvingCore"]),
@@ -34,10 +37,23 @@ let package = Package(
             dependencies: ["SeamCarvingCore", "SeamCarvingApple"],
             linkerSettings: [.linkedFramework("Vision")]
         ),
-        .target(name: "SeamCarvingCLI", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
+        .target(
+            name: "SeamCarvingCLI",
+            dependencies: [
+                "SeamCarvingCore",
+                "SeamCarvingApple",
+                "SeamCarvingVision",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
+        ),
         .executableTarget(
             name: "seamcarve-cli",
-            dependencies: ["SeamCarvingCLI", "SeamCarvingApple", "SeamCarvingVision"]
+            dependencies: [
+                "SeamCarvingCLI",
+                "SeamCarvingApple",
+                "SeamCarvingVision",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
         ),
         .target(
             name: "SeamCarvingBenchmark",

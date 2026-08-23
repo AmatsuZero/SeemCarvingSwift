@@ -31,6 +31,25 @@ protection is an optional adapter: choose an explicit Vision request revision,
 `.caireInspired` or `.visionQuality`, and `.detectOnce` or `.redetectEachPass`.
 All face rectangles use the same upright canonical coordinates as Core masks.
 
+
+## Command-line tool
+
+`seamcarve-cli` uses Apple `swift-argument-parser` for argv syntax while
+keeping `CLIOptions` and `CLIConfiguration` as the business configuration
+layer. The argv-to-options seam remains available as `CLIOptions.parse(_:)` for
+unit tests and embedders.
+
+```bash
+seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
+seamcarve-cli --input-dir DIR --output-dir DIR (--width PIXELS --height PIXELS | --percentage P | --square) [options]
+```
+
+Inputs can be local paths, `http(s)` URLs, or `-` for stdin. Outputs can be
+local paths or `-` for binary stdout; in stdout mode summaries stay off stdout
+so image bytes are not polluted. Supported options include backend/energy/order
+selection, masks, face protection, `--format png|jpeg|bmp`, debug seam artifacts,
+and batch `--recursive`/`--concurrency`.
+
 ## Capability alignment
 
 The package's user-facing capabilities are tracked against a Caire-inspired

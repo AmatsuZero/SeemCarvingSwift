@@ -118,24 +118,27 @@ public enum CLIConfiguration: Sendable, Equatable {
     case batch(BatchConfiguration)
 
     public static func parse(arguments: [String]) throws -> CLIConfiguration {
-        let scan = try BatchArgumentScan(arguments: arguments)
-        guard scan.isBatchMode else {
-            return .single(try CLIOptions.parse(arguments))
+        try parse(parsedArguments: CLIArgumentParser.parse(arguments))
+    }
+
+    public static func parse(parsedArguments parsed: CLIParsedArguments) throws -> CLIConfiguration {
+        guard parsed.inputDirectory != nil || parsed.outputDirectory != nil else {
+            return .single(try parsed.makeOptions())
         }
 
-        guard let inputDirectory = scan.inputDirectory,
-              let outputDirectory = scan.outputDirectory else {
+        guard let inputDirectory = parsed.inputDirectory,
+              let outputDirectory = parsed.outputDirectory else {
             throw CLIConfigurationError.incompatibleOptions(
                 "batch mode requires both --input-dir and --output-dir"
             )
         }
-        guard scan.positionalArguments.isEmpty else {
+        guard parsed.inputPath == nil, parsed.outputPath == nil else {
             throw CLIConfigurationError.incompatibleOptions(
                 "batch mode does not accept positional INPUT/OUTPUT or stdin/stdout paths"
             )
         }
 
-        let template = try CLIOptions.parse(["__batch_input__", "__batch_output__"] + arguments)
+        let template = try parsed.makeOptions(inputPath: "__batch_input__", outputPath: "__batch_output__")
         try validateBatchTemplate(template, inputDirectory: inputDirectory, outputDirectory: outputDirectory)
 
         return .batch(
@@ -204,55 +207,5 @@ public struct BatchConfiguration: Sendable, Equatable {
         self.outputDirectory = outputDirectory
         self.recursive = recursive
         self.concurrencyLimit = concurrencyLimit
-    }
-}
-
-private struct BatchArgumentScan {
-    let inputDirectory: String?
-    let outputDirectory: String?
-    let positionalArguments: [String]
-
-    var isBatchMode: Bool {
-        inputDirectory != nil || outputDirectory != nil
-    }
-
-    init(arguments: [String]) throws {
-        var inputDirectory: String?
-        var outputDirectory: String?
-        var positionalArguments: [String] = []
-
-        var index = 0
-        while index < arguments.count {
-            let argument = arguments[index]
-            switch argument {
-            case "--input-dir":
-                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
-                inputDirectory = arguments[index + 1]
-                index += 2
-            case "--output-dir":
-                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
-                outputDirectory = arguments[index + 1]
-                index += 2
-            case "--width", "--height", "--percentage", "--backend", "--energy", "--order", "--pre-scale",
-                 "--protect-mask", "--remove-mask", "--protect-strength", "--protect-weight", "--removal-weight",
-                 "--face-policy", "--face-cadence", "--blur-radius", "--sobel-threshold", "--format",
-                 "--debug-directory", "--seam-color", "--seam-shape", "--concurrency":
-                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
-                index += 2
-            case "--square", "--deterministic", "--debug", "--recursive":
-                index += 1
-            default:
-                if !argument.hasPrefix("--") {
-                    positionalArguments.append(argument)
-                    index += 1
-                } else {
-                    index += 1
-                }
-            }
-        }
-
-        self.inputDirectory = inputDirectory
-        self.outputDirectory = outputDirectory
-        self.positionalArguments = positionalArguments
     }
 }

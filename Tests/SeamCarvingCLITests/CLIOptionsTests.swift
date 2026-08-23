@@ -3,6 +3,34 @@ import XCTest
 import SeamCarvingVision
 
 final class CLIOptionsTests: XCTestCase {
+    func testArgumentParserEqualsSeparatedSyntax() throws {
+        let options = try CLIOptions.parse([
+            "input.png", "output.bmp",
+            "--width=20", "--height=18",
+            "--backend=cpu", "--energy=backward",
+            "--order=height-first", "--pre-scale=lanczos-residual",
+            "--format=bmp",
+            "--blur-radius=2", "--sobel-threshold=0.25",
+            "--debug", "--debug-directory=debug",
+            "--seam-color=#11223344", "--seam-shape=points",
+        ])
+
+        XCTAssertEqual(options.inputPath, "input.png")
+        XCTAssertEqual(options.outputPath, "output.bmp")
+        XCTAssertEqual(options.resizeMode, .exact(width: 20, height: 18))
+        XCTAssertEqual(options.backend, .cpu)
+        XCTAssertEqual(options.energy, .backwardSobel)
+        XCTAssertEqual(options.dimensionOrder, .heightThenWidth)
+        XCTAssertEqual(options.preScaleStrategy, .lanczosThenExactResidual)
+        XCTAssertEqual(options.outputFormat, .bmp)
+        XCTAssertEqual(options.blurRadius, 2)
+        XCTAssertEqual(options.sobelThreshold, 0.25)
+        XCTAssertTrue(options.debug)
+        XCTAssertEqual(options.debugDirectory, "debug")
+        XCTAssertEqual(options.seamColor, SeamColor(red: 17, green: 34, blue: 51, alpha: 68))
+        XCTAssertEqual(options.seamShape, .points)
+    }
+
     func testDocumentedExample() throws {
         let options = try CLIOptions.parse([
             "input.png", "output.png",
