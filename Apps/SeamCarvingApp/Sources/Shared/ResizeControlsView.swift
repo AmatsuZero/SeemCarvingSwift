@@ -24,6 +24,7 @@ struct ResizeControlsView: View {
     var body: some View {
         Form {
             Section(A11y.Label.controls) {
+                operationModeControls
                 targetSizeFields
                 Toggle(A11y.Label.lockAspect, isOn: $lockAspect)
                     .accessibilityIdentifier(A11y.ID.lockAspect)
@@ -65,6 +66,25 @@ struct ResizeControlsView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(A11y.ID.controls)
         .disabled(model.phase.isProcessing)
+    }
+
+    @ViewBuilder
+    private var operationModeControls: some View {
+        Picker("Operation", selection: $model.configuration.operationMode) {
+            Text("Resize").tag(ResizeOperationMode.resize)
+            Text("Remove object").tag(ResizeOperationMode.objectRemoval)
+        }
+        .accessibilityIdentifier(A11y.ID.operationMode)
+
+        if model.configuration.operationMode == .objectRemoval {
+            Toggle("Restore original size after removal", isOn: $model.configuration.restoreOriginalSize)
+                .accessibilityIdentifier(A11y.ID.restoreOriginalSize)
+            Text(model.configuration.restoreOriginalSize
+                ? "The result will be expanded back to the imported image size after the removal seams are carved."
+                : "The result size is determined by the seams needed to remove the painted object.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder
@@ -149,7 +169,9 @@ struct ResizeControlsView: View {
 extension ResizePhase {
     /// True while a resize is in flight; controls are disabled during this phase.
     var isProcessing: Bool {
-        if case .resizing = self { return true }
-        return false
+        switch self {
+        case .resizing, .detectingFaces: return true
+        default: return false
+        }
     }
 }

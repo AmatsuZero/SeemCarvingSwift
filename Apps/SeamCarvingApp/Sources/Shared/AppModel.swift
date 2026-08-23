@@ -26,6 +26,18 @@ import AppKit
 public protocol SeamCarvingService: Sendable {
     func resize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> RGBA8Image
 
+    /// Dedicated object-removal workflow. Implementations must delegate to the
+    /// Core removeObject API rather than treating the removal mask as a normal
+    /// resize mask. `targetMetadata` is the size the GUI will show after success
+    /// (source size when restoring, resulting carved size otherwise).
+    func removeObject(
+        from image: RGBA8Image,
+        removalMask: Mask,
+        restoreOriginalSize: Bool,
+        targetMetadata: PixelSize,
+        options: ResizeOptions
+    ) async throws -> RGBA8Image
+
     /// Optional face-aware entry point. Existing test services retain their
     /// simple implementation through this default forwarding behavior.
     func resize(
@@ -36,12 +48,47 @@ public protocol SeamCarvingService: Sendable {
     ) async throws -> RGBA8Image
 }
 
+public protocol AppFaceDetecting: Sendable {
+    func detectFaces(in image: RGBA8Image) async throws -> [FaceRegion]
+}
+
+public struct VisionAppFaceDetector: AppFaceDetecting {
+    public init() {}
+
+    public func detectFaces(in image: RGBA8Image) async throws -> [FaceRegion] {
+        let detector = try VisionFaceDetector()
+        let cgImage = try CGImageBridge.encode(image)
+        return try await detector.detectFaces(inUpright: cgImage)
+    }
+}
+
 public enum ExportFormat: String, Sendable, CaseIterable {
     case png
     case jpeg
 }
 
 public extension SeamCarvingService {
+    func removeObject(
+        from image: RGBA8Image,
+        removalMask: Mask,
+        restoreOriginalSize: Bool,
+        targetMetadata: PixelSize,
+        options: ResizeOptions
+    ) async throws -> RGBA8Image {
+        var effective = options
+        effective.masks = try MaskPair(
+            protectionLayers: options.masks.protectionLayers,
+            removal: removalMask,
+            removalWeight: options.masks.removalWeight
+        )
+        return try await SeamCarver().removeObject(
+            from: image,
+            removalMask: removalMask,
+            restoreOriginalSize: restoreOriginalSize,
+            options: effective
+        )
+    }
+
     func resize(
         _ image: RGBA8Image,
         to target: PixelSize,
@@ -78,6 +125,27 @@ public struct AppleSeamCarverService: SeamCarvingService {
         return try CGImageBridge.decode(resultCG)
     }
 
+    public func removeObject(
+        from image: RGBA8Image,
+        removalMask: Mask,
+        restoreOriginalSize: Bool,
+        targetMetadata: PixelSize,
+        options: ResizeOptions
+    ) async throws -> RGBA8Image {
+        var effective = options
+        effective.masks = try MaskPair(
+            protectionLayers: options.masks.protectionLayers,
+            removal: removalMask,
+            removalWeight: options.masks.removalWeight
+        )
+        return try await SeamCarver().removeObject(
+            from: image,
+            removalMask: removalMask,
+            restoreOriginalSize: restoreOriginalSize,
+            options: effective
+        )
+    }
+
     public func resize(
         _ image: RGBA8Image,
         to target: PixelSize,
@@ -92,6 +160,7 @@ public struct AppleSeamCarverService: SeamCarvingService {
         let detector = try VisionFaceDetector()
         let filteredDetector = ExcludingFaceDetector(
             base: detector,
+            excludedRegionIDs: faceProtection.excludedRegionIDs,
             excludedRegionIndices: faceProtection.excludedRegionIndices
         )
         let carver = try FaceAwareSeamCarver(
@@ -116,12 +185,13 @@ public struct AppleSeamCarverService: SeamCarvingService {
 
 private struct ExcludingFaceDetector: FaceDetecting, Sendable {
     let base: any FaceDetecting
+    let excludedRegionIDs: Set<FaceRegionID>
     let excludedRegionIndices: Set<Int>
 
     func detectFaces(inUpright image: CGImage) async throws -> [FaceRegion] {
         let regions = try await base.detectFaces(inUpright: image)
         return regions.enumerated().compactMap { index, region in
-            excludedRegionIndices.contains(index) ? nil : region
+            (excludedRegionIndices.contains(index) || excludedRegionIDs.contains(region.stableID)) ? nil : region
         }
     }
 }
@@ -140,6 +210,9 @@ public final class AppModel {
     /// Injectable service; defaults to the real `AppleSeamCarverService`.
     public var service: SeamCarvingService
 
+    /// Injectable face detector used by the explicit GUI preflight action.
+    public var faceDetector: AppFaceDetecting
+
     /// The single owned resize task. A new `resize()` cancels the prior one.
     private var resizeTask: Task<Void, Never>?
 
@@ -155,11 +228,13 @@ public final class AppModel {
 
     public init(
         configuration: ResizeConfiguration = ResizeConfiguration(),
-        service: SeamCarvingService = AppleSeamCarverService()
+        service: SeamCarvingService = AppleSeamCarverService(),
+        faceDetector: AppFaceDetecting = VisionAppFaceDetector()
     ) {
         self.configuration = configuration
         self.phase = .idle
         self.service = service
+        self.faceDetector = faceDetector
     }
 
     // MARK: Import
@@ -175,6 +250,7 @@ public final class AppModel {
             )
             self.document = document
             self.configuration.targetSize = document.targetSize
+            self.configuration.faceProtection?.detectedRegions = nil
             phase = .ready
         } catch {
             errorMessage = "Import failed: \(error.localizedDescription)"
@@ -203,6 +279,47 @@ public final class AppModel {
         }
     }
 
+    // MARK: Face preflight
+
+    /// Runs explicit face-detection preflight, stores stable region metadata in
+    /// the document and face configuration, and leaves face protection enabled on
+    /// failure so users can retry or resize without silently losing protection.
+    public func detectFaces() async {
+        guard let document else {
+            errorMessage = "No document imported."
+            phase = .failed
+            return
+        }
+        guard configuration.faceProtection != nil else {
+            errorMessage = "Enable face protection before detecting faces."
+            phase = .failed
+            return
+        }
+
+        phase = .detectingFaces
+        errorMessage = nil
+        do {
+            let regions = try await faceDetector.detectFaces(in: document.sourceImage)
+            document.faceRegions = regions
+            // Mutate the observable configuration through a local copy, then assign
+            // once. Optional-chained in-place mutations can overlap getter/modify
+            // accessors under Swift exclusivity checking.
+            if var faceProtection = configuration.faceProtection {
+                faceProtection.detectedRegions = regions
+                let detectedIDs = Set(regions.map(\.stableID))
+                faceProtection.excludedRegionIDs.formIntersection(detectedIDs)
+                faceProtection.excludedRegionIndices = faceProtection.excludedRegionIndices.filter {
+                    $0 >= 0 && $0 < regions.count
+                }
+                configuration.faceProtection = faceProtection
+            }
+            phase = .ready
+        } catch {
+            errorMessage = "Face detection failed: \(error.localizedDescription)"
+            phase = .failed
+        }
+    }
+
     // MARK: Resize
 
     /// Starts a resize and returns immediately. The work runs detached on a
@@ -223,6 +340,9 @@ public final class AppModel {
         do {
             try configuration.validate(against: document.sourceSize)
             try document.validateMasks()
+            if configuration.operationMode == .objectRemoval, document.currentMasks.removal == nil {
+                throw AppError.missingRemovalMask
+            }
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed
@@ -235,7 +355,9 @@ public final class AppModel {
         resizeTaskGeneration = myGeneration
 
         let source = document.sourceImage
-        let target = configuration.targetSize
+        let target = configuration.operationMode == .objectRemoval && configuration.restoreOriginalSize
+            ? document.sourceSize
+            : configuration.targetSize
         let faceProtection = configuration.faceProtection
         let options = ResizeOptions(
             energyMode: configuration.energyMode,
@@ -263,12 +385,23 @@ public final class AppModel {
 
         resizeTask = Task { [weak self] in
             do {
-                let result = try await activeService.resize(
-                    source,
-                    to: target,
-                    options: options,
-                    faceProtection: faceProtection
-                )
+                let result: RGBA8Image
+                if self?.configuration.operationMode == .objectRemoval, let removal = document.currentMasks.removal {
+                    result = try await activeService.removeObject(
+                        from: source,
+                        removalMask: removal,
+                        restoreOriginalSize: self?.configuration.restoreOriginalSize ?? true,
+                        targetMetadata: target,
+                        options: options
+                    )
+                } else {
+                    result = try await activeService.resize(
+                        source,
+                        to: target,
+                        options: options,
+                        faceProtection: faceProtection
+                    )
+                }
                 try Task.checkCancellation()
                 await self?.applyResult(result, generation: myGeneration)
             } catch is CancellationError {
@@ -284,7 +417,7 @@ public final class AppModel {
         guard generation == resizeGeneration else { return }
         guard let document else { return }
         document.replaceWorkingImage(result)
-        document.targetSize = configuration.targetSize
+        document.targetSize = (try? PixelSize(width: result.width, height: result.height)) ?? configuration.targetSize
         phase = .completed
         errorMessage = nil
     }

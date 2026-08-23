@@ -17,6 +17,7 @@ public enum ResizePhase: Equatable, Sendable {
     case idle
     case importing
     case ready
+    case detectingFaces
     case resizing(progress: ResizeProgress?)
     case cancelled
     case completed
@@ -28,6 +29,7 @@ public enum ResizePhase: Equatable, Sendable {
         case .idle: return "idle"
         case .importing: return "importing"
         case .ready: return "ready"
+        case .detectingFaces: return "detecting faces"
         case .resizing(let progress):
             if let progress {
                 return "resizing \(progress.completedEdits)/\(progress.totalEdits)"

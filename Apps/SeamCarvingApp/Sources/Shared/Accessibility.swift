@@ -24,6 +24,8 @@ enum A11y {
         static let backend = "editor.backend"
         static let deterministic = "editor.deterministic"
         static let preScale = "editor.preScale"
+        static let operationMode = "editor.operationMode"
+        static let restoreOriginalSize = "editor.restoreOriginalSize"
 
         static let maskModeProtect = "editor.maskModeProtect"
         static let maskModeRemove = "editor.maskModeRemove"
@@ -39,6 +41,7 @@ enum A11y {
         static let faceCadence = "editor.faceCadence"
         static let faceConfidence = "editor.faceConfidence"
         static let faceExpansion = "editor.faceExpansion"
+        static let faceDetect = "editor.faceDetect"
 
         static let cancel = "editor.cancel"
         static let resize = "editor.resize"
@@ -78,6 +81,7 @@ enum A11y {
         static let faceCadence = "Detection cadence"
         static let confidence = "Minimum confidence"
         static let expansion = "Expansion"
+        static let detectFaces = "Detect faces"
 
         static let cancel = "Cancel"
         static let resize = "Resize"

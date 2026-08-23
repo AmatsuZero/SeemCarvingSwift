@@ -70,6 +70,7 @@ struct ImageCanvasView: View {
         #endif
         // Overlay the protection/removal masks faintly so the user sees what is set.
         drawMaskOverlay(in: ctx, rect: rect)
+        drawFaceOverlay(in: ctx, rect: rect)
     }
 
     private func drawMaskOverlay(in ctx: GraphicsContext, rect: CGRect) {
@@ -87,6 +88,27 @@ struct ImageCanvasView: View {
         if let first = masks.protectionLayers.first {
             let path = maskPath(first.mask, rect: rect, scaleX: scaleX, scaleY: scaleY, w: w, h: h)
             ctx.fill(path, with: .color(.blue.opacity(0.3)))
+        }
+    }
+
+    private func drawFaceOverlay(in ctx: GraphicsContext, rect: CGRect) {
+        guard let doc = model.document else { return }
+        let regions = model.configuration.faceProtection?.detectedRegions ?? doc.faceRegions ?? []
+        guard !regions.isEmpty else { return }
+        let protectedIDs = Set(model.configuration.faceProtection?.effectiveRegions.map(\.stableID) ?? [])
+        let scaleX = rect.width / CGFloat(doc.sourceSize.width)
+        let scaleY = rect.height / CGFloat(doc.sourceSize.height)
+        for region in regions {
+            let box = CGRect(
+                x: rect.minX + CGFloat(region.x) * scaleX,
+                y: rect.minY + CGFloat(region.y) * scaleY,
+                width: CGFloat(region.width) * scaleX,
+                height: CGFloat(region.height) * scaleY
+            )
+            var path = Path()
+            path.addRect(box)
+            let color: Color = protectedIDs.contains(region.stableID) ? .green : .orange
+            ctx.stroke(path, with: .color(color.opacity(0.9)), lineWidth: 2)
         }
     }
 
@@ -149,7 +171,7 @@ extension ResizePhase {
         switch self {
         case .ready, .cancelled, .completed:
             return true
-        case .idle, .importing, .failed, .resizing:
+        case .idle, .importing, .failed, .detectingFaces, .resizing:
             return false
         }
     }

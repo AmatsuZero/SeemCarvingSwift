@@ -36,6 +36,7 @@ func defaultTargetSize() -> PixelSize { .unit }
 public enum AppError: Error, Equatable, LocalizedError {
     case invalidTargetDimensions
     case maskDimensionMismatch
+    case missingRemovalMask
     case invalidFaceConfiguration(String)
     case backendUnsupported(BackendPreference)
     case serviceFailure(String)
@@ -46,6 +47,8 @@ public enum AppError: Error, Equatable, LocalizedError {
             return "Target width and height must be positive."
         case .maskDimensionMismatch:
             return "Protection or removal mask dimensions must match the source image."
+        case .missingRemovalMask:
+            return "Object removal requires a removal mask. Paint the object with the Remove mask first."
         case .invalidFaceConfiguration(let reason):
             return "Face protection is invalid: \(reason)"
         case .backendUnsupported(let backend):
@@ -94,6 +97,33 @@ public enum ImageSource: Sendable {
     }
 }
 
+
+/// High-level GUI operation. Normal resize keeps the target-size controls as the
+/// product action; object removal sends the removal mask to Core's dedicated
+/// `removeObject(...restoreOriginalSize:)` workflow instead of treating the mask
+/// as a side effect of ordinary resizing.
+public enum ResizeOperationMode: String, CaseIterable, Hashable, Sendable {
+    case resize
+    case objectRemoval
+}
+
+/// Stable identity for a detected face region. It is value-derived so repeated
+/// detections with the same detector/revision keep the same UI identity even
+/// if the array is rebuilt.
+public struct FaceRegionID: Hashable, Equatable, Sendable, CustomStringConvertible {
+    public let rawValue: String
+
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public var description: String { rawValue }
+}
+
+public extension FaceRegion {
+    /// Stable value-derived ID used by the GUI for editable face-region lists.
+    var stableID: FaceRegionID {
+        FaceRegionID(rawValue: "\(x):\(y):\(width):\(height):\(confidence.bitPattern)")
+    }
+}
+
 // MARK: - Face protection configuration
 
 /// The UI's face-protection settings: the policy + cadence, plus the detected
@@ -104,17 +134,20 @@ public struct FaceProtectionConfiguration: Equatable, Sendable {
     public var policy: FaceProtectionPolicy
     public var cadence: FaceDetectionCadence
     public var detectedRegions: [FaceRegion]?
+    public var excludedRegionIDs: Set<FaceRegionID>
     public var excludedRegionIndices: Set<Int>
 
     public init(
         policy: FaceProtectionPolicy,
         cadence: FaceDetectionCadence = .detectOnceAndTransformMask,
         detectedRegions: [FaceRegion]? = nil,
+        excludedRegionIDs: Set<FaceRegionID> = [],
         excludedRegionIndices: Set<Int> = []
     ) {
         self.policy = policy
         self.cadence = cadence
         self.detectedRegions = detectedRegions
+        self.excludedRegionIDs = excludedRegionIDs
         self.excludedRegionIndices = excludedRegionIndices
     }
 
@@ -122,7 +155,7 @@ public struct FaceProtectionConfiguration: Equatable, Sendable {
     public var effectiveRegions: [FaceRegion] {
         guard let detected = detectedRegions else { return [] }
         return detected.enumerated().compactMap { index, region in
-            excludedRegionIndices.contains(index) ? nil : region
+            (excludedRegionIndices.contains(index) || excludedRegionIDs.contains(region.stableID)) ? nil : region
         }
     }
 
@@ -134,6 +167,10 @@ public struct FaceProtectionConfiguration: Equatable, Sendable {
                 throw AppError.invalidFaceConfiguration(
                     "excluded region index \(index) out of range 0..<\(detected.count)"
                 )
+            }
+            let detectedIDs = Set(detected.map(\.stableID))
+            for id in excludedRegionIDs where !detectedIDs.contains(id) {
+                throw AppError.invalidFaceConfiguration("excluded region id \(id.rawValue) was not detected")
             }
         }
     }
@@ -149,6 +186,8 @@ public struct ResizeConfiguration: Equatable, Sendable {
     public var backend: BackendPreference
     public var deterministic: Bool
     public var preScaleStrategy: PreScaleStrategy
+    public var operationMode: ResizeOperationMode
+    public var restoreOriginalSize: Bool
     public var faceProtection: FaceProtectionConfiguration?
 
     public init(
@@ -158,6 +197,8 @@ public struct ResizeConfiguration: Equatable, Sendable {
         backend: BackendPreference = .automatic,
         deterministic: Bool = false,
         preScaleStrategy: PreScaleStrategy = .none,
+        operationMode: ResizeOperationMode = .resize,
+        restoreOriginalSize: Bool = true,
         faceProtection: FaceProtectionConfiguration? = nil
     ) {
         self.targetSize = targetSize
@@ -166,6 +207,8 @@ public struct ResizeConfiguration: Equatable, Sendable {
         self.backend = backend
         self.deterministic = deterministic
         self.preScaleStrategy = preScaleStrategy
+        self.operationMode = operationMode
+        self.restoreOriginalSize = restoreOriginalSize
         self.faceProtection = faceProtection
     }
 

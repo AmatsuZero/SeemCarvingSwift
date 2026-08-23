@@ -23,6 +23,10 @@ struct FaceProtectionControlsView: View {
                 if model.configuration.faceProtection != nil {
                     policyPicker
                     cadencePicker
+                    Button(A11y.Label.detectFaces) { Task { await model.detectFaces() } }
+                        .accessibilityIdentifier(A11y.ID.faceDetect)
+                        .disabled(model.document == nil)
+                    cadenceExplanation
                     confidenceAndExpansion
                     detectedRegionsList
                 }
@@ -97,6 +101,15 @@ struct FaceProtectionControlsView: View {
         }
     }
 
+    @ViewBuilder
+    private var cadenceExplanation: some View {
+        Text(cadenceBinding.wrappedValue == .detectOnceAndTransformMask
+             ? "Detect once: region IDs stay stable and the generated mask is transformed during carving."
+             : "Re-detect each pass: the detector runs during carving; preflight regions remain editable exclusions for matching detections.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
     // MARK: - Confidence / expansion (policy params)
 
     @ViewBuilder
@@ -167,27 +180,35 @@ struct FaceProtectionControlsView: View {
     private var detectedRegionsList: some View {
         let regions = model.configuration.faceProtection?.detectedRegions
         ?? model.document?.faceRegions
-        if let regions, !regions.isEmpty {
+        if let regions {
             Section("Detected regions") {
-                ForEach(Array(regions.enumerated()), id: \.offset) { index, region in
-                    Toggle("Region \(index + 1) (\(region.width)×\(region.height), \(Int(region.confidence * 100))%)",
-                           isOn: excludeBinding(for: index))
+                if regions.isEmpty {
+                    Text("No faces detected.").foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(regions.enumerated()), id: \.element.stableID) { index, region in
+                        Toggle("Region \(index + 1) (\(region.width)×\(region.height), \(Int(region.confidence * 100))%)",
+                               isOn: protectionBinding(for: region, fallbackIndex: index))
+                    }
                 }
             }
         }
     }
 
-    /// A region is "protected" unless its index is in `excludedRegionIndices`;
-    /// toggling adds/removes it from that set.
-    private func excludeBinding(for index: Int) -> Binding<Bool> {
+    /// A region is protected unless its stable ID is excluded. We also clear any
+    /// legacy index exclusion for compatibility with older saved/test state.
+    private func protectionBinding(for region: FaceRegion, fallbackIndex: Int) -> Binding<Bool> {
         Binding {
-            !(model.configuration.faceProtection?.excludedRegionIndices.contains(index) ?? false)
+            let fp = model.configuration.faceProtection
+            return !(fp?.excludedRegionIDs.contains(region.stableID) ?? false)
+                && !(fp?.excludedRegionIndices.contains(fallbackIndex) ?? false)
         } set: { protected in
             guard model.configuration.faceProtection != nil else { return }
             if protected {
-                model.configuration.faceProtection?.excludedRegionIndices.remove(index)
+                model.configuration.faceProtection?.excludedRegionIDs.remove(region.stableID)
+                model.configuration.faceProtection?.excludedRegionIndices.remove(fallbackIndex)
             } else {
-                model.configuration.faceProtection?.excludedRegionIndices.insert(index)
+                model.configuration.faceProtection?.excludedRegionIDs.insert(region.stableID)
+                model.configuration.faceProtection?.excludedRegionIndices.remove(fallbackIndex)
             }
         }
     }
