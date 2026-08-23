@@ -46,6 +46,14 @@ public struct SeamColor: Sendable, Equatable {
         blue = bytes[2]
         alpha = bytes.count == 4 ? bytes[3] : 255
     }
+
+    var rgba8: RGBA8 {
+        RGBA8(r: red, g: green, b: blue, a: alpha)
+    }
+
+    var hexRGBA: String {
+        String(format: "#%02x%02x%02x%02x", red, green, blue, alpha)
+    }
 }
 
 /// Seam visualization shape (reserved for a later task).
