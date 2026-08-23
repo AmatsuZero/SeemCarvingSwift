@@ -168,4 +168,7 @@
 - Completed in `92d7eae`, `79c8a33`, and `b5527a1`: unified UIKit platform services, removed AppKit services and stale native-macOS paths, and added Catalyst-specific availability guards.
 - Catalyst build passed with `xcodebuild ... -destination 'platform=macOS,variant=Mac Catalyst' build CODE_SIGNING_ALLOWED=NO`.
 - iPhone 17 Simulator passed the unified scheme: 31 app unit tests plus 1 GUI UI test (`** TEST SUCCEEDED **`). The prior `BackendTimingRecorder` duplicate was not present in the rebuilt app; only one `SeamCarving.debug.dylib` runtime image is linked.
-- The remaining `UIAccessibilityLoaderWebShared`, `appintentsmetadataprocessor`, and Metal toolchain search-path messages are simulator/Xcode/system diagnostics, not app-owned startup registrations. Physical iPad validation and final capability-matrix acceptance remain.
+- iPad Air 13-inch Simulator passed the unified scheme: 31 app unit tests plus 1 GUI UI test (`** TEST SUCCEEDED **`).
+- Mac Catalyst unit tests passed with `CODE_SIGNING_ALLOWED=NO`; the Catalyst UI runner cannot be bootstrapped unsigned, and this Mac has an Apple Development iOS certificate but no Mac Development certificate. A signed Catalyst GUI run therefore remains pending signing setup.
+- The connected iPhone is visible but has Developer Mode disabled; the iPad is currently offline. Physical-device XCTest/Metal rerun remains pending until those device conditions are corrected.
+- The remaining `UIAccessibilityLoaderWebShared`, `appintentsmetadataprocessor`, `com.apple.linkd.autoShortcut`, and Metal toolchain search-path messages are simulator/Xcode/system diagnostics, not app-owned startup registrations. The capability and acceptance matrices now record these limitations explicitly.

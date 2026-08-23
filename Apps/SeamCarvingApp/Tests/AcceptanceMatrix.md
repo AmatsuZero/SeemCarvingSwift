@@ -4,16 +4,16 @@ This is the release gate for the shared SwiftUI editor and the Caire-aligned
 engine. A row is **verified** only when the listed command or device run has
 actually completed; source inspection alone is not sufficient.
 
-| Capability | macOS | iPhone simulator | iPad simulator | Physical iPad |
+| Capability | Mac Catalyst | iPhone simulator | iPad simulator | Physical iPad |
 |---|---|---|---|---|
-| App target builds | verified (`SeamCarvingMac`) | verified (`SeamCarvingIOS`) | verified (`SeamCarvingIOS`) | verified (`SeamCarvingIOS`) |
-| Shared XCTest/UI model tests | verified, 26/26 | verified, 26/26 | verified, 26/26 | verified, 26/26 |
+| App target builds | verified (`SeamCarvingApp`) | verified (`SeamCarvingApp`) | verified (`SeamCarvingApp`) | pending device online/developer mode |
+| Shared XCTest/UI model tests | unit tests verified; signed UI runner pending Mac Development identity | verified, 31 unit + 1 UI | verified, 31 unit + 1 UI | pending device online/developer mode |
 | Core package tests | verified, 100 tests | covered by package/device host | covered by package/device host | previously verified Metal suite; rerun for release |
 | Protect/remove masks | verified by Core + GUI + CLI mask E2E | GUI tests verified | GUI tests verified | covered by signed App XCTest |
 | Face protection, both cadences | Vision tests + macOS app compile | app compile/UI model verified | app compile/UI model verified | covered by signed App XCTest; Vision runtime not benchmarked |
 | Exact and Lanczos-residual resize | package tests verified | generic iOS build verified | generic iOS build verified | app target verified; Metal benchmark below |
-| PNG/JPEG export | PNG/JPEG encoder and macOS save panel wired | PNG/JPEG payload + ShareLink wired | PNG/JPEG payload + ShareLink wired | app target verified; manual picker flow still recommended |
-| Metal full backend | package parity verified | generic build verified | prior iPad benchmark verified | verified, 16/16 orientation cases |
+| PNG/JPEG export | PNG/JPEG payload + ShareLink wired | PNG/JPEG payload + ShareLink wired | PNG/JPEG payload + ShareLink wired | pending manual picker smoke |
+| Metal full backend | package parity verified | generic build verified | package/device-independent tests verified | prior signed screening: 16/16 orientation cases |
 
 ## Fresh physical-iPad Metal screening — 2026-08-23
 
@@ -32,14 +32,14 @@ one sample per case, direct resize, 1280×720, 8-seam removal.
 ```sh
 swift test -c release --package-path . --parallel
 xcodebuild -project Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj \
-  -scheme SeamCarvingMac -destination 'platform=macOS' \
+  -scheme SeamCarvingApp -destination 'platform=macOS,variant=Mac Catalyst' \
   CODE_SIGNING_ALLOWED=NO test
 xcodebuild -project Apps/SeamCarvingApp/SeamCarvingApp.xcodeproj \
-  -scheme SeamCarvingIOS \
+  -scheme SeamCarvingApp \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
   CODE_SIGNING_ALLOWED=NO test
 ```
 
-The physical-device rows must remain open until the device is online and the
-signed test host has been installed. An offline device is not treated as a
-passing result.
+The physical-device rows must remain open until the device is online, Developer
+Mode is enabled, and the signed test host has been installed. An offline device
+or a device with Developer Mode disabled is not treated as a passing result.
