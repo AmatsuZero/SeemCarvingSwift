@@ -1,0 +1,816 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01278D68369A082A5CF0284F /* MaskToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */; };
+		02ADD476942D904E8CF1C4A0 /* IOSPlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */; };
+		03FD7BA0AFA32A6951E5EF7F /* FaceProtectionControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */; };
+		0E5D12CB7993E43E811EF616 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3778929F0933F841B0B4B252 /* AppModel.swift */; };
+		180B015CAF79091300B3A12F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75E4EFDA047EC29DF29DBEF /* ContentView.swift */; };
+		193A076CDAF55236FBCA584A /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 504C2ACBD299DE30FF955C8E /* SeamCarvingVision */; };
+		1C9F704F2D6407BA5A71A810 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = F917CCE5F723C5827CFE0F3C /* Accessibility.swift */; };
+		2B9CE4581D1D3DF4AF68D5AA /* ResizeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5FBEF7D3B634D7118D5E40 /* ResizeConfigurationTests.swift */; };
+		45EC435C2388748171A4F339 /* MacPlatformServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F66DDB118A3768A9A329F5D /* MacPlatformServices.swift */; };
+		4E06E227C30CB85F5BCF0F53 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3778929F0933F841B0B4B252 /* AppModel.swift */; };
+		50B209614B26A3F319C1EA09 /* SeamCarvingCore in Frameworks */ = {isa = PBXBuildFile; productRef = 955C38DA6923E53FBF28A406 /* SeamCarvingCore */; };
+		57D4AAD65C9229C259C020FA /* MaskToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */; };
+		57F08992F71E1742F69E877A /* EditorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D116582298645AAACF50678 /* EditorUITests.swift */; };
+		5991F0E3B1FDE9E15D03E63E /* FaceProtectionControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */; };
+		5C553E8FEBFDAB98F758CC7D /* ResizeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA169BC723551B65481E7F /* ResizeConfiguration.swift */; };
+		6F9980F728AD7FD8AF598CA2 /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8FD9A61F5CD4754421D804 /* SeamCarvingApple */; };
+		715E2C0E3CD017D40AF02955 /* CarveProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077EEF62CA83A558BF3B743 /* CarveProgressView.swift */; };
+		72E45F4B2E721867ACEFE0F9 /* ImageCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */; };
+		77F6C9A56E6FA55D2B9B90F8 /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 802ECD2E7910E804786F90B3 /* SeamCarvingVision */; };
+		7A26CEF2BE08C8E375FD0DEF /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAF60E55CFCECC2C6BB29510 /* ExportView.swift */; };
+		7B0387E9CB8EAD7BDCB24ACC /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAF60E55CFCECC2C6BB29510 /* ExportView.swift */; };
+		7F520CD3940C16420B066CF5 /* ResizeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5FBEF7D3B634D7118D5E40 /* ResizeConfigurationTests.swift */; };
+		8B583276BCC1D879E0165F99 /* ResizeDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 767C665B027667E72901BF47 /* ResizeDocument.swift */; };
+		8D8F1FA4285F05ACFDA43A9E /* SeamCarvingCore in Frameworks */ = {isa = PBXBuildFile; productRef = 239EE93388137C8D969AB9C4 /* SeamCarvingCore */; };
+		A47BBADB5FF5B82A4368463F /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = CE300C71D701989987416596 /* SeamCarvingApple */; };
+		A9E2D22C1C14999FD7C0396C /* ResizeControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDBE36C3E1A9C31741B292A /* ResizeControlsView.swift */; };
+		AECD709F6FB33399F5F64E2D /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */; };
+		B2B481BC16849C726378D1A5 /* SeamCarvingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */; };
+		B87FD4B033960E57D4E2DF30 /* SeamCarvingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */; };
+		C16192E40F51505E238D43C0 /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 7FC66FA0DCDA48442CCE3BB2 /* SeamCarvingVision */; };
+		C8F5C3C579E69292C2692C0F /* ImageCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */; };
+		CA00CB1455C2DC334F283D30 /* ResizeDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 767C665B027667E72901BF47 /* ResizeDocument.swift */; };
+		CA78E4F47056F606407ACE5F /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = 7AB95474A0BB83BC8DA7069A /* SeamCarvingApple */; };
+		CB52B4E47C69E5274C05914B /* ResizeControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDBE36C3E1A9C31741B292A /* ResizeControlsView.swift */; };
+		CD7A62D7CB083C22D3A536B5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75E4EFDA047EC29DF29DBEF /* ContentView.swift */; };
+		D587FFAD7C16F7EA95D966B4 /* EditorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D116582298645AAACF50678 /* EditorUITests.swift */; };
+		D63F06D1B33526974968AF8B /* MaskPaintingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF6465605613391BF32F51B /* MaskPaintingController.swift */; };
+		D8C9AE1204A169B65DCFF0B3 /* SeamCarvingCore in Frameworks */ = {isa = PBXBuildFile; productRef = 088E5BADC929A3D9B6C2D34D /* SeamCarvingCore */; };
+		D90F3418481168B43AD3589B /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = F917CCE5F723C5827CFE0F3C /* Accessibility.swift */; };
+		DC2939E334FB2B1886EBC209 /* SeamCarvingApple in Frameworks */ = {isa = PBXBuildFile; productRef = B2E878AC180CA7DA26337C21 /* SeamCarvingApple */; };
+		DF5C637AE571AA8BC04ABBC8 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */; };
+		E0FB91A418D03892724F212F /* ResizeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFA169BC723551B65481E7F /* ResizeConfiguration.swift */; };
+		E2B01CC2585B1716E2D460C9 /* MaskPaintingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF6465605613391BF32F51B /* MaskPaintingController.swift */; };
+		E65E10DED0EB8E98C5FDBC42 /* CarveProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077EEF62CA83A558BF3B743 /* CarveProgressView.swift */; };
+		E94A6E9D1503B0967E582BF2 /* SeamCarvingVision in Frameworks */ = {isa = PBXBuildFile; productRef = 0B227F3E7B8BE983BAE1E88E /* SeamCarvingVision */; };
+		FFDDF4CD4627434CD5C425FC /* SeamCarvingCore in Frameworks */ = {isa = PBXBuildFile; productRef = 43B9E164DA9CCB5622B7E809 /* SeamCarvingCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3049144893DB7D7793DF8920 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 09C351FDC8742F0A8523A432 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6599A4EEE64F7E0B8D6D4872;
+			remoteInfo = SeamCarvingIOS;
+		};
+		EBE990AD3F6EBC5E9EDE17DE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 09C351FDC8742F0A8523A432 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9C2A4832C8016AB58F3C4A7B;
+			remoteInfo = SeamCarvingMac;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSPlatformServices.swift; sourceTree = "<group>"; };
+		0FF6465605613391BF32F51B /* MaskPaintingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskPaintingController.swift; sourceTree = "<group>"; };
+		1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaskToolbarView.swift; sourceTree = "<group>"; };
+		1CDBE36C3E1A9C31741B292A /* ResizeControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeControlsView.swift; sourceTree = "<group>"; };
+		1D116582298645AAACF50678 /* EditorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorUITests.swift; sourceTree = "<group>"; };
+		2928F8D2C19EC1B51F0873B5 /* SeemCarvingSwift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeemCarvingSwift; path = ../..; sourceTree = SOURCE_ROOT; };
+		2AC931E3C8DD2AC405B1AB42 /* SeamCarvingIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SeamCarvingIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3778929F0933F841B0B4B252 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCanvasView.swift; sourceTree = "<group>"; };
+		5FE0D17647EEA027149B0F38 /* SeamCarvingMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeamCarvingMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A5FBEF7D3B634D7118D5E40 /* ResizeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeConfigurationTests.swift; sourceTree = "<group>"; };
+		767C665B027667E72901BF47 /* ResizeDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeDocument.swift; sourceTree = "<group>"; };
+		7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceProtectionControlsView.swift; sourceTree = "<group>"; };
+		7F66DDB118A3768A9A329F5D /* MacPlatformServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlatformServices.swift; sourceTree = "<group>"; };
+		8EB803E50C48EEB69A183E83 /* SeamCarvingIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeamCarvingIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC4FA1212EB8207DDC4F6E6D /* SeamCarvingMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeamCarvingMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeamCarvingApp.swift; sourceTree = "<group>"; };
+		DAF60E55CFCECC2C6BB29510 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
+		E077EEF62CA83A558BF3B743 /* CarveProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarveProgressView.swift; sourceTree = "<group>"; };
+		EEFA169BC723551B65481E7F /* ResizeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeConfiguration.swift; sourceTree = "<group>"; };
+		F75E4EFDA047EC29DF29DBEF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F917CCE5F723C5827CFE0F3C /* Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		655682558B3297F40E27CE02 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CA78E4F47056F606407ACE5F /* SeamCarvingApple in Frameworks */,
+				8D8F1FA4285F05ACFDA43A9E /* SeamCarvingCore in Frameworks */,
+				C16192E40F51505E238D43C0 /* SeamCarvingVision in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		73A0BF04FB15C94008CB1D7F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A47BBADB5FF5B82A4368463F /* SeamCarvingApple in Frameworks */,
+				FFDDF4CD4627434CD5C425FC /* SeamCarvingCore in Frameworks */,
+				E94A6E9D1503B0967E582BF2 /* SeamCarvingVision in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B5BECD5AAC9B2B7D1C20429F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F9980F728AD7FD8AF598CA2 /* SeamCarvingApple in Frameworks */,
+				50B209614B26A3F319C1EA09 /* SeamCarvingCore in Frameworks */,
+				77F6C9A56E6FA55D2B9B90F8 /* SeamCarvingVision in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C5A945E227F2E3356F9564BC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC2939E334FB2B1886EBC209 /* SeamCarvingApple in Frameworks */,
+				D8C9AE1204A169B65DCFF0B3 /* SeamCarvingCore in Frameworks */,
+				193A076CDAF55236FBCA584A /* SeamCarvingVision in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		202BECBC8DE2151895C3B959 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */,
+				1D116582298645AAACF50678 /* EditorUITests.swift */,
+				6A5FBEF7D3B634D7118D5E40 /* ResizeConfigurationTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		72DCBE22A8248A786B5A7D5E /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B387577BB32E2C1AACE155CA /* iOS */,
+				96B8AFD7EB0936445ADD682A /* macOS */,
+				C42A176ED12DEB44C76BCCA6 /* Shared */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		931E5A2D44A5DF34488D268A /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				2928F8D2C19EC1B51F0873B5 /* SeemCarvingSwift */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		96B8AFD7EB0936445ADD682A /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				7F66DDB118A3768A9A329F5D /* MacPlatformServices.swift */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		B387577BB32E2C1AACE155CA /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				05C0F8E38EF635346BE10A0F /* IOSPlatformServices.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+		C42A176ED12DEB44C76BCCA6 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				F917CCE5F723C5827CFE0F3C /* Accessibility.swift */,
+				3778929F0933F841B0B4B252 /* AppModel.swift */,
+				E077EEF62CA83A558BF3B743 /* CarveProgressView.swift */,
+				F75E4EFDA047EC29DF29DBEF /* ContentView.swift */,
+				DAF60E55CFCECC2C6BB29510 /* ExportView.swift */,
+				7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */,
+				542CBA056AC20AA1F59D93C9 /* ImageCanvasView.swift */,
+				0FF6465605613391BF32F51B /* MaskPaintingController.swift */,
+				1C7CA32499A1C15A73D223EE /* MaskToolbarView.swift */,
+				EEFA169BC723551B65481E7F /* ResizeConfiguration.swift */,
+				1CDBE36C3E1A9C31741B292A /* ResizeControlsView.swift */,
+				767C665B027667E72901BF47 /* ResizeDocument.swift */,
+				D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		F468B802F7FFB9AFC2071930 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2AC931E3C8DD2AC405B1AB42 /* SeamCarvingIOS.app */,
+				8EB803E50C48EEB69A183E83 /* SeamCarvingIOSTests.xctest */,
+				AC4FA1212EB8207DDC4F6E6D /* SeamCarvingMac.app */,
+				5FE0D17647EEA027149B0F38 /* SeamCarvingMacTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F705EA8AF110835BE692CF02 = {
+			isa = PBXGroup;
+			children = (
+				931E5A2D44A5DF34488D268A /* Packages */,
+				72DCBE22A8248A786B5A7D5E /* Sources */,
+				202BECBC8DE2151895C3B959 /* Tests */,
+				F468B802F7FFB9AFC2071930 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		16237D6E903761568DEE15DD /* SeamCarvingMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D967688076102713F6DD527C /* Build configuration list for PBXNativeTarget "SeamCarvingMacTests" */;
+			buildPhases = (
+				E9620B8CE70CBA816CEE31B1 /* Sources */,
+				B5BECD5AAC9B2B7D1C20429F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E3D496E5CA03C1AC6FDD35D6 /* PBXTargetDependency */,
+			);
+			name = SeamCarvingMacTests;
+			packageProductDependencies = (
+				0E8FD9A61F5CD4754421D804 /* SeamCarvingApple */,
+				955C38DA6923E53FBF28A406 /* SeamCarvingCore */,
+				802ECD2E7910E804786F90B3 /* SeamCarvingVision */,
+			);
+			productName = SeamCarvingMacTests;
+			productReference = 5FE0D17647EEA027149B0F38 /* SeamCarvingMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		39831FC3012D29333F3A2738 /* SeamCarvingIOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2098F03551D268F50EB8242 /* Build configuration list for PBXNativeTarget "SeamCarvingIOSTests" */;
+			buildPhases = (
+				D846D705C72F50B274E6E06D /* Sources */,
+				655682558B3297F40E27CE02 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3B5DC312E5A1B17C14998973 /* PBXTargetDependency */,
+			);
+			name = SeamCarvingIOSTests;
+			packageProductDependencies = (
+				7AB95474A0BB83BC8DA7069A /* SeamCarvingApple */,
+				239EE93388137C8D969AB9C4 /* SeamCarvingCore */,
+				7FC66FA0DCDA48442CCE3BB2 /* SeamCarvingVision */,
+			);
+			productName = SeamCarvingIOSTests;
+			productReference = 8EB803E50C48EEB69A183E83 /* SeamCarvingIOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6599A4EEE64F7E0B8D6D4872 /* SeamCarvingIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 95159B07939A8F513E0FB2B3 /* Build configuration list for PBXNativeTarget "SeamCarvingIOS" */;
+			buildPhases = (
+				77042550EF5AED1CB0B7D1E3 /* Sources */,
+				73A0BF04FB15C94008CB1D7F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SeamCarvingIOS;
+			packageProductDependencies = (
+				CE300C71D701989987416596 /* SeamCarvingApple */,
+				43B9E164DA9CCB5622B7E809 /* SeamCarvingCore */,
+				0B227F3E7B8BE983BAE1E88E /* SeamCarvingVision */,
+			);
+			productName = SeamCarvingIOS;
+			productReference = 2AC931E3C8DD2AC405B1AB42 /* SeamCarvingIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9C2A4832C8016AB58F3C4A7B /* SeamCarvingMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E00E7770F1AC9B679FEC527B /* Build configuration list for PBXNativeTarget "SeamCarvingMac" */;
+			buildPhases = (
+				72DBEA15B582414317A19587 /* Sources */,
+				C5A945E227F2E3356F9564BC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SeamCarvingMac;
+			packageProductDependencies = (
+				B2E878AC180CA7DA26337C21 /* SeamCarvingApple */,
+				088E5BADC929A3D9B6C2D34D /* SeamCarvingCore */,
+				504C2ACBD299DE30FF955C8E /* SeamCarvingVision */,
+			);
+			productName = SeamCarvingMac;
+			productReference = AC4FA1212EB8207DDC4F6E6D /* SeamCarvingMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		09C351FDC8742F0A8523A432 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					16237D6E903761568DEE15DD = {
+						ProvisioningStyle = Automatic;
+					};
+					39831FC3012D29333F3A2738 = {
+						ProvisioningStyle = Automatic;
+					};
+					6599A4EEE64F7E0B8D6D4872 = {
+						ProvisioningStyle = Automatic;
+					};
+					9C2A4832C8016AB58F3C4A7B = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = C68E682DC5148B8442608320 /* Build configuration list for PBXProject "SeamCarvingApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = F705EA8AF110835BE692CF02;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				54D066BC961CE5928062D1DC /* XCLocalSwiftPackageReference "../.." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F468B802F7FFB9AFC2071930 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9C2A4832C8016AB58F3C4A7B /* SeamCarvingMac */,
+				6599A4EEE64F7E0B8D6D4872 /* SeamCarvingIOS */,
+				16237D6E903761568DEE15DD /* SeamCarvingMacTests */,
+				39831FC3012D29333F3A2738 /* SeamCarvingIOSTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		72DBEA15B582414317A19587 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D90F3418481168B43AD3589B /* Accessibility.swift in Sources */,
+				0E5D12CB7993E43E811EF616 /* AppModel.swift in Sources */,
+				E65E10DED0EB8E98C5FDBC42 /* CarveProgressView.swift in Sources */,
+				180B015CAF79091300B3A12F /* ContentView.swift in Sources */,
+				7B0387E9CB8EAD7BDCB24ACC /* ExportView.swift in Sources */,
+				03FD7BA0AFA32A6951E5EF7F /* FaceProtectionControlsView.swift in Sources */,
+				72E45F4B2E721867ACEFE0F9 /* ImageCanvasView.swift in Sources */,
+				45EC435C2388748171A4F339 /* MacPlatformServices.swift in Sources */,
+				E2B01CC2585B1716E2D460C9 /* MaskPaintingController.swift in Sources */,
+				57D4AAD65C9229C259C020FA /* MaskToolbarView.swift in Sources */,
+				5C553E8FEBFDAB98F758CC7D /* ResizeConfiguration.swift in Sources */,
+				CB52B4E47C69E5274C05914B /* ResizeControlsView.swift in Sources */,
+				8B583276BCC1D879E0165F99 /* ResizeDocument.swift in Sources */,
+				B87FD4B033960E57D4E2DF30 /* SeamCarvingApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77042550EF5AED1CB0B7D1E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C9F704F2D6407BA5A71A810 /* Accessibility.swift in Sources */,
+				4E06E227C30CB85F5BCF0F53 /* AppModel.swift in Sources */,
+				715E2C0E3CD017D40AF02955 /* CarveProgressView.swift in Sources */,
+				CD7A62D7CB083C22D3A536B5 /* ContentView.swift in Sources */,
+				7A26CEF2BE08C8E375FD0DEF /* ExportView.swift in Sources */,
+				5991F0E3B1FDE9E15D03E63E /* FaceProtectionControlsView.swift in Sources */,
+				02ADD476942D904E8CF1C4A0 /* IOSPlatformServices.swift in Sources */,
+				C8F5C3C579E69292C2692C0F /* ImageCanvasView.swift in Sources */,
+				D63F06D1B33526974968AF8B /* MaskPaintingController.swift in Sources */,
+				01278D68369A082A5CF0284F /* MaskToolbarView.swift in Sources */,
+				E0FB91A418D03892724F212F /* ResizeConfiguration.swift in Sources */,
+				A9E2D22C1C14999FD7C0396C /* ResizeControlsView.swift in Sources */,
+				CA00CB1455C2DC334F283D30 /* ResizeDocument.swift in Sources */,
+				B2B481BC16849C726378D1A5 /* SeamCarvingApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D846D705C72F50B274E6E06D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF5C637AE571AA8BC04ABBC8 /* AppModelTests.swift in Sources */,
+				D587FFAD7C16F7EA95D966B4 /* EditorUITests.swift in Sources */,
+				7F520CD3940C16420B066CF5 /* ResizeConfigurationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E9620B8CE70CBA816CEE31B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AECD709F6FB33399F5F64E2D /* AppModelTests.swift in Sources */,
+				57F08992F71E1742F69E877A /* EditorUITests.swift in Sources */,
+				2B9CE4581D1D3DF4AF68D5AA /* ResizeConfigurationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3B5DC312E5A1B17C14998973 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6599A4EEE64F7E0B8D6D4872 /* SeamCarvingIOS */;
+			targetProxy = 3049144893DB7D7793DF8920 /* PBXContainerItemProxy */;
+		};
+		E3D496E5CA03C1AC6FDD35D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9C2A4832C8016AB58F3C4A7B /* SeamCarvingMac */;
+			targetProxy = EBE990AD3F6EBC5E9EDE17DE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3E63FAA10AF827A6439893D7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_CFBundleDisplayName = "Seam Carving";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.seamcarving.ios;
+				PRODUCT_MODULE_NAME = Shared;
+				PRODUCT_NAME = SeamCarving;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		45B5E64DF183E05298CFAA2E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.seamcarving.ios-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/SeamCarving";
+			};
+			name = Release;
+		};
+		821AD90BA8169F2233716A41 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Seam Carving";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.seamcarving.mac;
+				PRODUCT_MODULE_NAME = Shared;
+				PRODUCT_NAME = SeamCarving;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		A94E01EE2296B1D27B263CA7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.seamcarving.ios-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/SeamCarving";
+			};
+			name = Debug;
+		};
+		AE51A1CA146EE29F9F838B03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B0AC7081091E97821A7DDE3B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_CFBundleDisplayName = "Seam Carving";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.seamcarving.ios;
+				PRODUCT_MODULE_NAME = Shared;
+				PRODUCT_NAME = SeamCarving;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CBB6EBA4EFDB95EA68E4B25C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.seamcarving.mac-tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/Contents/MacOS/SeamCarving";
+			};
+			name = Debug;
+		};
+		D3D6C6674E917808FD5F9D60 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Seam Carving";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.seamcarving.mac;
+				PRODUCT_MODULE_NAME = Shared;
+				PRODUCT_NAME = SeamCarving;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DB997F8061E50224D1A4D67E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.seamcarving.mac-tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/Contents/MacOS/SeamCarving";
+			};
+			name = Release;
+		};
+		F7D6D013FF466BCBD33297E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		95159B07939A8F513E0FB2B3 /* Build configuration list for PBXNativeTarget "SeamCarvingIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3E63FAA10AF827A6439893D7 /* Debug */,
+				B0AC7081091E97821A7DDE3B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A2098F03551D268F50EB8242 /* Build configuration list for PBXNativeTarget "SeamCarvingIOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A94E01EE2296B1D27B263CA7 /* Debug */,
+				45B5E64DF183E05298CFAA2E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C68E682DC5148B8442608320 /* Build configuration list for PBXProject "SeamCarvingApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE51A1CA146EE29F9F838B03 /* Debug */,
+				F7D6D013FF466BCBD33297E5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D967688076102713F6DD527C /* Build configuration list for PBXNativeTarget "SeamCarvingMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CBB6EBA4EFDB95EA68E4B25C /* Debug */,
+				DB997F8061E50224D1A4D67E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E00E7770F1AC9B679FEC527B /* Build configuration list for PBXNativeTarget "SeamCarvingMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D3D6C6674E917808FD5F9D60 /* Debug */,
+				821AD90BA8169F2233716A41 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		54D066BC961CE5928062D1DC /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		088E5BADC929A3D9B6C2D34D /* SeamCarvingCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingCore;
+		};
+		0B227F3E7B8BE983BAE1E88E /* SeamCarvingVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingVision;
+		};
+		0E8FD9A61F5CD4754421D804 /* SeamCarvingApple */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingApple;
+		};
+		239EE93388137C8D969AB9C4 /* SeamCarvingCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingCore;
+		};
+		43B9E164DA9CCB5622B7E809 /* SeamCarvingCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingCore;
+		};
+		504C2ACBD299DE30FF955C8E /* SeamCarvingVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingVision;
+		};
+		7AB95474A0BB83BC8DA7069A /* SeamCarvingApple */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingApple;
+		};
+		7FC66FA0DCDA48442CCE3BB2 /* SeamCarvingVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingVision;
+		};
+		802ECD2E7910E804786F90B3 /* SeamCarvingVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingVision;
+		};
+		955C38DA6923E53FBF28A406 /* SeamCarvingCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingCore;
+		};
+		B2E878AC180CA7DA26337C21 /* SeamCarvingApple */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingApple;
+		};
+		CE300C71D701989987416596 /* SeamCarvingApple */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SeamCarvingApple;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 09C351FDC8742F0A8523A432 /* Project object */;
+}

@@ -1,0 +1,126 @@
+name: SeamCarvingApp
+
+options:
+  bundleIdPrefix: com.seamcarving
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+packages:
+  SeamCarvingSwift:
+    path: ../..
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    GENERATE_INFOPLIST_FILE: YES
+
+targets:
+  SeamCarvingMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Shared
+      - path: Sources/macOS
+    dependencies:
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
+    settings:
+      base:
+        PRODUCT_NAME: SeamCarving
+        PRODUCT_MODULE_NAME: Shared
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac
+        INFOPLIST_KEY_CFBundleDisplayName: Seam Carving
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+
+  SeamCarvingIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/Shared
+      - path: Sources/iOS
+    dependencies:
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
+    settings:
+      base:
+        PRODUCT_NAME: SeamCarving
+        PRODUCT_MODULE_NAME: Shared
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_CFBundleDisplayName: Seam Carving
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+
+  SeamCarvingMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: SeamCarvingMac
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.mac-tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/Contents/MacOS/SeamCarving"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  SeamCarvingIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: SeamCarvingIOS
+      - package: SeamCarvingSwift
+        product: SeamCarvingApple
+      - package: SeamCarvingSwift
+        product: SeamCarvingCore
+      - package: SeamCarvingSwift
+        product: SeamCarvingVision
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.ios-tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarving.app/SeamCarving"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  SeamCarvingMac:
+    build:
+      targets:
+        SeamCarvingMac: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: SeamCarvingMacTests
+
+  SeamCarvingIOS:
+    build:
+      targets:
+        SeamCarvingIOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: SeamCarvingIOSTests
