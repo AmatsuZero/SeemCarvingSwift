@@ -14,7 +14,7 @@ import SeamCarvingVision
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -75,7 +75,7 @@ public enum ImageSource: Sendable {
     #if canImport(UIKit)
     case uiImage(UIImage)
     #endif
-    #if canImport(AppKit)
+    #if canImport(AppKit) && !targetEnvironment(macCatalyst)
     case nsImage(NSImage)
     #endif
 
@@ -87,7 +87,7 @@ public enum ImageSource: Sendable {
         case (.uiImage(let a), .uiImage(let b)):
             return a === b
         #endif
-        #if canImport(AppKit)
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
         case (.nsImage(let a), .nsImage(let b)):
             return a === b
         #endif

@@ -1,7 +1,7 @@
 import CoreGraphics
 import ImageIO
 import SeamCarvingCore
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 #if canImport(UIKit)
@@ -23,7 +23,7 @@ enum PlatformImageBridge {
     }
     #endif
 
-    #if canImport(AppKit)
+    #if canImport(AppKit) && !targetEnvironment(macCatalyst)
     static func decode(_ image: NSImage) throws -> RGBA8Image {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw SeamCarvingError.unsupportedPixelFormat

@@ -15,7 +15,7 @@ import SeamCarvingVision
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -269,7 +269,7 @@ public final class AppModel {
             }
             return try CGImageBridge.decode(cgImage)
         #endif
-        #if canImport(AppKit)
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
         case .nsImage(let nsImage):
             guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
                 throw AppError.serviceFailure("NSImage has no CGImage backing")

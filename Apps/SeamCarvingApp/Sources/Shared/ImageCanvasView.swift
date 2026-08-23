@@ -14,7 +14,7 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -63,7 +63,7 @@ struct ImageCanvasView: View {
 
     private func draw(image: RGBA8Image, rect: CGRect, in ctx: GraphicsContext, size: CGSize) {
         guard let cgImage = try? CGImageBridge.encode(image) else { return }
-        #if canImport(AppKit)
+        #if canImport(AppKit) && !targetEnvironment(macCatalyst)
         let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: image.width, height: image.height))
         ctx.draw(Image(nsImage: nsImage), in: rect)
         #elseif canImport(UIKit)

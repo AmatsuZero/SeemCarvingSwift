@@ -10,7 +10,7 @@ import CoreVideo
 #if canImport(UIKit)
 import UIKit
 #endif
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit
 #endif
 
@@ -108,7 +108,7 @@ public extension AppleSeamCarver {
     }
     #endif
 
-    #if canImport(AppKit)
+    #if canImport(AppKit) && !targetEnvironment(macCatalyst)
     func resize(
         _ image: NSImage,
         toPixelSize target: PixelSize,
