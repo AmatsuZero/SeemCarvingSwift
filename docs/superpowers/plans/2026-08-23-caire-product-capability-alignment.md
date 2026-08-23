@@ -390,3 +390,23 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
    - 保留旧 `Int` 语义，另增新的 `resizeMode` 配置接口。
    （建议在 Task 2 定义最终 `ResizeMode` 时一并决策并落实，避免二次破坏。）
 2. **`CLIProcessor` 仍直接写 stderr。** 内部直接 `FileHandle.standardError.write(...)` 输出 progress，处理层仍耦合进程 I/O。建议在 Task 3（stdin/stdout binary mode）之前改为注入 progress sink，由 `CLIEntry` 负责输出。
+
+### Task 2 — 已完成
+
+- **提交：** `f0dc2cd` `feat: add scalar resize and energy controls`
+- **验证：**
+  - `swift test --package-path . --parallel` → 139/139 通过
+  - `swift test --package-path . --filter 'CLIOptionsTests|CLIEndToEndTests' --parallel` → 通过
+  - `xcodebuild -scheme SeamCarvingSwift-Package -workspace . -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build` → BUILD SUCCEEDED
+  - `git diff --check` 干净
+- **改动摘要：**
+  - `ResizeOptions` 新增 `blurRadius: Int = 0`、`sobelThreshold: Float = 0`。
+  - `PixelSize.scaled(byPercentage:)`（源尺寸基准、round-half-away-from-zero、最小 1、允许 enlarge）与 `squareTarget()`（短边）。
+  - `LuminancePlane.blurred(radius:)`：可分离 box blur（clamp-to-edge），CPU 与 Accelerate 共用以保证 bit 兼容。
+  - `BackwardEnergy`/`AccelerateEnergy`：blur + Sobel threshold 进入实际 energy；零值复现默认结果。
+  - `CoreResizeEngine`：forward energy + blur/threshold 抛 `invalidConfiguration`（不静默忽略）。
+  - `MetalBackend`：blur/threshold 委托 CPU 参考后端（`effectiveIdentifier` 返回 `cpu-fallback`），不忽略参数。
+  - CLI：`--percentage`/`--square` 解析并按源尺寸解出目标；`--blur-radius`（Int）/`--sobel-threshold` 接线进 `ResizeOptions`；`CLIProcessor` 移除对应 reserved 拒绝。
+  - 移除 `CLIConfigurationError.reservedResizeModeNotImplemented`；`--help` 更新为 percentage/square/blur/sobel 已实现。
+  - `docs/capability-matrix.md` 新增第 11、12 行并标记 verified。
+- **语义约定：** percentage 以源尺寸为基准（`50`=一半），round half away from zero，每轴最小 1，`>100` enlarge；square 取短边为边长（不 enlarge）；blur/sobel 仅作用于 backward Sobel energy，配合 forward energy 时报错。
