@@ -19,6 +19,8 @@
 - Do not claim physical-device UI automation is passing; record the known XCTest automation-mode limitation accurately.
 - Do not add a documentation build dependency; GitHub Pages must serve the committed static files directly.
 - Preserve existing capability and acceptance documents; improve links and navigation rather than duplicating their authoritative matrices.
+- Provide English and Simplified Chinese coverage for the overview, architecture, principles, API, CLI, App, testing, and limitations. Use paired static pages (`foo.html` and `foo-zh.html`) with relative language-switch links; language switching must not require JavaScript, a server, or a build step.
+- Keep the README bilingual through a top-level language entry and a complete `README.zh-CN.md` companion. Both README entry points must link to both language versions of the static guides.
 
 ### Task 1: Audit the public surface and create the documentation information architecture
 
@@ -35,9 +37,9 @@
 - Each page must work when opened directly from a local filesystem and when served from a GitHub Pages project path; use relative links only.
 
 - [ ] **Step 1: Inventory the public modules, products, executable names, and app targets.** Record exact names and supported platforms in the site navigation and README outline.
-- [ ] **Step 2: Create the static site shell.** Add a semantic header, navigation, main content container, footer, skip link, responsive layout, code block styling, table styling, and dark-mode CSS using `prefers-color-scheme`.
+- [ ] **Step 2: Create the static site shell.** Add a semantic header, navigation, language switch, main content container, footer, skip link, responsive layout, code block styling, table styling, and dark-mode CSS using `prefers-color-scheme`.
 - [ ] **Step 3: Add a no-JavaScript navigation fallback.** Keep all navigation usable as ordinary relative links; JavaScript may only enhance the active-page marker or mobile menu.
-- [ ] **Step 4: Open `docs/index.html` through a local HTTP server and verify every navigation link resolves to an existing file.**
+- [ ] **Step 4: Open `docs/index.html` and `docs/index-zh.html` through a local HTTP server and verify every navigation and language-switch link resolves to an existing file.**
 - [ ] **Step 5: Commit the site shell independently.**
 
 ```bash
@@ -47,9 +49,8 @@ git commit -m "docs: add static documentation site shell"
 
 ### Task 2: Write the architecture and algorithm principles guides
 
-**Files:**
-- Create: `docs/architecture.html`
-- Create: `docs/principles.html`
+- Create: `docs/architecture.html`, `docs/architecture-zh.html`
+- Create: `docs/principles.html`, `docs/principles-zh.html`
 - Modify: `docs/index.html`
 - Modify: `README.md`
 
@@ -61,7 +62,7 @@ git commit -m "docs: add static documentation site shell"
 - [ ] **Step 2: Document the seam-carving loop with a concise numbered explanation: energy, dynamic programming, seam selection, mask constraints, edit, progress/cancellation.**
 - [ ] **Step 3: Explain horizontal processing, enlargement, Lanczos residual mode, face protection cadences, and the exact limitations of the Metal backend.**
 - [ ] **Step 4: Add diagrams using accessible HTML/CSS or inline SVG only; do not add binary diagram dependencies.**
-- [ ] **Step 5: Add links from README and index page; verify all technical claims against source and capability matrix.**
+- [ ] **Step 5: Add English/Chinese links from README and both index pages; verify all technical claims against source and capability matrix.**
 - [ ] **Step 6: Commit.**
 
 ```bash
@@ -72,7 +73,7 @@ git commit -m "docs: explain architecture and seam carving principles"
 ### Task 3: Write the Swift API reference and usage guide
 
 **Files:**
-- Create: `docs/api.html`
+- Create: `docs/api.html`, `docs/api-zh.html`
 - Modify: `docs/index.html`
 - Modify: `README.md`
 
@@ -84,7 +85,7 @@ git commit -m "docs: explain architecture and seam carving principles"
 - [ ] **Step 2: Add a minimal Core resize example using canonical RGBA8 data.**
 - [ ] **Step 3: Add an Apple facade example for `CGImage`/platform image conversion and backend configuration.**
 - [ ] **Step 4: Add mask, progress, cancellation, enlargement, and face-protection examples using the actual public API names.**
-- [ ] **Step 5: Add an API limitations section covering Core’s platform independence, Vision optionality, Metal selection, and exact versus approximate pre-scaling.**
+- [ ] **Step 5: Add an API limitations section covering Core’s platform independence, Vision optionality, Metal selection, and exact versus approximate pre-scaling, in both languages.**
 - [ ] **Step 6: Check code identifiers with `swift symbolgraph-extract` or source search and commit.**
 
 ```bash
@@ -95,7 +96,7 @@ git commit -m "docs: add Swift API guide"
 ### Task 4: Write the CLI user guide
 
 **Files:**
-- Create: `docs/cli.html`
+- Create: `docs/cli.html`, `docs/cli-zh.html`
 - Modify: `docs/index.html`
 - Modify: `README.md`
 
@@ -107,7 +108,7 @@ git commit -m "docs: add Swift API guide"
 - [ ] **Step 2: Document installation/build commands for local development and show `swift run seamcarve-cli --help`.**
 - [ ] **Step 3: Add examples for exact dimensions, percentage, square mode, backend/energy/order, deterministic mode, masks, face protection, output formats, stdin/stdout, remote URLs, and debug artifacts.**
 - [ ] **Step 4: Add batch examples for `--input-dir`, `--output-dir`, `--recursive`, and `--concurrency`, including output-path behavior and failure handling.**
-- [ ] **Step 5: Add an exit-code/error troubleshooting table based on the existing CLI tests.**
+- [ ] **Step 5: Add an exit-code/error troubleshooting table based on the existing CLI tests, in both languages.**
 - [ ] **Step 6: Verify every command with `swift run seamcarve-cli --help` and commit.**
 
 ```bash
@@ -118,7 +119,7 @@ git commit -m "docs: add CLI user guide"
 ### Task 5: Write the app user guide and platform notes
 
 **Files:**
-- Create: `docs/app.html`
+- Create: `docs/app.html`, `docs/app-zh.html`
 - Modify: `docs/index.html`
 - Modify: `Apps/SeamCarvingApp/README.md`
 - Modify: `README.md`
@@ -130,7 +131,7 @@ git commit -m "docs: add CLI user guide"
 - [ ] **Step 1: Document build/run prerequisites and the current Xcode project generation flow.**
 - [ ] **Step 2: Write the normal workflow from image import through configuration, mask painting, face protection, resize/cancel, and PNG/JPEG export.**
 - [ ] **Step 3: Add platform-specific layout notes for iPhone, iPad, and Catalyst, including dark-mode controls and Catalyst signing requirements.**
-- [ ] **Step 4: Add a testing section distinguishing simulator UI tests, Catalyst unit tests, physical iPad unit tests, physical Metal validation, and the known physical UI automation timeout.**
+- [ ] **Step 4: Add a testing section distinguishing simulator UI tests, Catalyst unit tests, physical iPad unit tests, physical Metal validation, and the known physical UI automation timeout, in both languages.**
 - [ ] **Step 5: Add troubleshooting for permissions, signing, provisioning profiles, generated Xcode projects, and harmless macOS/Xcode service logs.**
 - [ ] **Step 6: Verify UI labels against `ContentView.swift` and commit.**
 
@@ -151,10 +152,10 @@ git commit -m "docs: add cross-platform app guide"
 - README must provide a newcomer path: What it is -> install/build -> choose API/CLI/App -> architecture/principles -> tests/limitations.
 - Static HTML must contain no absolute repository-local paths and no broken relative links.
 
-- [ ] **Step 1: Check Markdown and HTML links with a local script that resolves every relative `href` and reports missing targets.**
+- [ ] **Step 1: Check Markdown and HTML links with a local script that resolves every relative `href` and reports missing targets, including both language trees and README companions.**
 - [ ] **Step 2: Run `git diff --check` and scan for stale claims, `TODO`, `TBD`, placeholder text, and undocumented flags.**
 - [ ] **Step 3: Build the package and run the relevant CLI help command after documentation changes.**
-- [ ] **Step 4: Serve `docs/` locally and inspect desktop/mobile layout, code blocks, tables, dark mode, keyboard focus, and navigation.**
+- [ ] **Step 4: Serve `docs/` locally and inspect desktop/mobile layout, code blocks, tables, dark mode, keyboard focus, navigation, and English/中文 switches.**
 - [ ] **Step 5: Confirm the GitHub Pages setup instruction is explicit: repository Settings -> Pages -> Deploy from branch -> `/docs`.**
 - [ ] **Step 6: Commit the final QA changes.**
 
@@ -167,10 +168,20 @@ git commit -m "docs: complete project onboarding documentation"
 
 - [ ] A new user can find the correct entry point within one minute.
 - [ ] README links to every guide and clearly separates Core, Apple facade, CLI, and App usage.
+- [ ] README and every major static guide provide complete English and Simplified Chinese entry points.
 - [ ] Every CLI option documented is present in the current parser.
 - [ ] API examples use current symbols and platform availability.
 - [ ] Architecture and algorithm claims match source behavior and capability matrix.
 - [ ] GitHub Pages can serve `docs/index.html` without a build step.
 - [ ] All static links resolve locally.
+- [ ] Every language switch is reciprocal and uses only relative links valid under a GitHub Pages project path.
 - [ ] `git diff --check` passes.
 - [ ] Existing tests remain unaffected.
+
+## Execution record
+
+- Added paired English/Simplified Chinese README and static HTML entry points for overview, architecture, principles, API, CLI, App, and capability acceptance.
+- Kept the Pages site build-free: language switches use relative HTML links only; no parent-repository README or source links are required by hosted pages.
+- Reworked the architecture visual into CSS-grid module layers plus a direct-dependency table sourced from `Package.swift`.
+- Principles diagrams are original inline SVGs with `aria-label`/`desc`, no SVG `<title>` tooltips, responsive horizontal scrolling, explicit arrows, seam paths, energy legends, and language-separated captions. Shrink/enlarge uses `W → W − 1` and `W → W + 1` with in-bounds targets.
+- QA must check both language trees, reciprocal switches, missing relative targets, SVG accessibility/tooltip regressions, viewBox bounds, `git diff --check`, `swift build`, `swift test`, and `swift run seamcarve-cli --help`.

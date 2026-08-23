@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="seamcarve-cli user guide">
+  <title>CLI Guide · SeamCarvingSwift</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="index.html">SeamCarvingSwift</a>
+    <nav aria-label="Primary navigation"><a href="index.html">Overview</a><a href="architecture.html">Architecture</a><a href="principles.html">Principles</a><a href="api.html">Swift API</a><a class="active" aria-current="page" href="cli.html">CLI</a><a href="app.html">App</a><a href="capability-matrix.html">Capabilities</a></nav>
+    <div class="language-switch" aria-label="Language"><a class="active" aria-current="page" href="cli.html">English</a><a href="cli-zh.html">中文</a></div>
+  </div></header>
+  <main id="main-content" class="container"><article>
+    <header><p class="eyebrow">Command line</p><h1><code>seamcarve-cli</code></h1><p class="lead">A macOS executable for content-aware image resizing. The command uses Swift Argument Parser for argv syntax and keeps image processing, batch orchestration, and exit-code behavior in the SeamCarvingCLI module.</p></header>
+
+    <h2>Build and inspect help</h2>
+    <pre><code>swift build --product seamcarve-cli
+swift run seamcarve-cli --help</code></pre>
+    <p>The executable is currently guarded for macOS because it uses Core Graphics,
+    ImageIO, and URLSession image I/O. The authoritative option spelling is the
+    output of <code>--help</code> and <code>Sources/SeamCarvingCLI/CLIArgumentParser.swift</code>.</p>
+
+    <h2>Invocation forms</h2>
+    <pre><code># Exact dimensions
+seamcarve-cli INPUT OUTPUT --width PIXELS --height PIXELS
+
+# Percentage or square mode
+seamcarve-cli INPUT OUTPUT --percentage PERCENT
+seamcarve-cli INPUT OUTPUT --square
+
+# Batch mode (do not provide positional INPUT/OUTPUT)
+seamcarve-cli --input-dir INPUT_DIR --output-dir OUTPUT_DIR \
+  --width PIXELS --height PIXELS</code></pre>
+    <p><code>INPUT</code> may be a local path, an explicit <code>http(s)</code> URL,
+    or <code>-</code> for binary stdin. <code>OUTPUT</code> may be a local path or
+    <code>-</code> for binary stdout. Exactly one resize mode is required:
+    width plus height, percentage, or square.</p>
+
+    <h2>Resize and backend options</h2>
+    <table><thead><tr><th>Option</th><th>Accepted values / behavior</th></tr></thead><tbody>
+      <tr><td><code>--width</code>, <code>--height</code></td><td>Positive exact target dimensions; both are required together.</td></tr>
+      <tr><td><code>--percentage P</code></td><td>Positive source-relative percentage; values above 100 enlarge, values below 100 shrink, and each axis rounds to at least 1.</td></tr>
+      <tr><td><code>--square</code></td><td>Uses the source short edge for both dimensions.</td></tr>
+      <tr><td><code>--backend</code></td><td><code>automatic</code> (default), <code>cpu</code>, <code>accelerate</code>, or <code>metal</code>.</td></tr>
+      <tr><td><code>--energy</code></td><td><code>backward</code> (default) or <code>forward</code>.</td></tr>
+      <tr><td><code>--order</code></td><td><code>width-first</code> (default), <code>height-first</code>, or <code>adaptive</code>.</td></tr>
+      <tr><td><code>--pre-scale</code></td><td><code>none</code> (default) or <code>lanczos-residual</code>; the latter is the explicit Apple-only approximation.</td></tr>
+      <tr><td><code>--deterministic</code></td><td>Use deterministic backend behavior where supported; the Apple facade chooses CPU.</td></tr>
+      <tr><td><code>--blur-radius</code></td><td>Non-negative backward-Sobel luma blur radius.</td></tr>
+      <tr><td><code>--sobel-threshold</code></td><td>Non-negative backward-Sobel gradient threshold.</td></tr>
+    </tbody></table>
+    <p>Blur radius and Sobel threshold cannot be combined with
+    <code>--energy forward</code>. If <code>--debug</code> is enabled with
+    <code>--backend metal</code> or <code>automatic</code>, seam observation forces
+    the effective backend to CPU and writes a warning to stderr.</p>
+
+    <h2>Masks and face protection</h2>
+    <pre><code>seamcarve-cli input.png output.png --width 900 --height 600 \
+  --protect-mask subject-mask.png --protect-strength hard
+
+seamcarve-cli input.png output.png --width 900 --height 600 \
+  --remove-mask object-mask.png --removal-weight 1500
+
+seamcarve-cli portrait.jpg portrait-resized.jpg --percentage 80 \
+  --face-policy caire --face-cadence once
+
+seamcarve-cli portrait.jpg portrait-resized.jpg --percentage 80 \
+  --face-policy vision --face-cadence each-pass</code></pre>
+    <ul>
+      <li><code>--protect-mask</code> and <code>--remove-mask</code> read local image files and require dimensions identical to the input.</li>
+      <li>Mask intensity is the maximum of the decoded red, green, and blue channels, normalized to <code>0...1</code>.</li>
+      <li><code>--protect-strength hard</code> makes marked protection pixels unavailable; <code>soft</code> uses <code>--protect-weight</code> (default 1000).</li>
+      <li><code>--removal-weight</code> defaults to 1000 and makes marked removal pixels attractive to cross.</li>
+      <li><code>--face-policy caire</code> or <code>vision</code> selects the corresponding Vision policy defaults. <code>--face-cadence once</code> is the default; <code>each-pass</code> redetects for each pass.</li>
+    </ul>
+    <p>Batch mode deliberately does not accept single-file mask arguments. Use a
+    separate invocation when every file needs a different mask.</p>
+
+    <h2>Output formats and streams</h2>
+    <pre><code># Format inferred from output extension
+seamcarve-cli input.png output.jpg --width 800 --height 600
+
+# Explicit format overrides the extension
+seamcarve-cli input.png result.data --width 800 --height 600 --format bmp
+
+# Binary pipeline; stdout contains only image bytes
+cat input.png | seamcarve-cli - - --width 800 --height 600 --format png &gt; result.png</code></pre>
+    <p>Supported explicit formats are <code>png</code>, <code>jpeg</code>/<code>jpg</code>,
+    and <code>bmp</code>. With a local output path, the normal summary is printed
+    to stdout as <code>WIDTHxHEIGHT BACKEND</code>; progress and errors are on
+    stderr. With output <code>-</code>, stdout is reserved for image bytes and
+    the summary is suppressed.</p>
+
+    <h2>Debug seam artifacts</h2>
+    <pre><code>seamcarve-cli input.png debug-output.png --width 800 --height 600 \
+  --debug --debug-directory debug-seams \
+  --seam-color '#ff0066cc' --seam-shape line</code></pre>
+    <p><code>--debug</code> requires <code>--debug-directory</code>. The directory
+    receives a <code>manifest.json</code> and one PNG overlay per observed seam.
+    Coordinates use the current image before the edit and a top-left origin.
+    <code>--seam-shape</code> is <code>line</code> or <code>points</code> and
+    <code>--seam-color</code> accepts <code>RRGGBB</code>, <code>RRGGBBAA</code>,
+    or an optional leading <code>#</code>.</p>
+
+    <h2>Batch processing</h2>
+    <pre><code># Direct children only; unsupported files are skipped
+seamcarve-cli --input-dir photos --output-dir resized \
+  --percentage 80 --concurrency 4
+
+# Preserve relative subdirectories and recurse
+seamcarve-cli --input-dir photos --output-dir resized \
+  --width 1200 --height 800 --recursive --concurrency 2</code></pre>
+    <p>Batch input and output must be local directories. Supported input
+    extensions are PNG, JPG/JPEG, and BMP. Jobs are sorted by normalized
+    relative path and run with a bounded concurrency limit (default 2). The
+    output keeps the relative path; an explicit <code>--format</code> changes
+    each file's extension to <code>.png</code>, <code>.jpg</code>, or
+    <code>.bmp</code>. Existing subdirectories are created as needed.</p>
+    <p>Each successful job is logged as <code>processed path -&gt; WxH backend</code>.
+    Individual failures are logged and included in the final summary; the
+    process exits with data-error status if any job fails. Batch mode does not
+    support debug artifacts or single-file masks.</p>
+
+    <h2>Exit codes and troubleshooting</h2>
+    <table><thead><tr><th>Code</th><th>Name</th><th>Typical cause</th></tr></thead><tbody>
+      <tr><td><code>0</code></td><td>success</td><td>Resize and output completed.</td></tr>
+      <tr><td><code>64</code></td><td>usage</td><td>Invalid or conflicting arguments, missing resize mode, reserved/incompatible configuration, or invalid debug combination.</td></tr>
+      <tr><td><code>65</code></td><td>data error</td><td>Input/mask cannot be decoded, mask dimensions differ, output format is unsupported, or output cannot be written. A batch with failed jobs also uses this status.</td></tr>
+      <tr><td><code>70</code></td><td>software error</td><td>Unexpected processing failure.</td></tr>
+      <tr><td><code>130</code></td><td>cancelled</td><td>Cancellation, conventionally <code>128 + SIGINT</code>.</td></tr>
+    </tbody></table>
+    <p>Read diagnostics from stderr. For a stream pipeline, never merge stderr
+    into stdout because stdout may contain encoded image bytes.</p>
+    <p>Continue with the <a href="api.html">Swift API guide</a> or review the
+    <a href="principles.html">backend and algorithm principles</a>.</p>
+  </article></main>
+  <footer class="site-footer"><div class="container"><p><a href="app.html">App guide</a> · <a href="index.html">Documentation home</a></p></div></footer>
+</body>
+</html>

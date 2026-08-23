@@ -14,25 +14,48 @@
     <nav aria-label="Primary navigation">
       <a href="index.html">Overview</a><a class="active" aria-current="page" href="architecture.html">Architecture</a><a href="principles.html">Principles</a><a href="api.html">Swift API</a><a href="cli.html">CLI</a><a href="app.html">App</a><a href="capability-matrix.html">Capabilities</a>
     </nav>
+    <div class="language-switch" aria-label="Language"><a class="active" aria-current="page" href="architecture.html">English</a><a href="architecture-zh.html">中文</a></div>
   </div></header>
   <main id="main-content" class="container"><article>
     <header><p class="eyebrow">Project map</p><h1>Architecture</h1><p class="lead">The package keeps image semantics in Core and puts platform concerns at the edges. This lets the CPU reference implementation define behavior while Accelerate, Metal, Apple image bridges, Vision, the CLI, and the shared app consume that contract.</p></header>
 
     <h2>Dependency flow</h2>
     <p>The dependency direction is intentionally one-way. Core does not import Apple frameworks; the Apple facade owns backend selection and image conversion; Vision is an optional adapter; CLI and App are consumers.</p>
-    <div class="callout" role="img" aria-label="Dependency flow: Core is consumed by Accelerate and Metal; Apple consumes all three; Vision consumes Apple and Core; CLI consumes Apple, Vision and Core; the app consumes Apple, Vision and Core.">
-      <svg viewBox="0 0 800 250" width="100%" height="auto" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="currentColor"/></marker></defs>
-        <g fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)">
-          <path d="M400 55 V100 M180 145 H350 M400 145 H350 M620 145 H450 M400 190 V225 M620 190 V225"/>
-        </g>
-        <g fill="var(--surface)" stroke="var(--border)" stroke-width="2">
-          <rect x="330" y="15" width="140" height="42" rx="8"/><rect x="105" y="100" width="150" height="45" rx="8"/><rect x="325" y="100" width="150" height="45" rx="8"/><rect x="545" y="100" width="150" height="45" rx="8"/><rect x="325" y="205" width="150" height="35" rx="8"/><rect x="545" y="205" width="150" height="35" rx="8"/>
-        </g>
-        <g fill="currentColor" font-family="sans-serif" font-size="16" text-anchor="middle"><text x="400" y="42">Core</text><text x="180" y="128">Accelerate</text><text x="400" y="128">Metal</text><text x="620" y="128">Apple</text><text x="400" y="228">Vision</text><text x="620" y="228">CLI / App</text></g>
-      </svg>
-      <p class="meta">The existing <a href="architecture.md">architecture notes</a> contain the locked pixel and backend semantics.</p>
+    <div class="module-layers" aria-label="Package target dependency layers">
+      <section class="module-layer">
+        <p class="layer-number">01 · Canonical engine</p>
+        <div class="module-card featured"><h3>SeamCarvingCore</h3><p>Image values, masks, energy, dynamic programming, seam editing, planning, and CPU reference behavior.</p><p class="depends">depends on: none</p></div>
+      </section>
+      <div class="layer-arrow" aria-hidden="true">↓</div>
+      <section class="module-layer">
+        <p class="layer-number">02 · Backend implementations</p>
+        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingAccelerate</h3><p>Accelerate-backed energy and seam operations.</p><p class="depends">depends on: Core</p></div><div class="module-card"><h3>SeamCarvingMetal</h3><p>Optional Metal backend and shader resources.</p><p class="depends">depends on: Core</p></div></div>
+      </section>
+      <div class="layer-arrow" aria-hidden="true">↓</div>
+      <section class="module-layer">
+        <p class="layer-number">03 · Apple platform adapters</p>
+        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingApple</h3><p>Apple image bridges and backend selection.</p><p class="depends">depends on: Core + Accelerate + Metal</p></div><div class="module-card"><h3>SeamCarvingVision</h3><p>Vision face detection and protection-mask composition.</p><p class="depends">depends on: Core + Apple</p></div></div>
+      </section>
+      <div class="layer-arrow" aria-hidden="true">↓</div>
+      <section class="module-layer">
+        <p class="layer-number">04 · Product consumers</p>
+        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingCLI</h3><p>CLI library and <code>seamcarve-cli</code> executable.</p><p class="depends">depends on: Core + Apple + Vision</p></div><div class="module-card"><h3>SwiftUI App</h3><p>One iPhone, iPad, and Mac Catalyst application target.</p><p class="depends">depends on: Core + Apple + Vision</p></div></div>
+      </section>
     </div>
+    <p class="meta">This layer view follows the direct target dependencies in <code>Package.swift</code>; it does not imply that every runtime operation uses every dependency. The existing <a href="architecture.md">architecture notes</a> contain the locked pixel and backend semantics.</p>
+
+    <h3>Dependency reference</h3>
+    <table>
+      <thead><tr><th>Target</th><th>Direct dependencies</th></tr></thead>
+      <tbody>
+        <tr><td><code>SeamCarvingAccelerate</code></td><td><code>SeamCarvingCore</code></td></tr>
+        <tr><td><code>SeamCarvingMetal</code></td><td><code>SeamCarvingCore</code></td></tr>
+        <tr><td><code>SeamCarvingApple</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingAccelerate</code>, <code>SeamCarvingMetal</code></td></tr>
+        <tr><td><code>SeamCarvingVision</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code></td></tr>
+        <tr><td><code>SeamCarvingCLI</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code>, <code>SeamCarvingVision</code></td></tr>
+        <tr><td>App target</td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code>, <code>SeamCarvingVision</code></td></tr>
+      </tbody>
+    </table>
 
     <h2>Module responsibilities</h2>
     <table>
@@ -72,6 +95,6 @@ seamcarve-cli            executable
 seamcarve-benchmark      executable</code></pre>
     <p>See the <a href="api.html">Swift API guide</a> for consumer-facing entry points and the <a href="app.html">app guide</a> for the XcodeGen/Xcode workflow.</p>
   </article></main>
-  <footer class="site-footer"><div class="container"><p><a href="../README.md">README</a> · <a href="index.html">Documentation home</a></p></div></footer>
+  <footer class="site-footer"><div class="container"><p><a href="index.html">Documentation home</a></p></div></footer>
 </body>
 </html>

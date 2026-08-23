@@ -1,5 +1,7 @@
 # SeamCarvingSwift
 
+**Language / 语言:** [English](README.md) · [中文](README.zh-CN.md)
+
 SeamCarvingSwift is a Swift 6 package for content-aware image resizing on
 iOS 17+ and macOS 14+. It provides a platform-independent RGBA8 seam-carving
 engine, optional Accelerate and Metal backends, Apple image bridges, Vision
@@ -10,13 +12,13 @@ Mac Catalyst.
 
 | You want to... | Start here |
 |---|---|
-| Understand the module boundaries and data flow | [Architecture](docs/architecture.html) |
-| Understand energy, seams, masks, enlargement, and Metal | [Algorithm principles](docs/principles.html) |
-| Integrate the Swift libraries | [Swift API guide](docs/api.html) |
-| Resize files from a shell or in a batch | [CLI guide](docs/cli.html) |
-| Run the iPhone/iPad/Catalyst editor | [App guide](docs/app.html) |
-| Review the implemented capability contract | [Capability matrix](docs/capability-matrix.md) |
-| Browse the hosted documentation | [GitHub Pages site](docs/index.html) |
+| Understand the module boundaries and data flow | [Architecture](docs/architecture.html) · [中文](docs/architecture-zh.html) |
+| Understand energy, seams, masks, enlargement, and Metal | [Algorithm principles](docs/principles.html) · [中文](docs/principles-zh.html) |
+| Integrate the Swift libraries | [Swift API guide](docs/api.html) · [中文](docs/api-zh.html) |
+| Resize files from a shell or in a batch | [CLI guide](docs/cli.html) · [中文](docs/cli-zh.html) |
+| Run the iPhone/iPad/Catalyst editor | [App guide](docs/app.html) · [中文](docs/app-zh.html) |
+| Review the implemented capability contract | [Capability matrix](docs/capability-matrix.html) · [中文](docs/capability-matrix-zh.html) |
+| Browse the hosted documentation | [GitHub Pages site](docs/index.html) · [中文](docs/index-zh.html) |
 
 ## Quick start
 
