@@ -67,7 +67,7 @@
 		6A5FBEF7D3B634D7118D5E40 /* ResizeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeConfigurationTests.swift; sourceTree = "<group>"; };
 		767C665B027667E72901BF47 /* ResizeDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizeDocument.swift; sourceTree = "<group>"; };
 		7B071D420FB4699C1EF1B350 /* FaceProtectionControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceProtectionControlsView.swift; sourceTree = "<group>"; };
-		8FDCC72EF3D15846BAE9CC56 /* SeamCarvingApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SeamCarvingApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8FDCC72EF3D15846BAE9CC56 /* SeamCarving.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeamCarving.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF2A5361B742B2EA0A6E5018 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		D1B4961499C5D8064030B4AE /* SeamCarvingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeamCarvingApp.swift; sourceTree = "<group>"; };
 		DAF60E55CFCECC2C6BB29510 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
@@ -168,7 +168,7 @@
 		F468B802F7FFB9AFC2071930 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8FDCC72EF3D15846BAE9CC56 /* SeamCarvingApp.app */,
+				8FDCC72EF3D15846BAE9CC56 /* SeamCarving.app */,
 				150529A85B5A26250F2DD13D /* SeamCarvingAppTests.xctest */,
 				46DC13845A32CF0775FDEA51 /* SeamCarvingAppUITests.xctest */,
 			);
@@ -230,7 +230,7 @@
 				0E1C90B525AF3D592EFA1B68 /* SeamCarvingVision */,
 			);
 			productName = SeamCarvingApp;
-			productReference = 8FDCC72EF3D15846BAE9CC56 /* SeamCarvingApp.app */;
+			productReference = 8FDCC72EF3D15846BAE9CC56 /* SeamCarving.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B247EE86F6CD918C398DB3BE /* SeamCarvingAppUITests */ = {
