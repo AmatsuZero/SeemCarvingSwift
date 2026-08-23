@@ -358,3 +358,22 @@ Task 5、6、7 都会触及共享模型/API，不能在未完成 Task 1/2 的 co
 - macOS、iPhone、iPad 的宿主测试通过；可用时 iPad 真机 App XCTest 和 Metal screening 通过。
 - `docs/capability-matrix.md`、README/help 文本与实际行为一致。
 - 所有任务均有独立提交，工作树只保留用户已有的未跟踪文件或明确记录的变更。
+
+## 执行记录（Execution Record）
+
+### Task 1 — 已完成
+
+- **提交：** `d03b126` `refactor: split CLI processing pipeline`
+- **验证：**
+  - `swift test --package-path . --filter CLIOptionsTests --parallel` → 通过（26 测试）
+  - `swift test --package-path . --filter CLIEndToEndTests --parallel` → 通过（5 测试，需 `SEAMCARVE_CLI_PATH`）
+  - `swift test --package-path . --parallel` → 123/123 通过，`git diff --check` 干净
+- **改动摘要：**
+  - `Sources/SeamCarvingCLI/CLIConfiguration.swift`（新增）：`ResizeMode`、`SeamColor`、`SeamShape`、`CLIExitCode`（sysexits 64/65/70/130）、`CLIConfigurationError`，stdout/stderr 契约写入 doc comment。
+  - `Sources/SeamCarvingCLI/CLIImageIO.swift`（新增）：`readImage`/`loadMask`/`writeImage` 与 `CLIImageIOError`（decode、unsupported format、mask size mismatch、encode）。
+  - `Sources/SeamCarvingCLI/CLIProcessor.swift`（新增）：把“读图 → 构造 mask → 构造 ResizeOptions → 调用 Apple/FaceAware service → 写出”抽为可单测 service，返回 `CLIProcessResult`。
+  - `CLIOptions.swift`：保留 positional `INPUT OUTPUT --width --height` 语法；预留类型化字段（`percentage`、`square`、`blurRadius`、`sobelThreshold`、`debug`、`debugDirectory`、`seamColor`、`seamShape`、batch directory/`recursive`/`concurrency`），新增 mode 冲突校验与 negative tests。
+  - `CLIEntry.swift`：变薄，只负责解析→调用 processor→stdout 摘要→stderr 诊断与退出码。
+  - `Package.swift`：`SeamCarvingCLI` 增加 `SeamCarvingApple` 依赖。
+- **已知预留（未实现，属后续任务）：** `percentage`/`square` 已解析并校验，但 `CLIProcessor` 抛出 usage 错误（退出码 64）而非静默忽略；`blur`/`sobel`/`debug`/`seam`/batch 字段已类型化预留，engine 接线在 Task 2–5。
+- **未改动：** 用户未提交的 `CODE_REVIEW.md`（保持未跟踪，未纳入提交）。
