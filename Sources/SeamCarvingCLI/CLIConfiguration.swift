@@ -90,6 +90,7 @@ public enum CLIExitCode: Int32, Sendable, Equatable {
 public enum CLIConfigurationError: Error, Equatable {
     case reservedOptionNotImplemented(String)
     case incompatibleOptions(String)
+    case missingRequiredOption(String)
 
     public var message: String {
         switch self {
@@ -97,6 +98,153 @@ public enum CLIConfigurationError: Error, Equatable {
             return "option \(option) is reserved and not yet implemented"
         case .incompatibleOptions(let detail):
             return detail
+        case .missingRequiredOption(let detail):
+            return detail
         }
+    }
+}
+
+/// Top-level CLI execution mode selected from the raw argument vector.
+public enum CLIConfiguration: Sendable, Equatable {
+    case single(CLIOptions)
+    case batch(BatchConfiguration)
+
+    public static func parse(arguments: [String]) throws -> CLIConfiguration {
+        let scan = try BatchArgumentScan(arguments: arguments)
+        guard scan.isBatchMode else {
+            return .single(try CLIOptions.parse(arguments))
+        }
+
+        guard let inputDirectory = scan.inputDirectory,
+              let outputDirectory = scan.outputDirectory else {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode requires both --input-dir and --output-dir"
+            )
+        }
+        guard scan.positionalArguments.isEmpty else {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode does not accept positional INPUT/OUTPUT or stdin/stdout paths"
+            )
+        }
+
+        let template = try CLIOptions.parse(["__batch_input__", "__batch_output__"] + arguments)
+        try validateBatchTemplate(template, inputDirectory: inputDirectory, outputDirectory: outputDirectory)
+
+        return .batch(
+            BatchConfiguration(
+                templateOptions: template,
+                inputDirectory: inputDirectory,
+                outputDirectory: outputDirectory,
+                recursive: template.recursive,
+                concurrencyLimit: template.concurrency ?? BatchConfiguration.defaultConcurrency
+            )
+        )
+    }
+
+    private static func validateBatchTemplate(
+        _ template: CLIOptions,
+        inputDirectory: String,
+        outputDirectory: String
+    ) throws {
+        if inputDirectory == "-" || outputDirectory == "-" {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode requires local input/output directories, not stdin/stdout"
+            )
+        }
+        if looksLikeRemoteURL(inputDirectory) || looksLikeRemoteURL(outputDirectory) {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode requires local input/output directories, not remote URLs"
+            )
+        }
+        if template.debug || template.debugDirectory != nil || template.seamColor != nil || template.seamShape != nil {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode does not support debug artifacts; use single-image mode instead"
+            )
+        }
+        if template.protectMaskPath != nil || template.removeMaskPath != nil {
+            throw CLIConfigurationError.incompatibleOptions(
+                "batch mode does not support single-file mask arguments"
+            )
+        }
+    }
+
+    private static func looksLikeRemoteURL(_ string: String) -> Bool {
+        guard let url = URL(string: string),
+              let scheme = url.scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
+    }
+}
+
+public struct BatchConfiguration: Sendable, Equatable {
+    public static let defaultConcurrency = 2
+
+    public let templateOptions: CLIOptions
+    public let inputDirectory: String
+    public let outputDirectory: String
+    public let recursive: Bool
+    public let concurrencyLimit: Int
+
+    public init(
+        templateOptions: CLIOptions,
+        inputDirectory: String,
+        outputDirectory: String,
+        recursive: Bool,
+        concurrencyLimit: Int
+    ) {
+        self.templateOptions = templateOptions
+        self.inputDirectory = inputDirectory
+        self.outputDirectory = outputDirectory
+        self.recursive = recursive
+        self.concurrencyLimit = concurrencyLimit
+    }
+}
+
+private struct BatchArgumentScan {
+    let inputDirectory: String?
+    let outputDirectory: String?
+    let positionalArguments: [String]
+
+    var isBatchMode: Bool {
+        inputDirectory != nil || outputDirectory != nil
+    }
+
+    init(arguments: [String]) throws {
+        var inputDirectory: String?
+        var outputDirectory: String?
+        var positionalArguments: [String] = []
+
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+            case "--input-dir":
+                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
+                inputDirectory = arguments[index + 1]
+                index += 2
+            case "--output-dir":
+                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
+                outputDirectory = arguments[index + 1]
+                index += 2
+            case "--width", "--height", "--percentage", "--backend", "--energy", "--order", "--pre-scale",
+                 "--protect-mask", "--remove-mask", "--protect-strength", "--protect-weight", "--removal-weight",
+                 "--face-policy", "--face-cadence", "--blur-radius", "--sobel-threshold", "--format",
+                 "--debug-directory", "--seam-color", "--seam-shape", "--concurrency":
+                guard index + 1 < arguments.count else { throw CLIParseError.invalidArguments }
+                index += 2
+            case "--square", "--deterministic", "--debug", "--recursive":
+                index += 1
+            default:
+                if !argument.hasPrefix("--") {
+                    positionalArguments.append(argument)
+                    index += 1
+                } else {
+                    index += 1
+                }
+            }
+        }
+
+        self.inputDirectory = inputDirectory
+        self.outputDirectory = outputDirectory
+        self.positionalArguments = positionalArguments
     }
 }

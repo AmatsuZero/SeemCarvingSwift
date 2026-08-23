@@ -13,14 +13,21 @@ enum CLIEntry {
         }
 
         do {
-            let options = try CLIOptions.parse(arguments)
-            let result = try await CLIProcessor().process(options)
-            // Binary stdout mode (`-` output) writes only image bytes; the summary
-            // is suppressed so it cannot pollute stdout.
-            if options.outputPath != "-" {
-                print("\(result.width)x\(result.height) \(result.backend)")
+            switch try CLIConfiguration.parse(arguments: arguments) {
+            case .single(let options):
+                let result = try await CLIProcessor().process(options)
+                // Binary stdout mode (`-` output) writes only image bytes; the summary
+                // is suppressed so it cannot pollute stdout.
+                if options.outputPath != "-" {
+                    print("\(result.width)x\(result.height) \(result.backend)")
+                }
+                exit(CLIExitCode.success.rawValue)
+            case .batch(let batch):
+                let summary = try await BatchProcessor(processFile: { options in
+                    try await CLIProcessor().process(options)
+                }).process(batch)
+                exit(summary.failedCount == 0 ? CLIExitCode.success.rawValue : CLIExitCode.dataError.rawValue)
             }
-            exit(CLIExitCode.success.rawValue)
         } catch {
             FileHandle.standardError.write(Data("error: \(message(for: error))\n".utf8))
             exit(CLIExitCode.exitCode(for: error).rawValue)
@@ -43,7 +50,9 @@ enum CLIEntry {
     }
 
     private static let helpText = """
-    Usage: seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
+    Usage:
+      seamcarve-cli INPUT OUTPUT (--width PIXELS --height PIXELS | --percentage P | --square) [options]
+      seamcarve-cli --input-dir DIR --output-dir DIR (--width PIXELS --height PIXELS | --percentage P | --square) [options]
 
     INPUT may be a local path, an http(s) URL, or `-` (read binary from stdin).
     OUTPUT may be a local path or `-` (write only image bytes to stdout).
@@ -59,10 +68,11 @@ enum CLIEntry {
       --face-policy caire|vision --face-cadence once|each-pass
       --blur-radius R --sobel-threshold T   (backward Sobel energy only)
       --format png|jpeg|bmp                 (optional for stdout; defaults to png)
-
-    Reserved (parsed but not yet implemented; rejected with exit code 64):
-      --debug --debug-directory DIR --seam-color HEX --seam-shape line|points
-      --input-dir DIR --output-dir DIR --recursive --concurrency N
+      --debug --debug-directory DIR         (write seam overlay PNGs + manifest)
+      --seam-color HEX --seam-shape line|points
+      --input-dir DIR --output-dir DIR
+      --recursive
+      --concurrency N                       (batch mode only; default 2)
     """
 }
 
