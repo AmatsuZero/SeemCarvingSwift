@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import CoreImage
 import SeamCarvingCore
+import SeamCarvingAppleRuntime
 @testable import SeamCarvingAppleImaging
 
 final class AppleImagingBridgeTests: XCTestCase {

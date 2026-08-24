@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import SeamCarvingAppleImaging
 import SeamCarvingCore
@@ -15,3 +16,4 @@ enum NSImageBridge {
         return NSImage(cgImage: cgImage, size: NSSize(width: image.width, height: image.height))
     }
 }
+#endif

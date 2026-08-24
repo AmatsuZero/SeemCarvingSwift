@@ -55,18 +55,19 @@ let package = Package(
         ),
         .target(
             name: "SeamCarvingApple",
-            dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]
+            dependencies: ["SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]
         ),
         .target(
             name: "SeamCarvingVision",
-            dependencies: ["SeamCarvingCore", "SeamCarvingApple"],
+            dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"],
             linkerSettings: [.linkedFramework("Vision")]
         ),
         .target(
             name: "SeamCarvingCLI",
             dependencies: [
                 "SeamCarvingCore",
-                "SeamCarvingApple",
+                "SeamCarvingAppleRuntime",
+                "SeamCarvingAppleImaging",
                 "SeamCarvingVision",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
@@ -75,14 +76,12 @@ let package = Package(
             name: "seamcarve-cli",
             dependencies: [
                 "SeamCarvingCLI",
-                "SeamCarvingApple",
-                "SeamCarvingVision",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .target(
             name: "SeamCarvingBenchmark",
-            dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]
+            dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingAppleImaging"]
         ),
         .executableTarget(name: "seamcarve-benchmark", dependencies: ["SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore", "SeamCarvingBenchmark"]),
@@ -91,8 +90,9 @@ let package = Package(
         .testTarget(name: "SeamCarvingAppleRuntimeTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime"]),
         .testTarget(name: "SeamCarvingAppleImagingTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]),
         .testTarget(name: "SeamCarvingCoreVideoTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingCoreVideo"]),
+        .testTarget(name: "SeamCarvingUIKitTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingUIKit"]),
         .testTarget(name: "SeamCarvingAppKitTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppKit"]),
-        .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
-        .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]),
+        .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging", "SeamCarvingVision"]),
+        .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingVision"]),
     ]
 )

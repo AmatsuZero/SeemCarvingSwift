@@ -3,7 +3,8 @@ import XCTest
 import CoreGraphics
 import ImageIO
 import SeamCarvingCore
-import SeamCarvingApple
+import SeamCarvingAppleImaging
+import SeamCarvingAppleRuntime
 @testable import SeamCarvingVision
 
 final class FaceAwareTests: XCTestCase {

@@ -7,7 +7,7 @@ import SeamCarvingCore
 @_spi(Benchmark) import SeamCarvingCore
 import SeamCarvingAccelerate
 import SeamCarvingMetal
-import SeamCarvingApple
+import SeamCarvingAppleImaging
 
     public struct BenchmarkRunner {
         public let sizes: [(Int, Int)]

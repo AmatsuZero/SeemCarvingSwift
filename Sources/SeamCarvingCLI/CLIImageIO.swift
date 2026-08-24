@@ -3,7 +3,7 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 import SeamCarvingCore
-import SeamCarvingApple
+import SeamCarvingAppleImaging
 
 /// Identifies which kind of user mask failed dimension validation.
 public enum CLIMaskKind: Sendable, Equatable {

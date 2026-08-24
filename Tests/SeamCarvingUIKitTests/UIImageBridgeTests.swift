@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import CoreGraphics
 import Foundation
 import SeamCarvingAppleRuntime
@@ -47,3 +48,4 @@ final class UIImageBridgeTests: XCTestCase {
         ))
     }
 }
+#endif

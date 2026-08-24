@@ -1,7 +1,8 @@
 import Foundation
 import CoreGraphics
 import SeamCarvingCore
-import SeamCarvingApple
+import SeamCarvingAppleImaging
+import SeamCarvingAppleRuntime
 import SeamCarvingVision
 
 /// The result of a single-image CLI run.

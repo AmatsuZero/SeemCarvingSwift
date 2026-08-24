@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import CoreGraphics
 import Foundation
@@ -45,3 +46,4 @@ final class NSImageBridgeTests: XCTestCase {
         ))
     }
 }
+#endif

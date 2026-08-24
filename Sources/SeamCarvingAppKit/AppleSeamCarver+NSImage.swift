@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import SeamCarvingAppleRuntime
 import SeamCarvingCore
@@ -13,3 +14,4 @@ public extension AppleSeamCarver {
         return try NSImageBridge.encode(result)
     }
 }
+#endif

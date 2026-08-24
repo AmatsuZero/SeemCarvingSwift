@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-import SeamCarvingApple
+import SeamCarvingAppleImaging
 import SeamCarvingCore
 
 struct SeamDebugArtifactConfiguration: Sendable, Equatable {

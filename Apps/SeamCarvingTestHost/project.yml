@@ -104,11 +104,9 @@ targets:
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
-        product: SeamCarvingAccelerate
+        product: SeamCarvingAppleRuntime
       - package: SeamCarvingSwift
-        product: SeamCarvingMetal
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleImaging
       - package: SeamCarvingSwift
         product: SeamCarvingVision
     settings:
@@ -128,11 +126,9 @@ targets:
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
-        product: SeamCarvingAccelerate
+        product: SeamCarvingAppleRuntime
       - package: SeamCarvingSwift
-        product: SeamCarvingMetal
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleImaging
       - package: SeamCarvingSwift
         product: SeamCarvingCLI
       - package: SeamCarvingSwift

@@ -7,7 +7,7 @@
 
 import CoreGraphics
 import Foundation
-import SeamCarvingApple
+import SeamCarvingAppleImaging
 import SeamCarvingCore
 import SwiftUI
 

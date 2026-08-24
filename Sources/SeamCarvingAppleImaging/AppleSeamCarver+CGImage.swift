@@ -1,5 +1,5 @@
 import CoreGraphics
-@_exported import SeamCarvingAppleRuntime
+import SeamCarvingAppleRuntime
 import SeamCarvingCore
 
 public extension AppleSeamCarver {
