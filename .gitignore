@@ -32,3 +32,10 @@ default.profraw
 
 # Local review artifacts
 CODE_REVIEW.md
+
+# WASM browser demo generated assets
+Examples/WasmDemo/web/node_modules/
+Examples/WasmDemo/web/dist/
+Examples/WasmDemo/web/src/generated/
+Examples/WasmDemo/web/playwright-report/
+Examples/WasmDemo/web/test-results/

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seam Carving WASM Demo</title>
+  </head>
+  <body>
+    <output data-testid="worker-status" aria-live="polite">loading</output>
+    <script type="module">
+      const status = document.querySelector('[data-testid="worker-status"]');
+      const worker = new Worker(new URL("./src/resize.worker.ts", import.meta.url), { type: "module" });
+      worker.addEventListener("message", ({ data }) => {
+        status.textContent = data?.type === "ready" ? "ready" : "error";
+      });
+      worker.addEventListener("error", () => {
+        status.textContent = "error";
+      });
+    </script>
+  </body>
+</html>
