@@ -110,6 +110,7 @@ class ResizeWorkerClient {
 
   private failInitialization(): void {
     clearTimeout(this.readyTimeout);
+    console.error("WASM worker initialization failed");
     this.onStatus("error");
     this.rejectReady(new Error("WASM worker initialization failed"));
   }
@@ -202,11 +203,16 @@ function validationMessage(): string | undefined {
   return undefined;
 }
 
-function updateControls(): void {
-  const valid = validationMessage() === undefined;
+function updateControls(reportInvalid = false): void {
+  const message = validationMessage();
+  const valid = message === undefined;
   resizeButton.disabled = isRunning || !valid;
   cancelButton.disabled = !isRunning;
   downloadButton.disabled = isRunning || !result;
+  sourceFile.disabled = isRunning;
+  targetWidth.disabled = isRunning;
+  targetHeight.disabled = isRunning;
+  if (reportInvalid && source && message) setStatus(message, true);
 }
 
 function clearResult(): void {
@@ -253,13 +259,14 @@ sourceFile.addEventListener("change", async () => {
     await decodeSource(file);
     setStatus("Image ready. Choose an output size and resize.");
   } catch (error) {
+    console.error("Image decode failed", error);
     setStatus(error instanceof Error ? error.message : "Unable to decode this image.", true);
   }
   updateControls();
 });
 
 for (const input of [targetWidth, targetHeight]) {
-  input.addEventListener("input", updateControls);
+  input.addEventListener("input", () => updateControls(true));
 }
 
 resizeButton.addEventListener("click", async () => {
@@ -291,6 +298,7 @@ resizeButton.addEventListener("click", async () => {
     if (error instanceof DOMException && error.name === "AbortError") {
       setStatus("Resize cancelled.");
     } else {
+      console.error("WASM resize failed", error);
       setStatus(error instanceof Error ? `Resize failed: ${error.message}` : "Resize failed.", true);
     }
   } finally {

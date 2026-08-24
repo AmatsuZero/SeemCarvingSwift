@@ -52,6 +52,19 @@ test("uses ImageBitmap EXIF orientation while decoding JPEG", async ({ page }) =
   expect(Math.abs(pixel[1] - 255)).toBeLessThanOrEqual(4);
   expect(Math.abs(pixel[2] - 0)).toBeLessThanOrEqual(4);
   expect(pixel[3]).toBe(255);
+
+  await page.locator("#target-width").fill("2");
+  await page.locator("#target-height").fill("3");
+  await page.getByRole("button", { name: "Resize" }).click();
+  await expect(page.locator("#result-canvas")).toHaveAttribute("width", "2");
+  await expect(page.locator("#result-canvas")).toHaveAttribute("height", "3");
+  const resultPixel = await page.locator("#result-canvas").evaluate((canvas) =>
+    Array.from((canvas as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, 1, 1).data),
+  );
+  expect(Math.abs(resultPixel[0] - 255)).toBeLessThanOrEqual(4);
+  expect(Math.abs(resultPixel[1] - 255)).toBeLessThanOrEqual(4);
+  expect(Math.abs(resultPixel[2] - 0)).toBeLessThanOrEqual(4);
+  expect(resultPixel[3]).toBe(255);
 });
 
 test("reports an invalid target and focuses the live status", async ({ page }) => {
@@ -60,5 +73,50 @@ test("reports an invalid target and focuses the live status", async ({ page }) =
   await page.locator("#target-width").fill("0");
 
   await expect(page.getByRole("button", { name: "Resize" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Download PNG" })).toBeDisabled();
+});
+
+test("reports source, target, and estimated-work limits through the focused live status", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#source-file").setInputFiles("tests/fixtures/source-over-limit-2001x1000.png");
+  await expect(page.locator("#status")).toContainText("Source image must contain at most 2,000,000 pixels");
+  await expect(page.locator("#status")).toBeFocused();
+  await expect(page.getByRole("button", { name: "Resize" })).toBeDisabled();
+
+  await page.locator("#source-file").setInputFiles(fixtures.png);
+  await page.locator("#target-width").fill("2000001");
+  await expect(page.locator("#status")).toContainText("Target image must contain at most 2,000,000 pixels");
+  await expect(page.locator("#status")).toBeFocused();
+  await expect(page.getByRole("button", { name: "Resize" })).toBeDisabled();
+
+  await page.locator("#source-file").setInputFiles("tests/fixtures/work-limit-64x31250.png");
+  await expect(page.locator("#source-canvas")).toHaveAttribute("width", "64");
+  await expect(page.locator("#source-canvas")).toHaveAttribute("height", "31250");
+  await page.locator("#target-width").fill("31250");
+  await page.locator("#target-height").fill("64");
+  await expect(page.locator("#status")).toContainText("80,000,000 pixel-work limit");
+  await expect(page.locator("#status")).toBeFocused();
+  await expect(page.getByRole("button", { name: "Resize" })).toBeDisabled();
+});
+
+test("locks source and dimensions during a resize, then restores them after UI cancellation", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#source-file").setInputFiles("tests/fixtures/work-limit-64x31250.png");
+  await expect(page.locator("#source-canvas")).toHaveAttribute("width", "64");
+  await expect(page.locator("#source-canvas")).toHaveAttribute("height", "31250");
+  await page.locator("#target-width").fill("64");
+  await page.locator("#target-height").fill("31249");
+  await page.getByRole("button", { name: "Resize" }).click();
+
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  await expect(page.locator("#source-file")).toBeDisabled();
+  await expect(page.locator("#target-width")).toBeDisabled();
+  await expect(page.locator("#target-height")).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await expect(page.locator("#status")).toContainText("Resize cancelled");
+  await expect(page.locator("#source-file")).toBeEnabled();
+  await expect(page.locator("#target-width")).toBeEnabled();
+  await expect(page.locator("#target-height")).toBeEnabled();
   await expect(page.getByRole("button", { name: "Download PNG" })).toBeDisabled();
 });
