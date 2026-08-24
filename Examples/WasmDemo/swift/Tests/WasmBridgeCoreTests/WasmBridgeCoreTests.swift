@@ -23,7 +23,10 @@ final class WasmBridgeCoreTests: XCTestCase {
             pixels: [0, 0, 0], sourceWidth: 1, sourceHeight: 1, targetWidth: 1, targetHeight: 1
         )
 
-        await XCTAssertThrowsErrorAsync { try await resizeRGBA8(request) }
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .invalidByteCount(expected: 4, actual: 3)
+        )
     }
 
     func testResizeRGBA8RejectsNonpositiveDimensions() async {
@@ -31,7 +34,10 @@ final class WasmBridgeCoreTests: XCTestCase {
             pixels: [], sourceWidth: 0, sourceHeight: 1, targetWidth: 1, targetHeight: 1
         )
 
-        await XCTAssertThrowsErrorAsync { try await resizeRGBA8(request) }
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .invalidDimensions
+        )
     }
 
     func testResizeRGBA8RejectsIntegerMultiplicationOverflow() async {
@@ -39,7 +45,21 @@ final class WasmBridgeCoreTests: XCTestCase {
             pixels: [], sourceWidth: .max, sourceHeight: 2, targetWidth: 1, targetHeight: 1
         )
 
-        await XCTAssertThrowsErrorAsync { try await resizeRGBA8(request) }
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .dimensionOverflow
+        )
+    }
+
+    func testResizeRGBA8RejectsSourcePixelLimit() async {
+        let request = ResizeRGBA8Request(
+            pixels: [], sourceWidth: 2_000_001, sourceHeight: 1, targetWidth: 1, targetHeight: 1
+        )
+
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .sourcePixelLimitExceeded(limit: 2_000_000)
+        )
     }
 
     func testResizeRGBA8RejectsTargetPixelLimit() async {
@@ -47,15 +67,25 @@ final class WasmBridgeCoreTests: XCTestCase {
             pixels: [0, 0, 0, 255], sourceWidth: 1, sourceHeight: 1, targetWidth: 2_000_001, targetHeight: 1
         )
 
-        await XCTAssertThrowsErrorAsync { try await resizeRGBA8(request) }
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .targetPixelLimitExceeded(limit: 2_000_000)
+        )
     }
 
     func testResizeRGBA8RejectsEstimatedWorkLimit() async {
         let request = ResizeRGBA8Request(
-            pixels: [], sourceWidth: 2_000_000, sourceHeight: 1, targetWidth: 1_000_000, targetHeight: 1
+            pixels: [UInt8](repeating: 0, count: 8_000_000),
+            sourceWidth: 1,
+            sourceHeight: 2_000_000,
+            targetWidth: 2_000_000,
+            targetHeight: 1
         )
 
-        await XCTAssertThrowsErrorAsync { try await resizeRGBA8(request) }
+        await XCTAssertThrowsErrorAsync(
+            { try await resizeRGBA8(request) },
+            expected: .estimatedWorkLimitExceeded(limit: 80_000_000)
+        )
     }
 
     func testResizeRGBA8NoOpRoundTripPreservesPixels() async throws {
@@ -96,11 +126,16 @@ final class WasmBridgeCoreTests: XCTestCase {
 
 func XCTAssertThrowsErrorAsync(
     _ expression: @escaping () async throws -> some Any,
+    expected: WasmBridgeError,
     file: StaticString = #filePath,
     line: UInt = #line
 ) async {
     do {
         _ = try await expression()
         XCTFail("Expected an error to be thrown", file: file, line: line)
-    } catch {}
+    } catch let error as WasmBridgeError {
+        XCTAssertEqual(error, expected, file: file, line: line)
+    } catch {
+        XCTFail("Expected WasmBridgeError \(expected), got \(error)", file: file, line: line)
+    }
 }
