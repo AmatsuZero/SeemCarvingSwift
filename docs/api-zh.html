@@ -10,8 +10,7 @@ let result = try await SeamCarver().resize(image, to: try PixelSize(width: 3, he
 import SeamCarvingApple
 let carver = try AppleSeamCarver(configuration: .init(backend: .automatic))
 let output: CGImage = try await carver.resize(inputCGImage, toPixelSize: target)</code></pre><p>facade 只 re-export Runtime 和 Imaging，保留 RGBA8、CGImage、CIImage API；不再导出 CVPixelBuffer、UIImage、NSImage overload。</p>
-<h2>显式平台 adapter</h2><pre><code>import SeamCarvingAppleRuntime
-import SeamCarvingAppleImaging
+<h2>显式平台 adapter</h2><pre><code>import SeamCarvingApple // Runtime + Imaging 兼容 facade
 import SeamCarvingUIKit // iOS/iPadOS/Catalyst 的 UIImage
 // 或改为 SeamCarvingAppKit（NSImage）/ SeamCarvingCoreVideo（CVPixelBuffer）。</code></pre>
 <p>adapter 会先把外部像素标准化成 upright、origin-zero、straight-alpha RGBA8，再调用 runtime。人脸保护仍是可选的 <code>SeamCarvingVision</code>。</p>
