@@ -11,8 +11,9 @@ let result = try await SeamCarver().resize(source, to: target)</code></pre>
 import SeamCarvingApple
 let carver = try AppleSeamCarver(configuration: .init(backend: .automatic))
 let output: CGImage = try await carver.resize(inputCGImage, toPixelSize: target)</code></pre><p>The facade re-exports Runtime and Imaging only. It preserves RGBA8, CGImage and CIImage APIs; it does not export CVPixelBuffer, UIImage or NSImage overloads.</p>
-<h2>Explicit platform adapters</h2><pre><code>import SeamCarvingUIKit // UIImage overloads on iOS/iPadOS/Catalyst
-import SeamCarvingAppKit // NSImage overloads on macOS
-import SeamCarvingCoreVideo // CVPixelBuffer overloads on Apple media platforms</code></pre>
+<h2>Explicit platform adapters</h2><pre><code>import SeamCarvingAppleRuntime
+import SeamCarvingAppleImaging
+import SeamCarvingUIKit // UIImage overloads on iOS/iPadOS/Catalyst
+// Or use SeamCarvingAppKit for NSImage, or SeamCarvingCoreVideo for CVPixelBuffer.</code></pre>
 <p>All adapters normalize external pixels into upright, origin-zero, straight-alpha RGBA8 before calling the runtime. Vision remains optional through <code>SeamCarvingVision</code>.</p>
 <h2>Platform status</h2><p>Core has a macOS/Linux/Windows CI build-and-test gate. Wasm and Android are not implemented products yet; the RGBA8 adapter boundary is reserved for their future bridges.</p></article></main></body></html>
