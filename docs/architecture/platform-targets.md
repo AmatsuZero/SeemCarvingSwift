@@ -55,6 +55,7 @@ SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
 
 ## 支持承诺
 
+- `Package.platforms: [.iOS(.v17), .macOS(.v14)]` 表示 Apple 侧的 deployment floor；它约束 Apple API 的最低系统版本，不是 Apple-exclusive host restriction。
 - v2 立即支持：Apple 平台（iOS 17+、macOS 14+）的现有功能。
-- v2 立即验证：`SeamCarvingCore` 在 macOS、Linux、Windows Swift 工具链可独立构建和测试；不以此承诺完整图片文件 I/O。
+- v2 立即验证：`SeamCarvingCore` 的 portability 由 macOS/Linux/Windows Core CI gate 决定；只有对应 toolchain 实际通过 `swift build --target SeamCarvingCore` 与 `swift test --filter SeamCarvingCoreTests`，才算该宿主构建被验证。
 - v2 预留：Wasm、Android、Windows 的 adapter contract；它们在各自 toolchain、图像 I/O 和 CI 可用前不列为已支持的平台。

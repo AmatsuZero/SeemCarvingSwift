@@ -36,24 +36,24 @@
 | `Sources/SeamCarvingAppKit/*` | NSImage bridge 与 overload |
 | `Sources/SeamCarvingApple/Exports.swift` | v2 compatibility re-export，仅导出 Runtime 与 Imaging |
 
-## Task 1: 固化边界并让 Core manifest 可跨平台解析
+## Task 1: 固化 Apple deployment floor 语义并让 Core portability gate 可验证
 
 **Files:**
 - Create: `docs/architecture/platform-targets.md`
 - Create: `.github/workflows/core-portability.yml`
 - Modify: `Package.swift:5-7`
 
-**Produces:** 跨平台边界文档与 Core-only CI 门禁。
+**Produces:** 跨平台边界文档、正确的 Apple deployment floor 说明与 Core-only CI 门禁。
 
-- [ ] **Step 1: 移除 package 级 Apple-only 限制**
+- [ ] **Step 1: 保留 package 级 Apple deployment floor，并明确其语义**
 
-从 `Package.swift` 删除：
+在 `Package.swift` 保留：
 
 ```swift
 platforms: [.iOS(.v17), .macOS(.v14)],
 ```
 
-不要用新的 package 级 `platforms` 替代它。iOS/macOS 的 deployment target 由 app/Xcode scheme 维护；这允许 Windows/Linux/Wasm toolchain 仅解析并构建 `SeamCarvingCore`。
+该声明定义 Apple 端 API 的最低 deployment floor，不是 Apple-exclusive host restriction。Windows/Linux/Wasm 的宿主可用性仍由实际 toolchain 对 `SeamCarvingCore` 的解析、构建与测试结果决定，而不是由这行声明单独决定。
 
 - [ ] **Step 2: 添加 Core portability CI**
 
@@ -85,7 +85,7 @@ jobs:
 
 Run: `swift build --target SeamCarvingCore && swift test --filter SeamCarvingCoreTests`
 
-Expected: 只构建 Core；所有 Core XCTest 通过。
+Expected: Apple deployment floors 保持不变；Core portability gate 在本机通过，并继续作为 macOS/Linux/Windows toolchain 支持的实际判定。
 
 - [ ] **Step 4: 提交**
 
