@@ -14,7 +14,7 @@ const previewURL = "http://127.0.0.1:4174";
 export default defineConfig({
   testDir: "./tests",
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4174",
+    command: "npm run build -- --mode test && npm run preview -- --host 127.0.0.1 --port 4174",
     url: previewURL,
     reuseExistingServer: !process.env.CI,
   },

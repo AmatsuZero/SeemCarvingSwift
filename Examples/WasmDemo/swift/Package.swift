@@ -22,7 +22,7 @@ let package = Package(
         .executableTarget(
             name: "WasmBridgeWorker",
             dependencies: [
-                .product(name: "SeamCarvingCore", package: "wasm-browser-demo"),
+                "WasmBridgeCore",
                 .product(name: "JavaScriptKit", package: "JavaScriptKit"),
                 .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),
             ]

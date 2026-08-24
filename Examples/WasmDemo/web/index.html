@@ -7,15 +7,6 @@
   </head>
   <body>
     <output data-testid="worker-status" aria-live="polite">loading</output>
-    <script type="module">
-      const status = document.querySelector('[data-testid="worker-status"]');
-      const worker = new Worker(new URL("./src/resize.worker.ts", import.meta.url), { type: "module" });
-      worker.addEventListener("message", ({ data }) => {
-        status.textContent = data?.type === "ready" ? "ready" : "error";
-      });
-      worker.addEventListener("error", () => {
-        status.textContent = "error";
-      });
-    </script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
