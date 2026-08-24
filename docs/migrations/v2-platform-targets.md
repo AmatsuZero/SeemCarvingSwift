@@ -65,6 +65,8 @@ target 混入 UIKit/AppKit 的互斥平台依赖。需要 `UIImage`、`NSImage` 
 ## 平台支持边界
 
 v2 的 Apple deployment floor 仍为 iOS 17+ 与 macOS 14+。`SeamCarvingCore`
-通过 macOS、Linux、Windows 的 Core-only CI gate 验证可移植性；这不代表整个
-package 已在这些宿主上得到支持。Wasm、Android、Windows adapter 目前仅为架构
-预留，必须先拥有各自的图像 bridge、目标 toolchain CI 和测试，才能宣称支持。
+当前以 manifest 隔离后的 Core tests 在 macOS 本地证明可移植边界；Linux/Windows
+仍是 CI 验证 gate，只有仓库 CI 实际跑通 `swift build --target SeamCarvingCore`
+与隔离后的 Core tests 后，才能把对应宿主记为已验证。这不代表整个 package 已在
+这些宿主上得到支持。Wasm、Android、Windows adapter 目前仅为架构预留，必须先
+拥有各自的图像 bridge、目标 toolchain CI 和测试，才能宣称支持。

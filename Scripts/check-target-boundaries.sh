@@ -14,7 +14,14 @@ require_allowed_imports() {
     local target="$1"
     shift
     local allowed=("$@")
+    local files=()
     local module
+
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(find "$target" -type f -name '*.swift' -print0)
+
+    [[ "${#files[@]}" -gt 0 ]] || fail "$target has no Swift sources to scan."
 
     while IFS= read -r module; do
         local accepted=false
@@ -26,7 +33,16 @@ require_allowed_imports() {
             fi
         done
         "$accepted" || fail "$target imports unapproved module '$module'."
-    done < <(awk '/^[[:space:]]*import[[:space:]]+/ { print $2 }' "$target"/*.swift)
+    done < <(awk '
+        /^[[:space:]]*(@[^[:space:]]+[[:space:]]+)*import[[:space:]]+/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "import" && (i + 1) <= NF) {
+                    print $(i + 1)
+                    break
+                }
+            }
+        }
+    ' "${files[@]}")
 }
 
 require_no_conditionals() {

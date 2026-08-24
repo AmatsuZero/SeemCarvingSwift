@@ -90,9 +90,11 @@ do not use the facade to conceal a Runtime, Imaging, UIKit, or AppKit dependency
 
 ### Cross-host boundary status
 
-`SeamCarvingCore` is protected by a macOS/Linux/Windows **Core-only
-cross-host build gate** (`swift build --target SeamCarvingCore` plus the Core
-tests). This validates the portable algorithm target, not complete image I/O or
+`SeamCarvingCore` is protected by a macOS-local **Core-only build and isolated
+test gate** plus a macOS/Linux/Windows CI verification matrix. Linux and
+Windows should only be called verified when repository CI evidence exists for
+`swift build --target SeamCarvingCore` and the isolated Core test target. The
+gate validates the portable algorithm target, not complete image I/O or
 application support on those hosts. Wasm and Android have adapter boundaries
 ready for implementation, but neither is currently a supported platform.
 

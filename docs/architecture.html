@@ -1,100 +1,19 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SeamCarvingSwift architecture">
-  <title>Architecture · SeamCarvingSwift</title>
-  <link rel="stylesheet" href="assets/styles.css">
-</head>
-<body>
-  <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="site-header"><div class="header-inner">
-    <a class="brand" href="index.html">SeamCarvingSwift</a>
-    <nav aria-label="Primary navigation">
-      <a href="index.html">Overview</a><a class="active" aria-current="page" href="architecture.html">Architecture</a><a href="principles.html">Principles</a><a href="api.html">Swift API</a><a href="cli.html">CLI</a><a href="app.html">App</a><a href="capability-matrix.html">Capabilities</a>
-    </nav>
-    <div class="language-switch" aria-label="Language"><a class="active" aria-current="page" href="architecture.html">English</a><a href="architecture-zh.html">中文</a></div>
-  </div></header>
-  <main id="main-content" class="container"><article>
-    <header><p class="eyebrow">Project map</p><h1>Architecture</h1><p class="lead">The package keeps image semantics in Core and puts platform concerns at the edges. This lets the CPU reference implementation define behavior while Accelerate, Metal, Apple image bridges, Vision, the CLI, and the shared app consume that contract.</p></header>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Architecture · SeamCarvingSwift</title><link rel="stylesheet" href="assets/styles.css"></head>
+<body><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">SeamCarvingSwift</a><nav><a href="index.html">Overview</a><a class="active" href="architecture.html">Architecture</a><a href="api.html">Swift API</a><a href="capability-matrix.html">Capabilities</a></nav><div class="language-switch"><a href="architecture-zh.html">中文</a></div></div></header>
+<main class="container"><article><header><p class="eyebrow">Project map</p><h1>Capability-based architecture</h1><p class="lead">Algorithms remain in a portable Core. Optional computation and host-image adapters depend inward; Core never depends on them.</p></header>
+<h2>Dependency graph</h2><pre><code>SeamCarvingCore
+├── SeamCarvingAccelerate
+├── SeamCarvingMetal
+├── SeamCarvingAppleRuntime       (Core + Accelerate + Metal)
+├── SeamCarvingAppleImaging       (Runtime + CGImage/CIImage/Core Image)
+├── SeamCarvingCoreVideo          (Runtime + CVPixelBuffer)
+├── SeamCarvingUIKit              (Runtime + Imaging + UIImage)
+└── SeamCarvingAppKit             (Runtime + Imaging + NSImage)
 
-    <h2>Dependency flow</h2>
-    <p>The dependency direction is intentionally one-way. Core does not import Apple frameworks; the Apple facade owns backend selection and image conversion; Vision is an optional adapter; CLI and App are consumers.</p>
-    <div class="module-layers" aria-label="Package target dependency layers">
-      <section class="module-layer">
-        <p class="layer-number">01 · Canonical engine</p>
-        <div class="module-card featured"><h3>SeamCarvingCore</h3><p>Image values, masks, energy, dynamic programming, seam editing, planning, and CPU reference behavior.</p><p class="depends">depends on: none</p></div>
-      </section>
-      <div class="layer-arrow" aria-hidden="true">↓</div>
-      <section class="module-layer">
-        <p class="layer-number">02 · Backend implementations</p>
-        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingAccelerate</h3><p>Accelerate-backed energy and seam operations.</p><p class="depends">depends on: Core</p></div><div class="module-card"><h3>SeamCarvingMetal</h3><p>Optional Metal backend and shader resources.</p><p class="depends">depends on: Core</p></div></div>
-      </section>
-      <div class="layer-arrow" aria-hidden="true">↓</div>
-      <section class="module-layer">
-        <p class="layer-number">03 · Apple platform adapters</p>
-        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingApple</h3><p>Apple image bridges and backend selection.</p><p class="depends">depends on: Core + Accelerate + Metal</p></div><div class="module-card"><h3>SeamCarvingVision</h3><p>Vision face detection and protection-mask composition.</p><p class="depends">depends on: Core + Apple</p></div></div>
-      </section>
-      <div class="layer-arrow" aria-hidden="true">↓</div>
-      <section class="module-layer">
-        <p class="layer-number">04 · Product consumers</p>
-        <div class="module-grid two"><div class="module-card"><h3>SeamCarvingCLI</h3><p>CLI library and <code>seamcarve-cli</code> executable.</p><p class="depends">depends on: Core + Apple + Vision</p></div><div class="module-card"><h3>SwiftUI App</h3><p>One iPhone, iPad, and Mac Catalyst application target.</p><p class="depends">depends on: Core + Apple + Vision</p></div></div>
-      </section>
-    </div>
-    <p class="meta">This layer view follows the direct target dependencies in <code>Package.swift</code>; it does not imply that every runtime operation uses every dependency. The existing <a href="architecture.md">architecture notes</a> contain the locked pixel and backend semantics.</p>
-
-    <h3>Dependency reference</h3>
-    <table>
-      <thead><tr><th>Target</th><th>Direct dependencies</th></tr></thead>
-      <tbody>
-        <tr><td><code>SeamCarvingAccelerate</code></td><td><code>SeamCarvingCore</code></td></tr>
-        <tr><td><code>SeamCarvingMetal</code></td><td><code>SeamCarvingCore</code></td></tr>
-        <tr><td><code>SeamCarvingApple</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingAccelerate</code>, <code>SeamCarvingMetal</code></td></tr>
-        <tr><td><code>SeamCarvingVision</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code></td></tr>
-        <tr><td><code>SeamCarvingCLI</code></td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code>, <code>SeamCarvingVision</code></td></tr>
-        <tr><td>App target</td><td><code>SeamCarvingCore</code>, <code>SeamCarvingApple</code>, <code>SeamCarvingVision</code></td></tr>
-      </tbody>
-    </table>
-
-    <h2>Module responsibilities</h2>
-    <table>
-      <thead><tr><th>Module / product</th><th>Responsibility</th><th>Important boundary</th></tr></thead>
-      <tbody>
-        <tr><td><code>SeamCarvingCore</code></td><td><code>RGBA8Image</code>, <code>Mask</code>, energy maps, dynamic programming, seam editing, resize planning, progress, cancellation, and the CPU backend.</td><td>Platform-independent; canonical input is upright, origin-zero, straight-alpha RGBA8.</td></tr>
-        <tr><td><code>SeamCarvingAccelerate</code></td><td>Accelerate-backed energy and seam operations.</td><td>Must match Core semantics; selected through the Apple layer.</td></tr>
-        <tr><td><code>SeamCarvingMetal</code></td><td>Optional asynchronous GPU backend for supported shrink paths.</td><td>Horizontal edits use CPU transposition; enlargement and adaptive ordering use the CPU reference path.</td></tr>
-        <tr><td><code>SeamCarvingApple</code></td><td>Decodes/encodes <code>CGImage</code>, <code>CIImage</code>, <code>CVPixelBuffer</code>, <code>UIImage</code>, and native <code>NSImage</code> where available; selects backends.</td><td>Apple-platform only. <code>.automatic</code> falls back Metal → Accelerate → CPU.</td></tr>
-        <tr><td><code>SeamCarvingVision</code></td><td>Uses Apple Vision face observations to produce Core masks and policy-driven face protection.</td><td>Optional; Core never imports Vision. The policy is Caire-inspired, not detector compatibility.</td></tr>
-        <tr><td><code>SeamCarvingCLI</code> / <code>seamcarve-cli</code></td><td>Argument parsing, image I/O, single-file and batch orchestration, debug artifacts, and exit-code mapping.</td><td>Uses <code>swift-argument-parser</code> for syntax; domain validation remains in the CLI configuration layer.</td></tr>
-        <tr><td>SwiftUI app</td><td>One <code>SeamCarvingApp</code> target with shared editor state and adaptive layouts for iPhone, iPad, and Mac Catalyst.</td><td>UI delegates image processing to the Apple service; the generated Xcode project is recreated from <code>project.yml</code>.</td></tr>
-      </tbody>
-    </table>
-
-    <h2>Image data flow</h2>
-    <ol>
-      <li>An Apple image bridge decodes an external image and applies orientation into the canonical upright coordinate space.</li>
-      <li>The Core engine receives RGBA8 bytes, a positive <code>PixelSize</code>, <code>ResizeOptions</code>, and optional masks.</li>
-      <li>The resize planner chooses width/height order and builds the energy plus mask adjustment for each current image.</li>
-      <li>A backend finds and edits seams one at a time. Progress is emitted after committed edits, and cancellation is checked between edits.</li>
-      <li>The Apple bridge encodes the resulting canonical image back to the requested image representation. The CLI then writes PNG, JPEG, or BMP.</li>
-    </ol>
-
-    <h2>Concurrency and memory</h2>
-    <p>Core APIs are <code>async</code> and <code>Sendable</code>-oriented. The CPU implementation uses compact Float32 rows and parent/index buffers rather than a full cost matrix. Metal completion is awaited through a checked continuation and does not block the main actor. The app owns one resize task and cancels a previous task when a new resize starts.</p>
-    <p>Backend SPI types are internal-facing and marked with the <code>Backend</code> SPI. Ordinary clients should use <code>SeamCarver</code> or <code>AppleSeamCarver</code>, not implement the backend protocol directly.</p>
-
-    <h2>Build products</h2>
-    <pre><code>SeamCarvingCore          library
-SeamCarvingAccelerate    library
-SeamCarvingMetal         library
-SeamCarvingApple         library
-SeamCarvingVision        library
-SeamCarvingCLI           library
-seamcarve-cli            executable
-seamcarve-benchmark      executable</code></pre>
-    <p>See the <a href="api.html">Swift API guide</a> for consumer-facing entry points and the <a href="app.html">app guide</a> for the XcodeGen/Xcode workflow.</p>
-  </article></main>
-  <footer class="site-footer"><div class="container"><p><a href="index.html">Documentation home</a></p></div></footer>
-</body>
-</html>
+SeamCarvingApple = compatibility re-export of Runtime + Imaging
+SeamCarvingVision = Core + Runtime + Imaging + Vision
+SeamCarvingCLI = Core + Runtime + Imaging + Vision</code></pre>
+<h2>Responsibilities</h2><table><thead><tr><th>Product</th><th>Responsibility</th></tr></thead><tbody><tr><td><code>SeamCarvingCore</code></td><td>RGBA8 pixels, masks, seam algorithms, CPU backend and portable configuration.</td></tr><tr><td><code>SeamCarvingAppleRuntime</code></td><td>Apple backend capability selection: Metal → Accelerate → CPU; exposes RGBA8 operations.</td></tr><tr><td><code>SeamCarvingAppleImaging</code></td><td>CGImage/CIImage bridges and Core Image Lanczos pre-scale.</td></tr><tr><td><code>SeamCarvingCoreVideo</code></td><td>CVPixelBuffer bridge.</td></tr><tr><td><code>SeamCarvingUIKit</code></td><td>UIImage bridge and orientation/scale handling.</td></tr><tr><td><code>SeamCarvingAppKit</code></td><td>NSImage raster bridge.</td></tr><tr><td><code>SeamCarvingApple</code></td><td>v2 compatibility facade for Runtime + Imaging only.</td></tr></tbody></table>
+<h2>Boundary rules</h2><p>Core has no Apple graphics/media/compute imports or platform conditionals. Runtime contains backend capability selection, not image types. UIKit and AppKit are separate targets; each may use only one whole-file own-framework compile guard so SwiftPM can discover it on incompatible hosts. No adapter mixes UIKit/AppKit or contains Catalyst-specific behavior branches.</p>
+<h2>Future hosts</h2><p>Wasm, Android and Windows adapters should translate their host buffers to <code>RGBA8Image</code> and depend only on Core (plus an explicit runtime if needed). They are not currently implemented products. The Core CI matrix is the verification gate for cross-host portability.</p></article></main></body></html>

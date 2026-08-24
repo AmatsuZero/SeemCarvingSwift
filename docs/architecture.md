@@ -74,11 +74,14 @@ signatures remain stable.
 
 ## Host validation and future adapters
 
-The macOS/Linux/Windows CI matrix validates `SeamCarvingCore` with a
-Core-only cross-host build and test gate. It validates the portable algorithm
-module—not image codecs, UI adapters, CLI file I/O, or complete application
-support on those hosts. Wasm and Android are adapter-boundary-ready only; no
-Wasm or Android support is shipped yet.
+The macOS command path and the isolated `SeamCarvingCoreTests` target verify
+the portable Core module locally. The Linux/Windows matrix is configured as the
+cross-host CI verification gate, but those hosts should only be described as
+verified when repository CI evidence exists for `swift build --target
+SeamCarvingCore` and the isolated Core tests. This gate validates the portable
+algorithm module—not image codecs, UI adapters, CLI file I/O, or complete
+application support on those hosts. Wasm and Android are adapter-boundary-ready
+only; no Wasm or Android support is shipped yet.
 
 The current command-line image codecs remain Apple-specific because
 `SeamCarvingCLI` uses ImageIO and CoreGraphics. A future host-neutral split is

@@ -87,10 +87,12 @@ Runtime、Imaging、UIKit 或 AppKit 依赖。
 
 ### 跨宿主边界状态
 
-`SeamCarvingCore` 由 macOS/Linux/Windows 的 **仅 Core 跨宿主构建 gate** 保护：
-它执行 `swift build --target SeamCarvingCore` 及 Core 测试。这验证的是可移植算法
-target，并不代表这些宿主的完整图像 I/O 或 App 已受支持。Wasm 与 Android 已预留
-adapter 边界，但目前均不是已支持的平台。
+`SeamCarvingCore` 现在由 macOS 本地的 **仅 Core 构建 + 隔离测试 gate** 与
+macOS/Linux/Windows CI 验证矩阵共同保护。只有仓库 CI 实际记录了
+`swift build --target SeamCarvingCore` 与隔离后的 Core test target 成功，才应把
+Linux/Windows 记为“已验证”。该 gate 验证的是可移植算法 target，并不代表这些
+宿主的完整图像 I/O 或 App 已受支持。Wasm 与 Android 已预留 adapter 边界，但
+目前均不是已支持的平台。
 
 ### 使用 CLI
 
