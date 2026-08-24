@@ -1,9 +1,20 @@
 import XCTest
 import SeamCarvingCore
 @_spi(Backend) import SeamCarvingCore
-@testable import SeamCarvingApple
+@testable import SeamCarvingAppleRuntime
 
 final class BackendSelectionTests: XCTestCase {
+    func testRuntimeResizeUsesInjectedCPUBackend() async throws {
+        let image = try RGBA8Image(width: 2, height: 2, pixels: [
+            0, 0, 0, 255, 255, 0, 0, 255,
+            0, 255, 0, 255, 0, 0, 255, 255,
+        ])
+        let carver = try AppleSeamCarver(configuration: .init(backend: .cpu, deterministic: true))
+        let output = try await carver.resize(image, toPixelSize: try PixelSize(width: 1, height: 2))
+        XCTAssertEqual(output.width, 1)
+        XCTAssertEqual(output.height, 2)
+    }
+
     func testAutomaticSelectsMetal() throws {
         let recorder = SelectionRecorder()
         let factory = recorder.makeFactory()

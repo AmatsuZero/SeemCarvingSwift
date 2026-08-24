@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
-@_spi(Backend) import SeamCarvingCore
+@_exported import SeamCarvingAppleRuntime
+import SeamCarvingCore
 #if canImport(CoreImage)
 import CoreImage
 #endif
@@ -14,34 +15,11 @@ import UIKit
 import AppKit
 #endif
 
-public struct AppleSeamCarverConfiguration: Sendable, Equatable {
-    public var backend: BackendPreference
-    public var metalMode: MetalExecutionMode
-    public var deterministic: Bool
-
-    public init(
-        backend: BackendPreference = .automatic,
-        metalMode: MetalExecutionMode = .full,
-        deterministic: Bool = false
-    ) {
-        self.backend = backend
-        self.metalMode = metalMode
-        self.deterministic = deterministic
-    }
-}
-
-public struct AppleSeamCarver: Sendable {
-    private let backend: any SeamCarvingBackend
-
-    public init(configuration: AppleSeamCarverConfiguration = .init()) throws {
-        self.backend = try BackendFactory.default.make(configuration)
-    }
-
-    init(configuration: AppleSeamCarverConfiguration, factory: BackendFactory) throws {
-        self.backend = try factory.make(configuration)
-    }
-
-    public func resize(
+/// Compatibility image-framework overloads. Runtime RGBA8 operations are defined
+/// in SeamCarvingAppleRuntime; these methods remain here until dedicated adapters
+/// are extracted.
+public extension AppleSeamCarver {
+    func resize(
         _ image: CGImage,
         toPixelSize target: PixelSize,
         options: ResizeOptions = .init()
@@ -55,21 +33,19 @@ public struct AppleSeamCarver: Sendable {
         )
         var plannedOptions = options
         plannedOptions.masks = planned.masks
-        let result = try await backend.resize(planned.image, to: target, options: plannedOptions)
+        let result = try await resize(planned.image, toPixelSize: target, options: plannedOptions)
         return try CGImageBridge.encode(result)
     }
 
-    public func findSeam(
+    func findSeam(
         in image: CGImage,
         orientation: SeamOrientation,
         options: ResizeOptions = .init()
     ) async throws -> SeamPath {
         let decoded = try CGImageBridge.decode(image)
-        return try await backend.findSeam(in: decoded, orientation: orientation, options: options)
+        return try await findSeam(in: decoded, orientation: orientation, options: options)
     }
-}
 
-public extension AppleSeamCarver {
     #if canImport(CoreImage)
     func resize(
         _ image: CIImage,
@@ -78,7 +54,7 @@ public extension AppleSeamCarver {
         options: ResizeOptions = .init()
     ) async throws -> CIImage {
         let decoded = try CIImageBridge.decode(image, orientation: orientation)
-        let result = try await backend.resize(decoded, to: target, options: options)
+        let result = try await resize(decoded, toPixelSize: target, options: options)
         return try CIImageBridge.encode(result)
     }
     #endif
@@ -91,7 +67,7 @@ public extension AppleSeamCarver {
         options: ResizeOptions = .init()
     ) async throws -> CVPixelBuffer {
         let decoded = try CVPixelBufferBridge.decode(pixelBuffer, orientation: orientation)
-        let result = try await backend.resize(decoded, to: target, options: options)
+        let result = try await resize(decoded, toPixelSize: target, options: options)
         return try CVPixelBufferBridge.encode(result)
     }
     #endif
@@ -103,7 +79,7 @@ public extension AppleSeamCarver {
         options: ResizeOptions = .init()
     ) async throws -> UIImage {
         let decoded = try PlatformImageBridge.decode(image)
-        let result = try await backend.resize(decoded, to: target, options: options)
+        let result = try await resize(decoded, toPixelSize: target, options: options)
         return try PlatformImageBridge.encode(result, scale: image.scale)
     }
     #endif
@@ -115,7 +91,7 @@ public extension AppleSeamCarver {
         options: ResizeOptions = .init()
     ) async throws -> NSImage {
         let decoded = try PlatformImageBridge.decode(image)
-        let result = try await backend.resize(decoded, to: target, options: options)
+        let result = try await resize(decoded, toPixelSize: target, options: options)
         return try PlatformImageBridge.encode(result)
     }
     #endif

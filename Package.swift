@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "SeamCarvingCore", targets: ["SeamCarvingCore"]),
         .library(name: "SeamCarvingAccelerate", targets: ["SeamCarvingAccelerate"]),
         .library(name: "SeamCarvingMetal", targets: ["SeamCarvingMetal"]),
+        .library(name: "SeamCarvingAppleRuntime", targets: ["SeamCarvingAppleRuntime"]),
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
         // Expose the implementation modules so the standalone iOS test host
@@ -29,8 +30,12 @@ let package = Package(
             resources: [.copy("Shaders/SeamCarving.metal")]
         ),
         .target(
-            name: "SeamCarvingApple",
+            name: "SeamCarvingAppleRuntime",
             dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal"]
+        ),
+        .target(
+            name: "SeamCarvingApple",
+            dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime"]
         ),
         .target(
             name: "SeamCarvingVision",
@@ -63,7 +68,8 @@ let package = Package(
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore", "SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal"]),
-        .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal", "SeamCarvingApple"]),
+        .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple"]),
+        .testTarget(name: "SeamCarvingAppleRuntimeTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime"]),
         .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
         .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]),
     ]

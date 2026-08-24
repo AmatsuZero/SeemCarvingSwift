@@ -3,8 +3,8 @@ import Foundation
 import SeamCarvingAccelerate
 import SeamCarvingMetal
 
-/// Internal injectable backend selector. `SeamCarvingApple` owns backend selection
-/// because `SeamCarvingCore` cannot depend on Accelerate or Metal.
+/// Internal injectable backend selector. The Apple runtime owns backend selection
+/// because SeamCarvingCore cannot depend on Accelerate or Metal.
 struct BackendFactory: Sendable {
     var makeAccelerate: @Sendable () throws -> any SeamCarvingBackend
     var makeMetal: @Sendable (MetalExecutionMode) throws -> any SeamCarvingBackend
