@@ -402,23 +402,17 @@ git commit -m "refactor: adopt capability-based platform modules"
 
 `Scripts/check-target-boundaries.sh`：
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+控制器裁定：`SeamCarvingCore` 必须零平台 import、零条件编译；Runtime 仅可导入
+`Foundation`、Core、Accelerate、Metal，且不得条件编译。Imaging 与 CoreVideo 不得
+条件编译，且分别不得依赖 UIKit/AppKit/CoreVideo、UIKit/AppKit。UIKit/AppKit 的
+唯一例外是每个 adapter 源文件一个包住整个文件的 own-framework
+`#if canImport(...)` guard，以保证 SwiftPM 在不兼容宿主仍可发现 package target；
+不得有其它 `#if`、`targetEnvironment`、sibling framework import 或算法分支。
 
-if grep -R -nE '^(import (Accelerate|Metal|CoreGraphics|CoreImage|CoreVideo|UIKit|AppKit|Vision)|#if (os|canImport)|.*targetEnvironment)' Sources/SeamCarvingCore; then
-  echo 'SeamCarvingCore must remain platform-neutral.' >&2
-  exit 1
-fi
-if grep -R -nE 'import AppKit|#if canImport\\(AppKit\\)|targetEnvironment' Sources/SeamCarvingUIKit; then
-  echo 'SeamCarvingUIKit must not contain AppKit or Catalyst branches.' >&2
-  exit 1
-fi
-if grep -R -nE 'import UIKit|#if canImport\\(UIKit\\)' Sources/SeamCarvingAppKit; then
-  echo 'SeamCarvingAppKit must not contain UIKit branches.' >&2
-  exit 1
-fi
-```
+脚本应将上述裁定作为可执行约束：Core 只允许 `Foundation`/`Dispatch` import；
+Runtime 只允许 `Foundation`、Core、Accelerate、Metal import；Imaging/CoreVideo
+没有条件编译并拒绝各自禁止的 framework。UIKit/AppKit 需验证每个 Swift 文件仅有
+首行 own-framework `canImport` 与末行 `#endif` 组成的 whole-file guard。
 
 给脚本可执行权限，并确保 Task 1 CI 在 build 前运行它。
 

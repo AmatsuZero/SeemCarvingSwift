@@ -38,8 +38,8 @@ SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
 
 ## 条件编译规则
 
-1. 算法 target 中不得出现 `#if os`、`#if canImport` 或 `targetEnvironment`。
-2. 一个适配 target 只服务一组系统框架；只在 target 的边界文件使用 availability 注解或极少量编译条件。
+1. `SeamCarvingCore`、`SeamCarvingAppleRuntime`、`SeamCarvingAppleImaging` 与 `SeamCarvingCoreVideo` 中不得出现条件编译；`SeamCarvingCore` 只能导入可移植的 `Foundation`/`Dispatch`。
+2. UIKit 与 AppKit 是唯一的窄例外：为让 SwiftPM 在不具备相应 framework 的宿主上发现 target，每个 adapter 源文件可使用唯一的、包住整个文件的 `#if canImport(UIKit)` 或 `#if canImport(AppKit)` guard。禁止 `#elseif`、`#else`、内层条件、`targetEnvironment` 与 sibling framework import。
 3. 不为同一份实现同时提供 UIKit/AppKit API；二者分别属于独立 target。
 4. 运行时 fallback（Metal → Accelerate → CPU）是 capability 选择，不是 OS 分支，应封装在 `SeamCarvingAppleRuntime`。
 5. 缺少可选能力时应返回明确的 `SeamCarvingError.invalidConfiguration`，而不是静默改变算法或隐藏 API。
