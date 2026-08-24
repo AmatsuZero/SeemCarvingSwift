@@ -1,17 +1,21 @@
 # Experimental browser WASM demo
 
-This static experiment runs the CPU-only `SeamCarvingCore` build locally in a
-browser Worker. It is not production platform support. It does not upload,
-persist, or otherwise send image bytes to a server.
+This is an **experimental**, static browser demo, not general WebAssembly
+platform support. It runs the CPU-only `SeamCarvingCore` path locally in a
+browser Worker. Source images and results stay in browser memory: the demo has
+no server endpoints and never uploads or persists image bytes.
+
+The demo does **not** add a portable image-I/O library, CLI, or application
+support. Browser Canvas owns PNG/JPEG decode and PNG export; the isolated Swift
+package only resizes compact RGBA8 pixels.
 
 ## Prerequisites
 
-- Swift 6.3.3 and the exact `swift-6.3.3-RELEASE_wasm` SDK.
-- Node 24.11.1 (see `web/.nvmrc`) and its bundled npm.
-- Chromium/Firefox/WebKit browser binaries installed by Playwright for E2E
-  testing.
+- Swift **6.3.3** and the exact `swift-6.3.3-RELEASE_wasm` SDK.
+- Node **24.11.1** (see `web/.nvmrc`) and its bundled npm.
+- Playwright browser binaries for each browser being tested.
 
-Install the SDK with the official artifact and checksum:
+Install the pinned SDK with the official artifact and checksum:
 
 ```sh
 swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
@@ -19,7 +23,21 @@ swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-
 swift sdk list
 ```
 
-## Build and smoke test
+The second command must list `swift-6.3.3-RELEASE_wasm`.
+
+## Build, run, and test
+
+```sh
+cd Examples/WasmDemo
+scripts/build-swift.sh
+
+cd web
+npm ci
+npm run dev
+```
+
+`npm run dev` is for local development only. To build and test the deployable
+static artifact instead:
 
 ```sh
 cd Examples/WasmDemo
@@ -27,12 +45,42 @@ scripts/build-swift.sh
 cd web
 npm ci
 npm run build
-npx playwright install --with-deps chromium
-npx playwright test tests/toolchain.spec.ts --project=chromium
+npx playwright install chromium firefox webkit
+npm run test:e2e
 ```
 
-`web/dist/` is a static-hosting artifact. Serve it with a host that sends
-`.wasm` as `application/wasm`; it has no server endpoints or image upload.
+The Playwright configuration always starts `vite preview` from `dist/`; it does
+not test through the Vite development server.
+
+| Browser | Experimental verification |
+| --- | --- |
+| Chromium | Playwright CI |
+| Firefox | Playwright CI |
+| WebKit | Playwright CI |
+| Safari | Manual release checklist |
+| Microsoft Edge | Manual release checklist |
+
+Before a release/demo presentation, deploy the exact production `dist/` and
+manually use Safari and Microsoft Edge to upload a PNG/JPEG, resize it, cancel
+a resize, and download the resulting PNG.
+
+## Static deployment
+
+After `npm run build`, deploy `web/dist/` unchanged to any static host. Configure
+the host to serve `.wasm` with `Content-Type: application/wasm`. There is no
+backend configuration, image upload endpoint, or persistent storage required.
+
+## Limits and behavior
+
+- Source and target images are limited to **2,000,000 pixels** each.
+- Estimated seam work is limited to **80,000,000 pixel-visits**:
+  `(abs(sourceWidth - targetWidth) * sourceHeight) +
+  (abs(sourceHeight - targetHeight) * targetWidth)`.
+- Processing is single-threaded and CPU-only inside a module Worker.
+- Cancel terminates and recreates that Worker; it is not cooperative in-algorithm
+  cancellation. No live progress is reported.
+- Pixels are tightly packed, top-left-origin, sRGB, straight-alpha RGBA8. Canvas
+  performs decode and PNG export.
 
 ## Pinned artifact contract
 
@@ -43,10 +91,11 @@ cd Examples/WasmDemo/swift
 swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js --product WasmBridgeWorker
 ```
 
-Its actual generated tree is:
+Its generated tree is copied unchanged by `scripts/build-swift.sh` from
+`.build/plugins/PackageToJS/outputs/Package/` into `web/src/generated/`:
 
 ```text
-.build/plugins/PackageToJS/outputs/Package/
+Package/
 ├── WasmBridgeWorker.wasm
 ├── index.js
 ├── instantiate.js
@@ -57,23 +106,19 @@ Its actual generated tree is:
     └── node.js
 ```
 
-Although the executable product is named `WasmBridgeWorker`, PackageToJS 0.56.1
-uses the default `outputs/Package/` directory unless invoked with `--output`.
-`index.js` exports the entry loader `init`; the Vite module Worker uses the
-recorded initializer:
+`index.js` exports `init`, which the Vite module Worker invokes with `await
+init()`. The generated JavaScriptKit runtime and browser-side WASI shim must
+remain together with the `.wasm` file.
 
-```ts
-import { init } from "./generated/index.js";
-await init();
+## Boundary check
+
+Before changing bridge code, run:
+
+```sh
+bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh
 ```
 
-`build-swift.sh` verifies that tree and copies it unchanged to
-`web/src/generated/` before Vite constructs the static distribution.
-
-## Limitations
-
-The initial release is single-threaded and CPU-only. Future image UI work must
-keep RGBA8 pixels tightly packed, sRGB, straight-alpha, and top-left-origin;
-use browser Canvas for decode and PNG export. The intended limits are source
-and target images of at most 2,000,000 pixels and estimated seam work of at
-most 80,000,000 pixel-visits.
+It permits only `SeamCarvingCore` in `WasmBridgeCore`, and only
+`WasmBridgeCore`, `JavaScriptKit`, and `JavaScriptEventLoop` in the executable
+worker. The root Swift package intentionally has no Node, Vite, JavaScriptKit,
+or browser dependency.
