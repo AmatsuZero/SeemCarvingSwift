@@ -10,6 +10,9 @@ let package = Package(
         .library(name: "SeamCarvingMetal", targets: ["SeamCarvingMetal"]),
         .library(name: "SeamCarvingAppleRuntime", targets: ["SeamCarvingAppleRuntime"]),
         .library(name: "SeamCarvingAppleImaging", targets: ["SeamCarvingAppleImaging"]),
+        .library(name: "SeamCarvingCoreVideo", targets: ["SeamCarvingCoreVideo"]),
+        .library(name: "SeamCarvingUIKit", targets: ["SeamCarvingUIKit"]),
+        .library(name: "SeamCarvingAppKit", targets: ["SeamCarvingAppKit"]),
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
         // Expose the implementation modules so the standalone iOS test host
@@ -37,6 +40,18 @@ let package = Package(
         .target(
             name: "SeamCarvingAppleImaging",
             dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime"]
+        ),
+        .target(
+            name: "SeamCarvingCoreVideo",
+            dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]
+        ),
+        .target(
+            name: "SeamCarvingUIKit",
+            dependencies: ["SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]
+        ),
+        .target(
+            name: "SeamCarvingAppKit",
+            dependencies: ["SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]
         ),
         .target(
             name: "SeamCarvingApple",
@@ -73,9 +88,10 @@ let package = Package(
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore", "SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal"]),
-        .testTarget(name: "SeamCarvingAppleTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple"]),
         .testTarget(name: "SeamCarvingAppleRuntimeTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime"]),
         .testTarget(name: "SeamCarvingAppleImagingTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"]),
+        .testTarget(name: "SeamCarvingCoreVideoTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingCoreVideo"]),
+        .testTarget(name: "SeamCarvingAppKitTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppKit"]),
         .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingApple", "SeamCarvingVision"]),
         .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingApple"]),
     ]

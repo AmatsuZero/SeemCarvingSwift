@@ -1,15 +1,9 @@
-import CoreGraphics
 import ImageIO
+import SeamCarvingAppleImaging
 import SeamCarvingCore
-#if canImport(AppKit) && !targetEnvironment(macCatalyst)
-import AppKit
-#endif
-#if canImport(UIKit)
 import UIKit
-#endif
 
-enum PlatformImageBridge {
-    #if canImport(UIKit)
+enum UIImageBridge {
     static func decode(_ image: UIImage) throws -> RGBA8Image {
         guard let cgImage = image.cgImage else {
             throw SeamCarvingError.unsupportedPixelFormat
@@ -21,24 +15,8 @@ enum PlatformImageBridge {
         let cgImage = try CGImageBridge.encode(image)
         return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
     }
-    #endif
-
-    #if canImport(AppKit) && !targetEnvironment(macCatalyst)
-    static func decode(_ image: NSImage) throws -> RGBA8Image {
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw SeamCarvingError.unsupportedPixelFormat
-        }
-        return try CGImageBridge.decode(cgImage)
-    }
-
-    static func encode(_ image: RGBA8Image) throws -> NSImage {
-        let cgImage = try CGImageBridge.encode(image)
-        return NSImage(cgImage: cgImage, size: NSSize(width: image.width, height: image.height))
-    }
-    #endif
 }
 
-#if canImport(UIKit)
 extension CGImagePropertyOrientation {
     init(_ orientation: UIImage.Orientation) {
         switch orientation {
@@ -54,4 +32,3 @@ extension CGImagePropertyOrientation {
         }
     }
 }
-#endif
