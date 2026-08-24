@@ -19,3 +19,16 @@ xcodebuild -project SeamCarvingApp.xcodeproj -scheme SeamCarvingApp \
 The generated Xcode project is committed so the app can be opened and built
 immediately. Regenerate it with `xcodegen generate` after changing
 `project.yml`, then review the generated project diff.
+
+## Launch screen
+
+The iOS launch screen uses `Sources/iOS/LaunchScreen.storyboard`, with a
+vector seam-path mark and the `LaunchBackground` named color. The color asset
+has light and dark variants; Auto Layout centers the vector mark on every
+iPhone and iPad size class. After an iOS build, validate that the compiled app
+contains the storyboard with:
+
+```sh
+zsh Tests/verify-launch-screen.sh \
+  /path/to/Build/Products/Debug-iphoneos/SeamCarving.app
+```
