@@ -38,7 +38,7 @@ private func postSuccess(jobId: Int, response: ResizeRGBA8Response) {
     result["width"] = .number(Double(response.width))
     result["height"] = .number(Double(response.height))
     result["pixels"] = output.buffer
-    _ = JSObject.global.postMessage!(result)
+    _ = JSObject.global.postMessage!(result, JSObject.global.Array.function!.new(output.buffer))
 }
 
 @MainActor
