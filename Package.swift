@@ -3,7 +3,6 @@ import PackageDescription
 
 let package = Package(
     name: "SeamCarvingSwift",
-    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "SeamCarvingCore", targets: ["SeamCarvingCore"]),
         .library(name: "SeamCarvingAccelerate", targets: ["SeamCarvingAccelerate"]),
