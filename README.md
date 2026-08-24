@@ -51,6 +51,53 @@ let result = try await SeamCarver().resize(image, to: target)
 See the [API guide](docs/api.html) for masks, progress, cancellation,
 enlargement, and the Apple facade.
 
+### Import the Apple capability you use
+
+The v2 `SeamCarvingApple` product is a compatibility facade for the CGImage
+surface only: it re-exports `SeamCarvingAppleRuntime` and
+`SeamCarvingAppleImaging`. UIKit and AppKit are separate products and must be
+imported explicitly.
+
+```swift
+// CGImage API / v2 compatibility facade
+import SeamCarvingCore
+import SeamCarvingApple
+
+let carver = try AppleSeamCarver()
+let output = try await carver.resize(cgImage, toPixelSize: target)
+```
+
+```swift
+// iOS, iPadOS, and Mac Catalyst UIImage overload
+import SeamCarvingCore
+import SeamCarvingAppleRuntime
+import SeamCarvingUIKit
+
+let output = try await AppleSeamCarver().resize(uiImage, toPixelSize: target)
+```
+
+```swift
+// macOS NSImage overload
+import SeamCarvingCore
+import SeamCarvingAppleRuntime
+import SeamCarvingAppKit
+
+let output = try await AppleSeamCarver().resize(nsImage, toPixelSize: target)
+```
+
+Add the matching SwiftPM product dependency for every directly imported module;
+do not use the facade to conceal a Runtime, Imaging, UIKit, or AppKit dependency.
+
+### Cross-host boundary status
+
+`SeamCarvingCore` is protected by a macOS-local **Core-only build and isolated
+test gate** plus a macOS/Linux/Windows CI verification matrix. Linux and
+Windows should only be called verified when repository CI evidence exists for
+`swift build --target SeamCarvingCore` and the isolated Core test target. The
+gate validates the portable algorithm target, not complete image I/O or
+application support on those hosts. Wasm and Android have adapter boundaries
+ready for implementation, but neither is currently a supported platform.
+
 ### Run the CLI
 
 ```sh
@@ -65,6 +112,12 @@ stdin/stdout. Exact dimensions, percentage, square, backend, energy, order,
 pre-scale, masks, face protection, debug artifacts, output format, and batch
 options are documented in the [CLI guide](docs/cli.html). The examples there
 are derived from `swift run seamcarve-cli --help` and the parser sources.
+
+The current CLI image I/O is intentionally Apple-specific: it uses ImageIO and
+CoreGraphics. A future cross-host split will keep options, validation, and
+pipeline orchestration in `SeamCarvingCLIModel`, while moving these codecs into
+`SeamCarvingAppleCLIImageIO`. Those are documented future boundaries only; this
+release does not add non-Apple image I/O.
 
 ### Build the Apple app
 
@@ -111,15 +164,21 @@ project does not claim Caire compatibility or use Caire's detector.
 SeamCarvingCore
     ├── SeamCarvingAccelerate
     ├── SeamCarvingMetal
-    └── SeamCarvingApple ──┬── SeamCarvingVision
-                           ├── SeamCarvingCLI / seamcarve-cli
-                           └── shared SwiftUI app
+    ├── SeamCarvingAppleRuntime
+    │   ├── SeamCarvingAppleImaging ──┬── SeamCarvingVision
+    │   │                             ├── SeamCarvingCLI / seamcarve-cli
+    │   │                             └── shared SwiftUI app
+    │   ├── SeamCarvingCoreVideo
+    │   ├── SeamCarvingUIKit
+    │   └── SeamCarvingAppKit
+    └── SeamCarvingApple (CGImage compatibility facade)
 ```
 
 Core owns image and mask semantics, energy, dynamic programming, seam editing,
-planning, and the CPU oracle. Apple bridges normalize external images and
-select the backend. Vision turns face observations into Core masks. See the
-[architecture guide](docs/architecture.html) for the full data flow.
+planning, and the CPU oracle. AppleRuntime selects the backend, AppleImaging
+bridges CGImage/Core Image, and the CoreVideo/UIKit/AppKit targets own their
+respective system-image types. Vision turns face observations into Core masks.
+See the [architecture guide](docs/architecture.html) for the full data flow.
 
 ## Backend and algorithm notes
 
@@ -145,7 +204,7 @@ Package tests:
 swift test --package-path . --parallel
 ```
 
-The latest recorded regression has 165 package tests passing, including Metal
+The latest recorded regression has 169 package tests passing, including Metal
 parity and shrink smoke tests. The Apple app acceptance record also contains:
 
 - iPhone and iPad Simulator: 31 unit tests plus 2 UI tests passing;
@@ -175,7 +234,12 @@ build step is required.
 Sources/SeamCarvingCore/        platform-independent engine
 Sources/SeamCarvingAccelerate/  Accelerate backend
 Sources/SeamCarvingMetal/       Metal backend and shader
-Sources/SeamCarvingApple/       Apple image bridges and backend selection
+Sources/SeamCarvingAppleRuntime/ Apple backend selection and RGBA8 API
+Sources/SeamCarvingAppleImaging/ CGImage/CIImage adapter
+Sources/SeamCarvingCoreVideo/    CVPixelBuffer adapter
+Sources/SeamCarvingUIKit/        UIImage adapter
+Sources/SeamCarvingAppKit/       NSImage adapter
+Sources/SeamCarvingApple/        CGImage compatibility facade
 Sources/SeamCarvingVision/      Vision face-protection adapter
 Sources/SeamCarvingCLI/         CLI options, I/O, batching, artifacts
 Sources/seamcarve-cli/          executable entry point

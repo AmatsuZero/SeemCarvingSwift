@@ -8,7 +8,8 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Observation
-import SeamCarvingApple
+import SeamCarvingAppleImaging
+import SeamCarvingAppleRuntime
 import SeamCarvingCore
 import SeamCarvingVision
 

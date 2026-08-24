@@ -1,0 +1,39 @@
+name: Core portability
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+      - run: bash Scripts/check-target-boundaries.sh
+      - run: swift build --target SeamCarvingCore
+      - run: swift build --target SeamCarvingCLIModel
+      - run: swift build --target SeamCarvingCLIArguments
+      - run: swift build --target SeamCarvingCLIOrchestration
+      - run: swift test --filter SeamCarvingCoreTests
+
+  apple-cli:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+      - run: bash Scripts/check-target-boundaries.sh
+      - run: swift build --product seamcarve-cli
+      - run: |
+          SEAMCARVE_CLI_PATH="$(swift build --show-bin-path)/seamcarve-cli" \
+            swift test --filter SeamCarvingAppleCLITests

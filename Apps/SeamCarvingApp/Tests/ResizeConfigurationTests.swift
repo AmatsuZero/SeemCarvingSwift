@@ -8,7 +8,7 @@
 // project once Task 5 lands.
 
 import Foundation
-import SeamCarvingApple
+import SeamCarvingAppleRuntime
 import SeamCarvingCore
 import SeamCarvingVision
 import XCTest

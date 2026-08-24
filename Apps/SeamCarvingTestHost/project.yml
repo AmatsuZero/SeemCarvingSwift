@@ -74,24 +74,22 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
         BUNDLE_LOADER: "$(TEST_HOST)"
         CODE_SIGN_STYLE: Automatic
-  SeamCarvingAppleDeviceTests:
+  SeamCarvingUIKitTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: ../../Tests/SeamCarvingAppleTests
+      - path: ../../Tests/SeamCarvingUIKitTests
     dependencies:
       - target: SeamCarvingTestHost
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
-        product: SeamCarvingAccelerate
+        product: SeamCarvingAppleRuntime
       - package: SeamCarvingSwift
-        product: SeamCarvingMetal
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingUIKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.apple-device-tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.seamcarving.uikit-tests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeamCarvingTestHost.app/SeamCarvingTestHost"
         BUNDLE_LOADER: "$(TEST_HOST)"
@@ -106,11 +104,9 @@ targets:
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
-        product: SeamCarvingAccelerate
+        product: SeamCarvingAppleRuntime
       - package: SeamCarvingSwift
-        product: SeamCarvingMetal
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleImaging
       - package: SeamCarvingSwift
         product: SeamCarvingVision
     settings:
@@ -130,11 +126,9 @@ targets:
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
-        product: SeamCarvingAccelerate
+        product: SeamCarvingAppleRuntime
       - package: SeamCarvingSwift
-        product: SeamCarvingMetal
-      - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleImaging
       - package: SeamCarvingSwift
         product: SeamCarvingCLI
       - package: SeamCarvingSwift
@@ -154,7 +148,7 @@ schemes:
         SeamCarvingCoreDeviceTests: [test]
         SeamCarvingAccelerateDeviceTests: [test]
         SeamCarvingMetalDeviceTests: [test]
-        SeamCarvingAppleDeviceTests: [test]
+        SeamCarvingUIKitTests: [test]
         SeamCarvingVisionDeviceTests: [test]
         SeamCarvingCLIDeviceTests: [test]
     test:
@@ -164,6 +158,6 @@ schemes:
         - name: SeamCarvingCoreDeviceTests
         - name: SeamCarvingAccelerateDeviceTests
         - name: SeamCarvingMetalDeviceTests
-        - name: SeamCarvingAppleDeviceTests
+        - name: SeamCarvingUIKitTests
         - name: SeamCarvingVisionDeviceTests
         - name: SeamCarvingCLIDeviceTests

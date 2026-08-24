@@ -29,7 +29,11 @@ targets:
       - path: Sources/iOS
     dependencies:
       - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleRuntime
+      - package: SeamCarvingSwift
+        product: SeamCarvingAppleImaging
+      - package: SeamCarvingSwift
+        product: SeamCarvingUIKit
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift
@@ -54,7 +58,11 @@ targets:
     dependencies:
       - target: SeamCarvingApp
       - package: SeamCarvingSwift
-        product: SeamCarvingApple
+        product: SeamCarvingAppleRuntime
+      - package: SeamCarvingSwift
+        product: SeamCarvingAppleImaging
+      - package: SeamCarvingSwift
+        product: SeamCarvingUIKit
       - package: SeamCarvingSwift
         product: SeamCarvingCore
       - package: SeamCarvingSwift

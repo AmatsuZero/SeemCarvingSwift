@@ -49,6 +49,51 @@ let result = try await SeamCarver().resize(image, to: target)
 
 Mask、进度、取消、放大和 Apple facade 示例见 [Swift API 指南](docs/api-zh.html)。
 
+### 按所用能力导入 Apple 模块
+
+v2 的 `SeamCarvingApple` product 是仅面向 CGImage 的兼容 facade：它只重新导出
+`SeamCarvingAppleRuntime` 和 `SeamCarvingAppleImaging`。UIKit 与 AppKit 是独立
+product，必须显式导入。
+
+```swift
+// CGImage API / v2 兼容 facade
+import SeamCarvingCore
+import SeamCarvingApple
+
+let carver = try AppleSeamCarver()
+let output = try await carver.resize(cgImage, toPixelSize: target)
+```
+
+```swift
+// iOS、iPadOS、Mac Catalyst 的 UIImage overload
+import SeamCarvingCore
+import SeamCarvingAppleRuntime
+import SeamCarvingUIKit
+
+let output = try await AppleSeamCarver().resize(uiImage, toPixelSize: target)
+```
+
+```swift
+// macOS 的 NSImage overload
+import SeamCarvingCore
+import SeamCarvingAppleRuntime
+import SeamCarvingAppKit
+
+let output = try await AppleSeamCarver().resize(nsImage, toPixelSize: target)
+```
+
+每个直接导入的模块都应添加对应的 SwiftPM product dependency；不要用 facade 隐藏
+Runtime、Imaging、UIKit 或 AppKit 依赖。
+
+### 跨宿主边界状态
+
+`SeamCarvingCore` 现在由 macOS 本地的 **仅 Core 构建 + 隔离测试 gate** 与
+macOS/Linux/Windows CI 验证矩阵共同保护。只有仓库 CI 实际记录了
+`swift build --target SeamCarvingCore` 与隔离后的 Core test target 成功，才应把
+Linux/Windows 记为“已验证”。该 gate 验证的是可移植算法 target，并不代表这些
+宿主的完整图像 I/O 或 App 已受支持。Wasm 与 Android 已预留 adapter 边界，但
+目前均不是已支持的平台。
+
 ### 使用 CLI
 
 ```sh
@@ -61,6 +106,11 @@ swift run seamcarve-cli --input-dir photos --output-dir resized \
 `seamcarve-cli` 支持本地文件、明确的 `http(s)` URL，以及用 `-` 表示 stdin/
 stdout。exact、percentage、square、backend、energy、order、pre-scale、mask、人脸
 保护、debug artifact、输出格式和批处理参数见 [CLI 指南](docs/cli-zh.html)。
+
+当前 CLI 的图像 I/O 有意保持 Apple-specific：它使用 ImageIO 和 CoreGraphics。未来
+的跨宿主拆分会将参数、验证和 pipeline orchestration 放在 `SeamCarvingCLIModel`，并将
+这些 codec 放在 `SeamCarvingAppleCLIImageIO`。这只是文档中的未来边界；本版本不提供
+非 Apple 图像 I/O。
 
 ### 构建 App
 
@@ -109,13 +159,34 @@ artifact 需要 seam observation，因此会使用 CPU。
 项目不包含视频 temporal coherence、learned saliency、transport maps、MLX、Core ML、
 HDR/extended-range canonical input，也不提供 GPU-only 合同。
 
+## 架构概览
+
+```text
+SeamCarvingCore
+    ├── SeamCarvingAccelerate
+    ├── SeamCarvingMetal
+    ├── SeamCarvingAppleRuntime
+    │   ├── SeamCarvingAppleImaging ──┬── SeamCarvingVision
+    │   │                             ├── SeamCarvingCLI / seamcarve-cli
+    │   │                             └── shared SwiftUI app
+    │   ├── SeamCarvingCoreVideo
+    │   ├── SeamCarvingUIKit
+    │   └── SeamCarvingAppKit
+    └── SeamCarvingApple（CGImage compatibility facade）
+```
+
+Core 负责图像/mask 语义、energy、dynamic programming、seam editing、planning 和 CPU
+oracle。AppleRuntime 选择 backend，AppleImaging 负责 CGImage/Core Image bridge，
+CoreVideo/UIKit/AppKit target 各自拥有对应系统图像类型。Vision 将人脸观察结果转成
+Core mask。
+
 ## 测试与真实限制
 
 ```sh
 swift test --package-path . --parallel
 ```
 
-最近一次记录的 package regression 为 165 个测试通过，包含 Metal parity 和 shrink
+最近一次记录的 package regression 为 169 个测试通过，包含 Metal parity 和 shrink
 smoke。Apple App 验收记录包括：
 
 - iPhone/iPad Simulator：31 个单测 + 2 个 UI 测试通过；
@@ -142,7 +213,12 @@ Xcode/macOS 系统诊断，不应通过危险 entitlement 隐藏。
 Sources/SeamCarvingCore/        平台无关引擎
 Sources/SeamCarvingAccelerate/  Accelerate 后端
 Sources/SeamCarvingMetal/       Metal 后端与 shader
-Sources/SeamCarvingApple/       Apple 图像桥接与后端选择
+Sources/SeamCarvingAppleRuntime/ Apple backend 选择与 RGBA8 API
+Sources/SeamCarvingAppleImaging/ CGImage/CIImage adapter
+Sources/SeamCarvingCoreVideo/    CVPixelBuffer adapter
+Sources/SeamCarvingUIKit/        UIImage adapter
+Sources/SeamCarvingAppKit/       NSImage adapter
+Sources/SeamCarvingApple/        CGImage compatibility facade
 Sources/SeamCarvingVision/      Vision 人脸保护适配器
 Sources/SeamCarvingCLI/         CLI 参数、I/O、批处理、artifact
 Sources/seamcarve-cli/          CLI 入口

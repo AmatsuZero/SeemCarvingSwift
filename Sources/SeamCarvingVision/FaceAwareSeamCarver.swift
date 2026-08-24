@@ -2,7 +2,8 @@ import CoreGraphics
 import ImageIO
 import SeamCarvingCore
 @_spi(Backend) import SeamCarvingCore
-import SeamCarvingApple
+import SeamCarvingAppleImaging
+import SeamCarvingAppleRuntime
 
 public struct FaceAwareSeamCarver: Sendable {
     private let appleCarver: AppleSeamCarver

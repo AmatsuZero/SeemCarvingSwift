@@ -1,49 +1,17 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="SeamCarvingSwift Swift API 指南"><title>Swift API · SeamCarvingSwift</title><link rel="stylesheet" href="assets/styles.css"></head>
-<body><a class="skip-link" href="#main-content">跳到正文</a><header class="site-header"><div class="header-inner"><a class="brand" href="index-zh.html">SeamCarvingSwift</a><nav aria-label="主导航"><a href="index-zh.html">概览</a><a href="architecture-zh.html">架构</a><a href="principles-zh.html">原理</a><a class="active" aria-current="page" href="api-zh.html">Swift API</a><a href="cli-zh.html">CLI</a><a href="app-zh.html">App</a><a href="capability-matrix-zh.html">能力</a></nav><div class="language-switch" aria-label="语言"><a href="api.html">English</a><a class="active" aria-current="page" href="api-zh.html">中文</a></div></div></header>
-<main id="main-content" class="container"><article><header><p class="eyebrow">集成指南</p><h1>Swift API</h1><p class="lead">已有 canonical RGBA8 像素时使用 Core；从 CGImage 等 Apple 图像开始时使用 Apple facade；需要人脸保护时再加入 Vision。</p></header>
-<h2>包和平台</h2><p>Package 使用 Swift tools 6.0，平台下限是 iOS 17 和 macOS 14。Core、Accelerate、Metal、Apple、Vision、CLI 和 benchmark 都是独立 product。Core-only 不导入 Apple framework。</p><pre><code>import SeamCarvingCore
-
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Swift API · SeamCarvingSwift</title><link rel="stylesheet" href="assets/styles.css"></head>
+<body><header class="site-header"><div class="header-inner"><a class="brand" href="index-zh.html">SeamCarvingSwift</a><nav><a href="index-zh.html">概览</a><a href="architecture-zh.html">架构</a><a class="active" href="api-zh.html">Swift API</a><a href="capability-matrix-zh.html">能力</a></nav><div class="language-switch"><a href="api.html">English</a></div></div></header>
+<main class="container"><article><header><p class="eyebrow">集成指南</p><h1>Swift API</h1><p class="lead">已有 canonical RGBA8 像素时使用 Core；外部图像类型只导入其所属 adapter。</p></header>
+<h2>模块选择</h2><table><thead><tr><th>图像/API</th><th>导入</th></tr></thead><tbody><tr><td>RGBA8Image 和 CPU 参考 API</td><td><code>SeamCarvingCore</code></td></tr><tr><td>Apple 后端选择、CGImage、CIImage</td><td><code>SeamCarvingApple</code>（v2 兼容 facade），或 <code>SeamCarvingAppleRuntime</code> + <code>SeamCarvingAppleImaging</code></td></tr><tr><td>CVPixelBuffer</td><td><code>SeamCarvingCoreVideo</code></td></tr><tr><td>UIImage</td><td><code>SeamCarvingUIKit</code></td></tr><tr><td>NSImage</td><td><code>SeamCarvingAppKit</code></td></tr></tbody></table>
+<h2>Core</h2><pre><code>import SeamCarvingCore
 let image = try RGBA8Image(width: 4, height: 4, pixels: rgbaBytes)
-let target = try PixelSize(width: 3, height: 4)
-let result = try await SeamCarver().resize(image, to: target)</code></pre><p><code>RGBA8Image</code> 要求正尺寸和恰好 <code>width * height * 4</code> 个 row-major RGBA 字节。</p>
-<h2>Apple facade</h2><p><strong>适用：</strong><code>SeamCarvingApple</code>，Apple 平台。</p><pre><code>import SeamCarvingApple
-import SeamCarvingCore
-
-let carver = try AppleSeamCarver(configuration: .init(
-    backend: .automatic, metalMode: .full, deterministic: false
-))
-let output = try await carver.resize(
-    inputCGImage,
-    toPixelSize: try PixelSize(width: 1200, height: 800),
-    options: .init(energyMode: .forwardLuma)
-)</code></pre><p>Apple facade 还提供带 orientation 的 <code>CIImage</code>/<code>CVPixelBuffer</code> overload、UIKit 的 <code>UIImage</code> overload，以及非 Catalyst AppKit 的 <code>NSImage</code> overload。</p>
-<h2>ResizeOptions</h2><table><thead><tr><th>属性</th><th>取值/含义</th></tr></thead><tbody><tr><td><code>energyMode</code></td><td><code>.backwardSobel</code> 或 <code>.forwardLuma</code></td></tr><tr><td><code>dimensionOrder</code></td><td><code>.widthThenHeight</code>、<code>.heightThenWidth</code>、<code>.adaptiveNormalizedCost</code></td></tr><tr><td><code>masks</code></td><td><code>MaskPair</code>，含保护层、remove mask 和 removal weight</td></tr><tr><td><code>preScaleStrategy</code></td><td>默认 <code>.none</code>，或 Apple-only <code>.lanczosThenExactResidual</code></td></tr><tr><td><code>blurRadius</code>/<code>sobelThreshold</code></td><td>只作用于 backward Sobel；0 保持默认结果</td></tr><tr><td><code>progress</code></td><td>每次提交 seam 后回调 <code>ResizeProgress</code></td></tr><tr><td><code>seamObserver</code></td><td>可抛错的 seam 观察 hook；抛 <code>CancellationError</code> 会在应用前停止</td></tr></tbody></table>
-<h2>Mask、对象移除和取消</h2><pre><code>let protect = try Mask(width: 4, height: 4, values: protectValues)
-let remove = try Mask(width: 4, height: 4, values: removeValues)
-let masks = try MaskPair(
-    protectionLayers: [try ProtectionLayer(mask: protect, strength: .soft(1_000))],
-    removal: remove,
-    removalWeight: 1_000
-)
-let output = try await SeamCarver().removeObject(
-    from: image, removalMask: remove,
-    restoreOriginalSize: true,
-    options: ResizeOptions(masks: masks)
-)</code></pre><p>Mask 值在 <code>0...1</code>；hard protection 让像素不可选，soft protection 增加代价，remove 减少代价。resize 是 async，可保存 Task 并调用 <code>cancel()</code>；进度含完成编辑数、总编辑数和当前尺寸。</p>
-<h2>Vision 人脸保护</h2><pre><code>import SeamCarvingVision
-
-let faceCarver = try FaceAwareSeamCarver(
-    configuration: .init(backend: .automatic),
-    detector: try VisionFaceDetector(),
-    policy: .caireInspired(try CaireInspiredParameters(
-        expansionFraction: 0.10,
-        protectionWeight: 1_000,
-        minimumConfidence: 0.5
-    )),
-    cadence: .detectOnceAndTransformMask
-)
-let output = try await faceCarver.resize(
-    inputCGImage, orientation: .up, toPixelSize: target
-)</code></pre><p>也可以使用 <code>VisionQualityParameters</code>。<code>.redetectEveryPass</code> 目前只支持 seam removal，不支持 enlargement。这里的 Caire-inspired 是 mask 策略，不是 detector 兼容。</p>
-<h2>API 限制</h2><ul><li>Core 不知道 UIKit、AppKit、Core Image、Vision 或 Metal。</li><li>Metal 不保证 enlargement、adaptive order 或所有方向都只在 GPU 运行。</li><li>精确逐 seam 是默认；Lanczos residual 是显式 Apple-only 近似。</li><li>人脸 redetect cadence 不支持放大。</li></ul><p>继续阅读<a href="cli-zh.html">CLI 指南</a>或<a href="app-zh.html">App 指南</a>。</p></article></main><footer class="site-footer"><div class="container"><p><a href="principles-zh.html">原理</a> · <a href="index-zh.html">文档首页</a></p></div></footer></body></html>
+let result = try await SeamCarver().resize(image, to: try PixelSize(width: 3, height: 4))</code></pre>
+<h2>CGImage / CIImage 兼容 facade</h2><pre><code>import CoreGraphics
+import SeamCarvingApple
+let carver = try AppleSeamCarver(configuration: .init(backend: .automatic))
+let output: CGImage = try await carver.resize(inputCGImage, toPixelSize: target)</code></pre><p>facade 只 re-export Runtime 和 Imaging，保留 RGBA8、CGImage、CIImage API；不再导出 CVPixelBuffer、UIImage、NSImage overload。</p>
+<h2>显式平台 adapter</h2><pre><code>import SeamCarvingApple // Runtime + Imaging 兼容 facade
+import SeamCarvingUIKit // iOS/iPadOS/Catalyst 的 UIImage
+// 或改为 SeamCarvingAppKit（NSImage）/ SeamCarvingCoreVideo（CVPixelBuffer）。</code></pre>
+<p>adapter 会先把外部像素标准化成 upright、origin-zero、straight-alpha RGBA8，再调用 runtime。人脸保护仍是可选的 <code>SeamCarvingVision</code>。</p>
+<h2>平台状态</h2><p>Core 有 macOS/Linux/Windows 的 CI build/test gate。Wasm 和 Android 尚不是已实现的 product，只预留了未来 bridge 使用的 RGBA8 adapter 边界。</p></article></main></body></html>
