@@ -10,8 +10,23 @@ public protocol BackwardEnergyProvider: Sendable {
     func compute(for image: RGBA8Image, blurRadius: Int, sobelThreshold: Float) throws -> EnergyMap
 }
 
-import Dispatch
 import Foundation
+
+/// Converts a monotonic-clock duration to whole nanoseconds, saturating on
+/// overflow. `ContinuousClock` is available in both the host and WASI
+/// toolchains, unlike `DispatchTime`.
+@inline(__always)
+func elapsedNanoseconds(_ duration: Duration) -> UInt64 {
+    let components = duration.components
+    guard components.seconds >= 0, components.attoseconds >= 0 else { return 0 }
+
+    let (secondsNanoseconds, secondsOverflow) = UInt64(components.seconds)
+        .multipliedReportingOverflow(by: 1_000_000_000)
+    let attosecondsNanoseconds = UInt64(components.attoseconds / 1_000_000_000)
+    let (nanoseconds, nanosecondsOverflow) = secondsNanoseconds
+        .addingReportingOverflow(attosecondsNanoseconds)
+    return secondsOverflow || nanosecondsOverflow ? .max : nanoseconds
+}
 
 @_spi(Benchmark)
 public struct BackendPhaseDurations: Sendable, Codable, Equatable {
@@ -69,8 +84,9 @@ public final class BackendTimingRecorder: @unchecked Sendable {
     }
 
     func measure<T>(_ phase: WritableKeyPath<BackendPhaseDurations, UInt64>, _ body: () throws -> T) rethrows -> T {
-        let start = DispatchTime.now().uptimeNanoseconds
-        defer { add(phase, DispatchTime.now().uptimeNanoseconds - start) }
+        let clock = ContinuousClock()
+        let start = clock.now
+        defer { add(phase, elapsedNanoseconds(start.duration(to: clock.now))) }
         return try body()
     }
 
