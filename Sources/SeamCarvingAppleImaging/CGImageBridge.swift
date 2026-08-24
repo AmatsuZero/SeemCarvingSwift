@@ -69,7 +69,8 @@ public enum CGImageBridge {
     }
 
     /// Applies an EXIF orientation to an upright top-left-origin RGBA8 image.
-    static func applyOrientation(_ orientation: CGImagePropertyOrientation, to image: RGBA8Image) throws -> RGBA8Image {        let rawWidth = image.width
+    public static func applyOrientation(_ orientation: CGImagePropertyOrientation, to image: RGBA8Image) throws -> RGBA8Image {
+        let rawWidth = image.width
         let rawHeight = image.height
         let (outWidth, outHeight) = orientedSize(width: rawWidth, height: rawHeight, orientation: orientation)
         var out = [UInt8](repeating: 0, count: outWidth * outHeight * 4)

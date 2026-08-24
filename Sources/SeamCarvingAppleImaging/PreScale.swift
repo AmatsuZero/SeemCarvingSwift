@@ -1,9 +1,7 @@
 import CoreGraphics
+import CoreImage
 import Foundation
 import SeamCarvingCore
-#if canImport(CoreImage)
-import CoreImage
-#endif
 
 /// Pre-scale planning that runs in the Apple layer (where Core Image is
 /// available). Core Image / Core Graphics must never be imported by
@@ -36,7 +34,6 @@ enum PreScalePlanner {
         case .none:
             return Planned(image: image, masks: masks)
         case .lanczosThenExactResidual:
-            #if canImport(CoreImage)
             let source = try PixelSize(width: image.width, height: image.height)
             guard source != target else {
                 return Planned(image: image, masks: masks)
@@ -45,15 +42,9 @@ enum PreScalePlanner {
             let scaledImage = try lanczosScale(image, to: intermediate)
             let scaledMasks = try lanczosScaleMasks(masks, to: intermediate)
             return Planned(image: scaledImage, masks: scaledMasks)
-            #else
-            throw SeamCarvingError.invalidConfiguration(
-                "preScaleStrategy .lanczosThenExactResidual requires Core Image, which is unavailable on this platform"
-            )
-            #endif
         }
     }
 
-    #if canImport(CoreImage)
     /// Lanczos-scales an RGBA8 image to the exact target size via Core Image.
     private static func lanczosScale(_ image: RGBA8Image, to size: PixelSize) throws -> RGBA8Image {
         let cgImage = try CGImageBridge.encode(image)
@@ -148,5 +139,4 @@ enum PreScalePlanner {
         let rgba = try RGBA8Image(width: mask.width, height: mask.height, pixels: pixels)
         return CIImage(cgImage: try CGImageBridge.encode(rgba))
     }
-    #endif
 }

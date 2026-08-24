@@ -1,12 +1,9 @@
-import CoreGraphics
-import Foundation
+@_exported import SeamCarvingAppleImaging
 @_exported import SeamCarvingAppleRuntime
 import SeamCarvingCore
-#if canImport(CoreImage)
-import CoreImage
-#endif
 #if canImport(CoreVideo)
 import CoreVideo
+import ImageIO
 #endif
 #if canImport(UIKit)
 import UIKit
@@ -15,50 +12,8 @@ import UIKit
 import AppKit
 #endif
 
-/// Compatibility image-framework overloads. Runtime RGBA8 operations are defined
-/// in SeamCarvingAppleRuntime; these methods remain here until dedicated adapters
-/// are extracted.
+/// Temporary compatibility overloads for adapters that are extracted in Task 4.
 public extension AppleSeamCarver {
-    func resize(
-        _ image: CGImage,
-        toPixelSize target: PixelSize,
-        options: ResizeOptions = .init()
-    ) async throws -> CGImage {
-        let decoded = try CGImageBridge.decode(image)
-        let planned = try PreScalePlanner.plan(
-            image: decoded,
-            masks: options.masks,
-            target: target,
-            strategy: options.preScaleStrategy
-        )
-        var plannedOptions = options
-        plannedOptions.masks = planned.masks
-        let result = try await resize(planned.image, toPixelSize: target, options: plannedOptions)
-        return try CGImageBridge.encode(result)
-    }
-
-    func findSeam(
-        in image: CGImage,
-        orientation: SeamOrientation,
-        options: ResizeOptions = .init()
-    ) async throws -> SeamPath {
-        let decoded = try CGImageBridge.decode(image)
-        return try await findSeam(in: decoded, orientation: orientation, options: options)
-    }
-
-    #if canImport(CoreImage)
-    func resize(
-        _ image: CIImage,
-        orientation: CGImagePropertyOrientation,
-        toPixelSize target: PixelSize,
-        options: ResizeOptions = .init()
-    ) async throws -> CIImage {
-        let decoded = try CIImageBridge.decode(image, orientation: orientation)
-        let result = try await resize(decoded, toPixelSize: target, options: options)
-        return try CIImageBridge.encode(result)
-    }
-    #endif
-
     #if canImport(CoreVideo)
     func resize(
         _ pixelBuffer: CVPixelBuffer,
