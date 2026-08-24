@@ -9,12 +9,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        # setup-swift supports macOS and Ubuntu; Windows is not supported.
+        os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
+      # macos-latest already supplies the Swift toolchain that matches its Xcode SDK.
       - uses: swift-actions/setup-swift@v2
+        if: matrix.os == 'ubuntu-latest'
         with:
           swift-version: '6.0'
       - run: bash Scripts/check-target-boundaries.sh
@@ -22,16 +25,16 @@ jobs:
       - run: swift build --target SeamCarvingCLIModel
       - run: swift build --target SeamCarvingCLIArguments
       - run: swift build --target SeamCarvingCLIOrchestration
+      # swift test builds all test targets, including Apple-framework targets on Linux.
+      - run: swift build --target SeamCarvingCoreTests
       - run: swift test --filter SeamCarvingCoreTests
+        if: matrix.os == 'macos-latest'
 
   apple-cli:
     runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '6.0'
       - run: bash Scripts/check-target-boundaries.sh
       - run: swift build --product seamcarve-cli
       - run: |
