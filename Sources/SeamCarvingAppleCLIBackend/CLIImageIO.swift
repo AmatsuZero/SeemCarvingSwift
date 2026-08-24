@@ -4,6 +4,7 @@ import ImageIO
 import UniformTypeIdentifiers
 import SeamCarvingCore
 import SeamCarvingAppleImaging
+import SeamCarvingCLIModel
 
 /// Identifies which kind of user mask failed dimension validation.
 public enum CLIMaskKind: Sendable, Equatable {
@@ -18,12 +19,7 @@ public enum CLIMaskKind: Sendable, Equatable {
     }
 }
 
-/// Output image format selectable via `--format` or the output path extension.
-public enum CLIOutputFormat: String, Sendable, Equatable {
-    case png
-    case jpeg
-    case bmp
-
+extension CLIOutputFormat {
     var utType: UTType {
         switch self {
         case .png: return .png
@@ -32,15 +28,6 @@ public enum CLIOutputFormat: String, Sendable, Equatable {
         }
     }
 
-    /// Parses a user-facing format name (`png`, `jpg`/`jpeg`, `bmp`).
-    static func parse(_ string: String) -> CLIOutputFormat? {
-        switch string.lowercased() {
-        case "png": return .png
-        case "jpg", "jpeg": return .jpeg
-        case "bmp": return .bmp
-        default: return nil
-        }
-    }
 }
 
 /// Input/output errors surfaced by the CLI pipeline.

@@ -1,7 +1,10 @@
 #if os(macOS)
 import ArgumentParser
 import Foundation
-import SeamCarvingCLI
+import SeamCarvingAppleCLIBackend
+import SeamCarvingCLIArguments
+import SeamCarvingCLIModel
+import SeamCarvingCLIOrchestration
 
 @main
 struct SeamCarveCommand: AsyncParsableCommand {
@@ -20,7 +23,7 @@ struct SeamCarveCommand: AsyncParsableCommand {
 
     mutating func run() async throws {
         do {
-            switch try CLIConfiguration.parse(parsedArguments: arguments) {
+            switch try CLIArgumentParser.configuration(from: arguments) {
             case .single(let options):
                 let result = try await CLIProcessor().process(options)
                 // Binary stdout mode (`-` output) writes only image bytes; the summary
@@ -29,9 +32,11 @@ struct SeamCarveCommand: AsyncParsableCommand {
                     print("\(result.width)x\(result.height) \(result.backend)")
                 }
             case .batch(let batch):
-                let summary = try await BatchProcessor(processFile: { options in
-                    try await CLIProcessor().process(options)
-                }).process(batch)
+                let processor = CLIProcessor()
+                let summary = try await BatchProcessor(
+                    processFile: { options in try await processor.process(options) },
+                    errorMessage: { processor.message(for: $0) }
+                ).process(batch)
                 if summary.failedCount != 0 {
                     throw ExitCode(CLIExitCode.dataError.rawValue)
                 }
@@ -40,7 +45,7 @@ struct SeamCarveCommand: AsyncParsableCommand {
             throw exitCode
         } catch {
             FileHandle.standardError.write(Data("error: \(message(for: error))\n".utf8))
-            throw ExitCode(CLIExitCode.exitCode(for: error).rawValue)
+            throw ExitCode((CLIProcessor().exitCode(for: error) ?? CLIExitCode.exitCode(for: error)).rawValue)
         }
     }
 

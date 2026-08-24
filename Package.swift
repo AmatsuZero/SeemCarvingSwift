@@ -15,11 +15,14 @@ let package = Package(
         .library(name: "SeamCarvingAppKit", targets: ["SeamCarvingAppKit"]),
         .library(name: "SeamCarvingApple", targets: ["SeamCarvingApple"]),
         .library(name: "SeamCarvingVision", targets: ["SeamCarvingVision"]),
-        // Expose the implementation modules so the standalone iOS test host
-        // can link the package's existing XCTest sources.
+        .library(name: "SeamCarvingCLIModel", targets: ["SeamCarvingCLIModel"]),
+        .library(name: "SeamCarvingCLIArguments", targets: ["SeamCarvingCLIArguments"]),
+        .library(name: "SeamCarvingCLIOrchestration", targets: ["SeamCarvingCLIOrchestration"]),
+        .library(name: "SeamCarvingAppleCLIBackend", targets: ["SeamCarvingAppleCLIBackend"]),
+        // Deprecated source-compatible umbrella for existing CLI library users.
         .library(name: "SeamCarvingCLI", targets: ["SeamCarvingCLI"]),
         .library(name: "SeamCarvingBenchmark", targets: ["SeamCarvingBenchmark"]),
-        .executable(name: "seamcarve-cli", targets: ["seamcarve-cli"]),
+        .executable(name: "seamcarve-cli", targets: ["seamcarve-cli-apple"]),
         .executable(name: "seamcarve-benchmark", targets: ["seamcarve-benchmark"]),
     ],
     dependencies: [
@@ -62,20 +65,42 @@ let package = Package(
             dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging"],
             linkerSettings: [.linkedFramework("Vision")]
         ),
+        .target(name: "SeamCarvingCLIModel", dependencies: ["SeamCarvingCore"]),
         .target(
-            name: "SeamCarvingCLI",
+            name: "SeamCarvingCLIArguments",
             dependencies: [
+                "SeamCarvingCLIModel",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
+        ),
+        .target(name: "SeamCarvingCLIOrchestration", dependencies: ["SeamCarvingCLIModel"]),
+        .target(
+            name: "SeamCarvingAppleCLIBackend",
+            dependencies: [
+                "SeamCarvingCLIModel",
+                "SeamCarvingCLIOrchestration",
                 "SeamCarvingCore",
                 "SeamCarvingAppleRuntime",
                 "SeamCarvingAppleImaging",
                 "SeamCarvingVision",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
+        ),
+        .target(
+            name: "SeamCarvingCLI",
+            dependencies: [
+                "SeamCarvingCLIModel",
+                "SeamCarvingCLIArguments",
+                "SeamCarvingCLIOrchestration",
+                "SeamCarvingAppleCLIBackend",
             ]
         ),
         .executableTarget(
-            name: "seamcarve-cli",
+            name: "seamcarve-cli-apple",
             dependencies: [
-                "SeamCarvingCLI",
+                "SeamCarvingCLIModel",
+                "SeamCarvingCLIArguments",
+                "SeamCarvingCLIOrchestration",
+                "SeamCarvingAppleCLIBackend",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
@@ -95,6 +120,8 @@ let package = Package(
         .testTarget(name: "SeamCarvingAppKitTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppKit"]),
         .testTarget(name: "SeamCarvingAppleCompatibilityTests", dependencies: ["SeamCarvingApple", "SeamCarvingCore"]),
         .testTarget(name: "SeamCarvingVisionTests", dependencies: ["SeamCarvingCore", "SeamCarvingAppleRuntime", "SeamCarvingAppleImaging", "SeamCarvingVision"]),
-        .testTarget(name: "SeamCarvingCLITests", dependencies: ["SeamCarvingCLI", "SeamCarvingVision"]),
+        .testTarget(name: "SeamCarvingCLIArgumentsTests", dependencies: ["SeamCarvingCLIArguments", "SeamCarvingCLIModel"]),
+        .testTarget(name: "SeamCarvingCLIOrchestrationTests", dependencies: ["SeamCarvingCLIOrchestration", "SeamCarvingCLIArguments", "SeamCarvingCLIModel"]),
+        .testTarget(name: "SeamCarvingAppleCLITests", dependencies: ["SeamCarvingAppleCLIBackend", "SeamCarvingCLIArguments", "SeamCarvingCLIModel", "SeamCarvingCLIOrchestration"]),
     ]
 )

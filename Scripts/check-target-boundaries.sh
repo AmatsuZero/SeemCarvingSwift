@@ -85,6 +85,11 @@ imaging='Sources/SeamCarvingAppleImaging'
 core_video='Sources/SeamCarvingCoreVideo'
 uikit='Sources/SeamCarvingUIKit'
 appkit='Sources/SeamCarvingAppKit'
+cli_model='Sources/SeamCarvingCLIModel'
+cli_arguments='Sources/SeamCarvingCLIArguments'
+cli_orchestration='Sources/SeamCarvingCLIOrchestration'
+apple_cli='Sources/SeamCarvingAppleCLIBackend'
+apple_cli_entry='Sources/seamcarve-cli-apple'
 
 # Core is intentionally portable: Foundation and Dispatch are the only allowed
 # host modules, and no compile-time platform selection may enter this target.
@@ -112,3 +117,14 @@ if grep -R -n 'targetEnvironment' "$uikit" "$appkit"; then
 fi
 require_outer_framework_guard "$uikit" UIKit
 require_outer_framework_guard "$appkit" AppKit
+
+# The command model and orchestration are the future Windows CLI seam. Syntax
+# parsing and Apple image APIs must stay outside of them.
+require_allowed_imports "$cli_model" Foundation SeamCarvingCore
+require_no_conditionals "$cli_model"
+require_allowed_imports "$cli_arguments" Foundation ArgumentParser SeamCarvingCore SeamCarvingCLIModel
+require_no_imports "$cli_arguments" 'CoreGraphics|ImageIO|UniformTypeIdentifiers|SeamCarvingVision|SeamCarvingApple'
+require_no_conditionals "$cli_arguments"
+require_allowed_imports "$cli_orchestration" Foundation SeamCarvingCLIModel
+require_no_conditionals "$cli_orchestration"
+require_no_imports "$apple_cli_entry" 'CoreGraphics|ImageIO|UniformTypeIdentifiers|SeamCarvingVision'

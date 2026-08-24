@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 import SeamCarvingCore
-import SeamCarvingVision
+import SeamCarvingCLIModel
 
 /// The swift-argument-parser backed syntax layer for `seamcarve-cli`.
 ///
@@ -138,7 +138,7 @@ public struct CLIParsedArguments: ParsableArguments, Sendable {
             protectStrength: protectionStrength,
             protectWeight: protectWeight,
             removalWeight: removalWeight,
-            facePolicy: try facePolicy?.domainValue(),
+            facePolicy: facePolicy?.domainValue,
             faceCadence: faceCadence.domainValue,
             blurRadius: blurRadius,
             sobelThreshold: sobelThreshold,
@@ -182,6 +182,24 @@ public enum CLIArgumentParser {
         } catch {
             throw CLIParseError.invalidArguments
         }
+    }
+
+    public static func parseConfiguration(_ arguments: [String]) throws -> CLIConfiguration {
+        try configuration(from: parse(arguments))
+    }
+
+    public static func configuration(from parsed: CLIParsedArguments) throws -> CLIConfiguration {
+        if parsed.inputDirectory != nil || parsed.outputDirectory != nil {
+            guard parsed.inputPath == nil, parsed.outputPath == nil else {
+                throw CLIConfigurationError.incompatibleOptions(
+                    "batch mode does not accept positional INPUT/OUTPUT or stdin/stdout paths"
+                )
+            }
+            return try CLIConfiguration.make(
+                from: parsed.makeOptions(inputPath: "__batch_input__", outputPath: "__batch_output__")
+            )
+        }
+        return try CLIConfiguration.make(from: parsed.makeOptions())
     }
 }
 
@@ -272,10 +290,10 @@ public enum FacePolicyArgument: String, ExpressibleByArgument, Sendable, Equatab
         self.init(rawValue: argument.lowercased())
     }
 
-    func domainValue() throws -> FaceProtectionPolicy {
+    var domainValue: FacePolicyRequest {
         switch self {
-        case .caire: return .caireInspired(try CaireInspiredParameters())
-        case .vision: return .visionQuality(try VisionQualityParameters())
+        case .caire: return .caire
+        case .vision: return .vision
         }
     }
 }
@@ -288,10 +306,10 @@ public enum FaceCadenceArgument: String, ExpressibleByArgument, Sendable, Equata
         self.init(rawValue: argument.lowercased())
     }
 
-    var domainValue: FaceDetectionCadence {
+    var domainValue: FaceCadenceRequest {
         switch self {
-        case .once: return .detectOnceAndTransformMask
-        case .eachPass: return .redetectEveryPass
+        case .once: return .once
+        case .eachPass: return .eachPass
         }
     }
 }

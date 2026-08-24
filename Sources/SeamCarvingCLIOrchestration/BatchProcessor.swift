@@ -1,5 +1,31 @@
 import Foundation
-import SeamCarvingCore
+import SeamCarvingCLIModel
+
+public struct CLIBackendCapabilities: Sendable, Equatable {
+    public let outputFormats: Set<CLIOutputFormat>
+    public let supportsFaceProtection: Bool
+    public let supportsDebugArtifacts: Bool
+
+    public init(outputFormats: Set<CLIOutputFormat>, supportsFaceProtection: Bool, supportsDebugArtifacts: Bool) {
+        self.outputFormats = outputFormats
+        self.supportsFaceProtection = supportsFaceProtection
+        self.supportsDebugArtifacts = supportsDebugArtifacts
+    }
+}
+
+public protocol CLIImageBackend: Sendable {
+    var capabilities: CLIBackendCapabilities { get }
+    func process(_ options: CLIOptions) async throws -> CLIProcessResult
+    func exitCode(for error: Error) -> CLIExitCode?
+    func message(for error: Error) -> String?
+}
+
+public protocol CLIFileSystem: Sendable {
+    func enumerateImages(at inputDirectory: String, recursive: Bool) throws -> CLIBatchInputEnumeration
+    func outputPath(root: String, relativePath: String) -> String
+    func createDirectory(_ path: String) throws
+    func createParentDirectory(forOutputPath path: String) throws
+}
 
 public struct BatchFailure: Sendable, Equatable {
     public let relativePath: String
@@ -28,18 +54,39 @@ public struct BatchProcessSummary: Sendable, Equatable {
 public struct BatchProcessor: Sendable {
     public typealias ProcessFile = @Sendable (CLIOptions) async throws -> CLIProcessResult
     public typealias Logger = @Sendable (String) -> Void
+    public typealias ErrorMessage = @Sendable (Error) -> String?
 
     private let logger: Logger
     private let processFile: ProcessFile
+    private let errorMessage: ErrorMessage
+    private let fileSystem: any CLIFileSystem
 
     public init(
         logger: @escaping Logger = { message in
             FileHandle.standardError.write(Data((message + "\n").utf8))
         },
-        processFile: @escaping ProcessFile
+        processFile: @escaping ProcessFile,
+        errorMessage: @escaping ErrorMessage = { _ in nil }
+    ) {
+        self.init(logger: logger, processFile: processFile, errorMessage: errorMessage, fileSystem: FoundationCLIFileSystem())
+    }
+
+    public init(
+        logger: @escaping Logger,
+        processFile: @escaping ProcessFile,
+        errorMessage: @escaping ErrorMessage,
+        fileSystem: any CLIFileSystem
     ) {
         self.logger = logger
         self.processFile = processFile
+        self.errorMessage = errorMessage
+        self.fileSystem = fileSystem
+    }
+
+    public init(backend: any CLIImageBackend, logger: @escaping Logger = { message in
+        FileHandle.standardError.write(Data((message + "\n").utf8))
+    }, fileSystem: any CLIFileSystem = FoundationCLIFileSystem()) {
+        self.init(logger: logger, processFile: { try await backend.process($0) }, errorMessage: { backend.message(for: $0) }, fileSystem: fileSystem)
     }
 
     public func process(_ configuration: BatchConfiguration) async throws -> BatchProcessSummary {
@@ -84,77 +131,29 @@ public struct BatchProcessor: Sendable {
     }
 
     private func enumerateJobs(_ configuration: BatchConfiguration) throws -> BatchEnumeration {
-        let inputRoot = URL(fileURLWithPath: configuration.inputDirectory, isDirectory: true).standardizedFileURL
-        let outputRoot = URL(fileURLWithPath: configuration.outputDirectory, isDirectory: true).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputRoot.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            throw CLIConfigurationError.incompatibleOptions("input directory does not exist: \(configuration.inputDirectory)")
-        }
-        try FileManager.default.createDirectory(at: outputRoot, withIntermediateDirectories: true)
-
-        var jobs: [BatchJob] = []
-        var skippedCount = 0
-
-        if configuration.recursive {
-            let enumerator = FileManager.default.enumerator(
-                at: inputRoot,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            while let url = enumerator?.nextObject() as? URL {
-                let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-                if values.isDirectory == true { continue }
-                let relativePath = relativePath(for: url, base: inputRoot)
-                if supportedImagePath(relativePath) {
-                    jobs.append(makeJob(inputURL: url, relativePath: relativePath, outputRoot: outputRoot, template: configuration.templateOptions))
-                } else {
-                    skippedCount += 1
-                }
-            }
-        } else {
-            for url in try FileManager.default.contentsOfDirectory(at: inputRoot, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
-                let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-                if values.isDirectory == true { continue }
-                let relativePath = relativePath(for: url, base: inputRoot)
-                if supportedImagePath(relativePath) {
-                    jobs.append(makeJob(inputURL: url, relativePath: relativePath, outputRoot: outputRoot, template: configuration.templateOptions))
-                } else {
-                    skippedCount += 1
-                }
-            }
+        try fileSystem.createDirectory(configuration.outputDirectory)
+        let enumeration = try fileSystem.enumerateImages(at: configuration.inputDirectory, recursive: configuration.recursive)
+        let jobs = enumeration.inputs.map { input in
+            let relativeOutput = outputRelativePath(for: input.relativePath, explicitFormat: configuration.templateOptions.outputFormat)
+            return BatchJob(inputPath: input.inputPath, outputPath: fileSystem.outputPath(root: configuration.outputDirectory, relativePath: relativeOutput), relativePath: input.relativePath)
         }
 
-        jobs.sort { normalizedSortKey($0.relativePath) < normalizedSortKey($1.relativePath) }
-        return BatchEnumeration(jobs: jobs, skippedCount: skippedCount)
+        return BatchEnumeration(jobs: jobs.sorted { normalizedSortKey($0.relativePath) < normalizedSortKey($1.relativePath) }, skippedCount: enumeration.skippedCount)
     }
 
     private func run(job: BatchJob, template: CLIOptions) async throws -> BatchJobResult {
         do {
-            try FileManager.default.createDirectory(
-                at: job.outputURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let options = makePerFileOptions(inputPath: job.inputURL.path, outputPath: job.outputURL.path, template: template)
+            try fileSystem.createParentDirectory(forOutputPath: job.outputPath)
+            let options = makePerFileOptions(inputPath: job.inputPath, outputPath: job.outputPath, template: template)
             let result = try await processFile(options)
             return .success(relativePath: job.relativePath, result: result)
         } catch is CancellationError {
             throw CancellationError()
-        } catch let imageIOError as CLIImageIOError {
-            return .failure(BatchFailure(relativePath: job.relativePath, message: imageIOError.message))
         } catch let configurationError as CLIConfigurationError {
             return .failure(BatchFailure(relativePath: job.relativePath, message: configurationError.message))
         } catch {
-            return .failure(BatchFailure(relativePath: job.relativePath, message: "\(error)"))
+            return .failure(BatchFailure(relativePath: job.relativePath, message: errorMessage(error) ?? "\(error)"))
         }
-    }
-
-    private func makeJob(inputURL: URL, relativePath: String, outputRoot: URL, template: CLIOptions) -> BatchJob {
-        let outputRelativePath = outputRelativePath(for: relativePath, explicitFormat: template.outputFormat)
-        return BatchJob(
-            inputURL: inputURL.standardizedFileURL,
-            outputURL: outputRoot.appendingPathComponent(outputRelativePath, isDirectory: false),
-            relativePath: relativePath
-        )
     }
 
     private func makePerFileOptions(inputPath: String, outputPath: String, template: CLIOptions) -> CLIOptions {
@@ -206,16 +205,6 @@ public struct BatchProcessor: Sendable {
         return directory.appendingPathComponent(outputFileName).path
     }
 
-    private func relativePath(for fileURL: URL, base baseURL: URL) -> String {
-        let basePath = baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/"
-        return String(fileURL.standardizedFileURL.path.dropFirst(basePath.count))
-    }
-
-    private func supportedImagePath(_ relativePath: String) -> Bool {
-        let ext = URL(fileURLWithPath: relativePath).pathExtension.lowercased()
-        return ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "bmp"
-    }
-
     private func normalizedSortKey(_ relativePath: String) -> String {
         relativePath.precomposedStringWithCanonicalMapping.lowercased()
     }
@@ -227,12 +216,47 @@ private struct BatchEnumeration {
 }
 
 private struct BatchJob: Sendable, Equatable {
-    let inputURL: URL
-    let outputURL: URL
+    let inputPath: String
+    let outputPath: String
     let relativePath: String
 }
 
 private enum BatchJobResult: Sendable {
     case success(relativePath: String, result: CLIProcessResult)
     case failure(BatchFailure)
+}
+
+/// Foundation implementation used by the current Apple assembly. It is kept in
+/// the portable orchestration target because Foundation supports Windows too;
+/// future adapters can provide native semantics through `CLIFileSystem`.
+public struct FoundationCLIFileSystem: CLIFileSystem {
+    public init() {}
+
+    public func enumerateImages(at inputDirectory: String, recursive: Bool) throws -> CLIBatchInputEnumeration {
+        let root = URL(fileURLWithPath: inputDirectory, isDirectory: true).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw CLIConfigurationError.incompatibleOptions("input directory does not exist: \(inputDirectory)")
+        }
+        let urls: [URL]
+        if recursive {
+            let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+            urls = (enumerator?.allObjects as? [URL]) ?? []
+        } else {
+            urls = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+        }
+        let base = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        var skippedCount = 0
+        let inputs: [CLIBatchInput] = try urls.compactMap { url in
+            if try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true { return nil }
+            let relative = String(url.standardizedFileURL.path.dropFirst(base.count)).replacingOccurrences(of: "\\", with: "/")
+            guard ["png", "jpg", "jpeg", "bmp"].contains(URL(fileURLWithPath: relative).pathExtension.lowercased()) else { skippedCount += 1; return nil }
+            return CLIBatchInput(inputPath: url.path, relativePath: relative)
+        }
+        return CLIBatchInputEnumeration(inputs: inputs, skippedCount: skippedCount)
+    }
+
+    public func outputPath(root: String, relativePath: String) -> String { URL(fileURLWithPath: root).appendingPathComponent(relativePath).path }
+    public func createDirectory(_ path: String) throws { try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true) }
+    public func createParentDirectory(forOutputPath path: String) throws { try FileManager.default.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true) }
 }

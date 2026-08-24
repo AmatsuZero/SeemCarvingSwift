@@ -47,11 +47,11 @@ public struct SeamColor: Sendable, Equatable {
         alpha = bytes.count == 4 ? bytes[3] : 255
     }
 
-    var rgba8: RGBA8 {
+    public var rgba8: RGBA8 {
         RGBA8(r: red, g: green, b: blue, a: alpha)
     }
 
-    var hexRGBA: String {
+    public var hexRGBA: String {
         String(format: "#%02x%02x%02x%02x", red, green, blue, alpha)
     }
 }
@@ -87,7 +87,6 @@ public enum CLIExitCode: Int32, Sendable, Equatable {
         if error is CancellationError { return .cancelled }
         if error is CLIParseError { return .usage }
         if error is CLIConfigurationError { return .usage }
-        if error is CLIImageIOError { return .dataError }
         return .softwareError
     }
 }
@@ -117,37 +116,33 @@ public enum CLIConfiguration: Sendable, Equatable {
     case single(CLIOptions)
     case batch(BatchConfiguration)
 
-    public static func parse(arguments: [String]) throws -> CLIConfiguration {
-        try parse(parsedArguments: CLIArgumentParser.parse(arguments))
-    }
-
-    public static func parse(parsedArguments parsed: CLIParsedArguments) throws -> CLIConfiguration {
-        guard parsed.inputDirectory != nil || parsed.outputDirectory != nil else {
-            return .single(try parsed.makeOptions())
+    /// Builds the execution mode after argv parsing has produced model values.
+    public static func make(from options: CLIOptions) throws -> CLIConfiguration {
+        guard options.inputDirectory != nil || options.outputDirectory != nil else {
+            return .single(options)
         }
 
-        guard let inputDirectory = parsed.inputDirectory,
-              let outputDirectory = parsed.outputDirectory else {
+        guard let inputDirectory = options.inputDirectory,
+              let outputDirectory = options.outputDirectory else {
             throw CLIConfigurationError.incompatibleOptions(
                 "batch mode requires both --input-dir and --output-dir"
             )
         }
-        guard parsed.inputPath == nil, parsed.outputPath == nil else {
+        guard options.inputPath == "__batch_input__", options.outputPath == "__batch_output__" else {
             throw CLIConfigurationError.incompatibleOptions(
                 "batch mode does not accept positional INPUT/OUTPUT or stdin/stdout paths"
             )
         }
 
-        let template = try parsed.makeOptions(inputPath: "__batch_input__", outputPath: "__batch_output__")
-        try validateBatchTemplate(template, inputDirectory: inputDirectory, outputDirectory: outputDirectory)
+        try validateBatchTemplate(options, inputDirectory: inputDirectory, outputDirectory: outputDirectory)
 
         return .batch(
             BatchConfiguration(
-                templateOptions: template,
+                templateOptions: options,
                 inputDirectory: inputDirectory,
                 outputDirectory: outputDirectory,
-                recursive: template.recursive,
-                concurrencyLimit: template.concurrency ?? BatchConfiguration.defaultConcurrency
+                recursive: options.recursive,
+                concurrencyLimit: options.concurrency ?? BatchConfiguration.defaultConcurrency
             )
         )
     }
@@ -184,6 +179,36 @@ public enum CLIConfiguration: Sendable, Equatable {
               let scheme = url.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https"
     }
+}
+
+/// Result returned by any platform image-processing backend.
+public struct CLIProcessResult: Sendable, Equatable {
+    public let width: Int
+    public let height: Int
+    public let backend: BackendPreference
+
+    public init(width: Int, height: Int, backend: BackendPreference) {
+        self.width = width
+        self.height = height
+        self.backend = backend
+    }
+}
+
+/// A logical batch input. `relativePath` always uses `/` separators.
+public struct CLIBatchInput: Sendable, Equatable {
+    public let inputPath: String
+    public let relativePath: String
+
+    public init(inputPath: String, relativePath: String) {
+        self.inputPath = inputPath
+        self.relativePath = relativePath
+    }
+}
+
+public struct CLIBatchInputEnumeration: Sendable, Equatable {
+    public let inputs: [CLIBatchInput]
+    public let skippedCount: Int
+    public init(inputs: [CLIBatchInput], skippedCount: Int) { self.inputs = inputs; self.skippedCount = skippedCount }
 }
 
 public struct BatchConfiguration: Sendable, Equatable {

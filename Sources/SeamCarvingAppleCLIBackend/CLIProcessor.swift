@@ -4,19 +4,8 @@ import SeamCarvingCore
 import SeamCarvingAppleImaging
 import SeamCarvingAppleRuntime
 import SeamCarvingVision
-
-/// The result of a single-image CLI run.
-public struct CLIProcessResult: Sendable, Equatable {
-    public let width: Int
-    public let height: Int
-    public let backend: BackendPreference
-
-    public init(width: Int, height: Int, backend: BackendPreference) {
-        self.width = width
-        self.height = height
-        self.backend = backend
-    }
-}
+import SeamCarvingCLIModel
+import SeamCarvingCLIOrchestration
 
 /// Executes the single-image pipeline: read input, build masks, resize via the
 /// Apple or face-aware service, then write the result.
@@ -78,8 +67,8 @@ public struct CLIProcessor: Sendable {
                     deterministic: options.deterministic || options.debug
                 ),
                 detector: try VisionFaceDetector(),
-                policy: policy,
-                cadence: options.faceCadence
+                policy: try policy.visionPolicy(),
+                cadence: options.faceCadence.visionCadence
             )
             result = try await faceCarver.resize(inputImage, orientation: .up, toPixelSize: target, options: resizeOptions)
         } else {
@@ -230,5 +219,19 @@ public struct CLIProcessor: Sendable {
             )
         }
         return masks
+    }
+}
+
+extension CLIProcessor: CLIImageBackend {
+    public var capabilities: CLIBackendCapabilities {
+        CLIBackendCapabilities(outputFormats: [.png, .jpeg, .bmp], supportsFaceProtection: true, supportsDebugArtifacts: true)
+    }
+
+    public func exitCode(for error: Error) -> CLIExitCode? {
+        error is CLIImageIOError ? .dataError : nil
+    }
+
+    public func message(for error: Error) -> String? {
+        (error as? CLIImageIOError)?.message
     }
 }

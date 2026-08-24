@@ -4,7 +4,10 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
-import SeamCarvingCLI
+import SeamCarvingAppleCLIBackend
+import SeamCarvingCLIArguments
+import SeamCarvingCLIModel
+import SeamCarvingCLIOrchestration
 
 final class CLIEndToEndTests: XCTestCase {
     func testResizeImageViaExecutable() throws {
@@ -89,7 +92,7 @@ final class CLIEndToEndTests: XCTestCase {
         }
         try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--width", "20", "--height", "18",
             "--backend", "cpu", "--energy", "backward",
@@ -118,7 +121,7 @@ final class CLIEndToEndTests: XCTestCase {
         }
         try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--percentage", "50", "--backend", "cpu",
         ])
@@ -144,7 +147,7 @@ final class CLIEndToEndTests: XCTestCase {
         }
         try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--square", "--backend", "cpu",
         ])
@@ -163,7 +166,7 @@ final class CLIEndToEndTests: XCTestCase {
         }
         try Self.writeGradientPNG(width: 5, height: 5, to: inputURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--width", "4", "--height", "5", "--backend", "cpu",
             "--debug", "--debug-directory", debugURL.path,
@@ -210,7 +213,7 @@ final class CLIEndToEndTests: XCTestCase {
             ["--seam-color", "#ff0000"],
             ["--seam-shape", "line"],
         ] {
-            let options = try CLIOptions.parse(["in", "out", "--width", "4", "--height", "5"] + extra)
+            let options = try CLIArgumentParser.parseOptions(["in", "out", "--width", "4", "--height", "5"] + extra)
             do {
                 _ = try await CLIProcessor(progressSink: { _ in }).process(options)
                 XCTFail("expected \(extra) to require --debug")
@@ -230,7 +233,7 @@ final class CLIEndToEndTests: XCTestCase {
         for extra in reservedCases {
             var args = ["in.png", "out.png", "--width", "20", "--height", "18"]
             args.append(contentsOf: extra)
-            let options = try CLIOptions.parse(args)
+            let options = try CLIArgumentParser.parseOptions(args)
             do {
                 _ = try await CLIProcessor().process(options)
                 XCTFail("expected reserved option rejection for \(extra.joined(separator: " "))")
@@ -250,7 +253,7 @@ final class CLIEndToEndTests: XCTestCase {
         }
         try Self.writeGradientPNG(width: 5, height: 5, to: inputURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--width", "4", "--height", "5", "--backend", "metal",
             "--debug", "--debug-directory", debugURL.path,
@@ -278,7 +281,7 @@ final class CLIEndToEndTests: XCTestCase {
         for extra in cases {
             var args = ["in.png", "out.png", "--width", "20", "--height", "18"]
             args.append(contentsOf: extra)
-            let options = try CLIOptions.parse(args)
+            let options = try CLIArgumentParser.parseOptions(args)
             do {
                 _ = try await CLIProcessor().process(options)
                 XCTFail("expected incompatible options error for \(extra.joined(separator: " "))")
@@ -298,7 +301,7 @@ final class CLIEndToEndTests: XCTestCase {
         try Self.writeGradientPNG(width: 32, height: 24, to: inputURL)
         try Self.writeMaskPNG(width: 16, height: 12, protectedRect: CGRect(x: 4, y: 4, width: 8, height: 4), to: maskURL)
 
-        let options = try CLIOptions.parse([
+        let options = try CLIArgumentParser.parseOptions([
             inputURL.path, outputURL.path,
             "--width", "20", "--height", "18",
             "--protect-mask", maskURL.path, "--protect-strength", "hard",
@@ -307,7 +310,7 @@ final class CLIEndToEndTests: XCTestCase {
             _ = try await CLIProcessor().process(options)
             XCTFail("expected mask dimension mismatch")
         } catch let error as CLIImageIOError {
-            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+            XCTAssertEqual(CLIProcessor().exitCode(for: error) ?? CLIExitCode.exitCode(for: error), .dataError)
         }
     }
 
@@ -470,7 +473,7 @@ final class CLIEndToEndTests: XCTestCase {
             guard case .networkFailure = error else {
                 return XCTFail("unexpected image I/O error: \(error)")
             }
-            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+            XCTAssertEqual(CLIProcessor().exitCode(for: error) ?? CLIExitCode.exitCode(for: error), .dataError)
         }
     }
 
@@ -480,7 +483,7 @@ final class CLIEndToEndTests: XCTestCase {
             try CLIImageIO.writeImage(image, toPath: "/nonexistent-directory/output.png", format: .png)
             XCTFail("expected output write failure")
         } catch let error as CLIImageIOError {
-            XCTAssertEqual(CLIExitCode.exitCode(for: error), .dataError)
+            XCTAssertEqual(CLIProcessor().exitCode(for: error) ?? CLIExitCode.exitCode(for: error), .dataError)
             guard case .cannotWriteOutput = error else {
                 return XCTFail("unexpected image I/O error: \(error)")
             }

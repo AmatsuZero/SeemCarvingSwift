@@ -1,7 +1,9 @@
 #if os(macOS)
 import XCTest
 import Foundation
-@testable import SeamCarvingCLI
+@testable import SeamCarvingCLIOrchestration
+import SeamCarvingCLIArguments
+import SeamCarvingCLIModel
 
 final class BatchProcessorTests: XCTestCase {
     func testSortsNormalizedPathsAndSkipsNonImages() async throws {
@@ -174,14 +176,14 @@ final class BatchProcessorTests: XCTestCase {
     }
 
     func testBatchConfigurationRejectsSingleStreamAndDebugConflicts() throws {
-        XCTAssertThrowsError(try CLIConfiguration.parse(arguments: [
+        XCTAssertThrowsError(try CLIArgumentParser.parseConfiguration([
             "-", "out.png",
             "--input-dir", "src",
             "--output-dir", "dst",
             "--width", "8", "--height", "6",
         ]))
 
-        XCTAssertThrowsError(try CLIConfiguration.parse(arguments: [
+        XCTAssertThrowsError(try CLIArgumentParser.parseConfiguration([
             "--input-dir", "src",
             "--output-dir", "dst",
             "--width", "8", "--height", "6",
@@ -190,7 +192,7 @@ final class BatchProcessorTests: XCTestCase {
     }
 
     private func parseBatchConfiguration(_ arguments: [String]) throws -> BatchConfiguration {
-        let configuration = try CLIConfiguration.parse(arguments: arguments)
+        let configuration = try CLIArgumentParser.parseConfiguration(arguments)
         guard case .batch(let batch) = configuration else {
             XCTFail("expected batch configuration")
             throw TestFailure()
