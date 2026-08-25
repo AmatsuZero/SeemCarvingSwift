@@ -3,6 +3,7 @@ import type {
   ResizeRequestMessage,
   ResizeSuccessMessage,
 } from "./protocol.js";
+import { WebGPUProcessor } from "./webgpu.js";
 
 /** The CPU fallback contract used by the worker-owned selector. */
 export interface WasmCPUProcessor extends ResizeProcessor {}
@@ -43,7 +44,7 @@ export class ResizeSelector implements ResizeProcessor {
 
   constructor(
     private readonly wasm: WasmCPUProcessor,
-    private readonly createGPUProcessor: GPUProcessorFactory = () => undefined,
+    private readonly createGPUProcessor: GPUProcessorFactory = () => new WebGPUProcessor(),
     private readonly getNavigator: NavigatorGetter = browserNavigator,
   ) {}
 
