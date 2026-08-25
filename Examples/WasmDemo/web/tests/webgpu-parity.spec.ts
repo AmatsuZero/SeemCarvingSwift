@@ -12,10 +12,25 @@ const fixtures = [
     ]),
   },
   {
-    name: "parent and final argmin ties",
-    width: 3,
+    // RGB is deliberately 0/255 so its linear luma is exact. The calculated
+    // energy rows are [0,0,0,0], [2,2,2,4], [4,2,2,6], making the final
+    // costs [6,4,4,8]. Argmin must choose x=1 over x=2, then x=1's actual
+    // predecessor candidates x=0,1,2 are tied and must choose the left x=0.
+    // Unique alpha markers are ignored by energy but make either bad choice
+    // observable in the returned RGBA bytes.
+    name: "observable interior parent and final argmin ties",
+    width: 4,
     height: 3,
-    pixels: new Uint8Array(Array.from({ length: 9 }, () => [64, 64, 64, 255]).flat()),
+    pixels: new Uint8Array([
+      0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40,
+      0, 0, 0, 50, 0, 0, 0, 60, 0, 0, 0, 70, 0, 0, 0, 80,
+      0, 0, 0, 90, 255, 255, 255, 100, 0, 0, 0, 110, 255, 255, 255, 120,
+    ]),
+    expectedPixels: [
+      0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40,
+      0, 0, 0, 60, 0, 0, 0, 70, 0, 0, 0, 80,
+      0, 0, 0, 90, 0, 0, 0, 110, 255, 255, 255, 120,
+    ],
   },
   {
     name: "height-one final reduction",
@@ -63,6 +78,7 @@ test("WebGPU removes the same backward-Sobel seam as the WASM CPU", async ({ bro
 
       expect(cpu.backend, fixture.name).toBe("wasm-cpu");
       expect(gpu.backend, fixture.name).toBe("webgpu");
+      if (fixture.expectedPixels) expect(Array.from(cpu.pixels), fixture.name).toEqual(fixture.expectedPixels);
       expect(Array.from(gpu.pixels), fixture.name).toEqual(Array.from(cpu.pixels));
     }
   } finally {
