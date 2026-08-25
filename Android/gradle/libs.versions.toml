@@ -1,0 +1,12 @@
+[versions]
+android-gradle-plugin = "8.10.1"
+gradle = "8.14.5"
+kotlin = "2.1.21"
+ndk = "27.3.13750724"
+swift = "6.3.3"
+swift-android-sdk = "swift-6.3.3-RELEASE_android"
+swift-java = "0.2.0"
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "android-gradle-plugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
