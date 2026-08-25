@@ -64,4 +64,5 @@ void init().then(() => {
       (error: unknown) => postFailure(data.jobId, error),
     );
   };
+  worker.postMessage({ type: "ready", ready: true } satisfies WorkerResponseMessage);
 }).catch((error: unknown) => postFailure(0, error));

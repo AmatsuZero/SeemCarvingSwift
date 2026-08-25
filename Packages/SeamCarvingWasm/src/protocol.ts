@@ -14,7 +14,8 @@ export interface ResizeRequestMessage {
 
 export interface WorkerReadyMessage {
   type: "ready";
-  jobId: number;
+  /** Distinguishes the TypeScript dispatcher handshake from Swift legacy ready events. */
+  ready: true;
 }
 
 export interface ResizeSuccessMessage {

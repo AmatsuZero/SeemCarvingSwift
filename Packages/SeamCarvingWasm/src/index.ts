@@ -25,7 +25,9 @@ export interface SeamCarver {
 }
 
 export async function createSeamCarver(options: CreateSeamCarverOptions = {}): Promise<SeamCarver> {
-  return new WorkerSeamCarver(
+  const carver = new WorkerSeamCarver(
     options.worker ?? new Worker(new URL("./worker.js", import.meta.url), { type: "module" }),
   );
+  await carver.waitUntilReady();
+  return carver;
 }

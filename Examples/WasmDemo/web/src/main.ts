@@ -5,19 +5,27 @@ const workerStatus = document.querySelector<HTMLOutputElement>("[data-testid=wor
 if (!workerStatus) throw new Error("Missing worker status output");
 
 let client: SeamCarver | undefined;
+let clientGeneration = 0;
 let clientPromise = createClient();
 
 function createClient(): Promise<SeamCarver> {
+  const generation = ++clientGeneration;
   workerStatus.textContent = "loading";
-  const promise = createSeamCarver();
-  void promise.then(
+  return createSeamCarver().then(
     (carver) => {
+      if (generation !== clientGeneration) {
+        carver.terminate();
+        throw new Error("Seam carver has been terminated");
+      }
       client = carver;
       workerStatus.textContent = "ready";
+      return carver;
     },
-    () => { workerStatus.textContent = "error"; },
+    (error: unknown) => {
+      if (generation === clientGeneration) workerStatus.textContent = "error";
+      throw error;
+    },
   );
-  return promise;
 }
 
 function replaceClient(): void {
