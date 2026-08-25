@@ -4,6 +4,8 @@ import type {
   ResizeSuccessMessage,
   WorkerResponseMessage,
 } from "./protocol.js";
+import { ResizeSelector } from "./selector.js";
+import { WasmCPUProcessor, type WasmResizeCallable } from "./wasm-cpu.js";
 
 interface WorkerScope {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -13,7 +15,7 @@ interface WorkerScope {
 const worker = self as unknown as WorkerScope;
 
 type WasmResizeGlobal = typeof globalThis & {
-  __seamCarvingWasmResize?: (request: ResizeRequestMessage) => Promise<ResizeSuccessMessage>;
+  __seamCarvingWasmResize?: WasmResizeCallable;
 };
 
 function isSafePositiveInteger(value: unknown): value is number {
@@ -49,6 +51,7 @@ void init().then(() => {
   const wasmResize = (worker as WasmResizeGlobal).__seamCarvingWasmResize;
   if (!wasmResize) throw new Error("WASM CPU resize callable is unavailable");
 
+  const selector = new ResizeSelector(new WasmCPUProcessor(wasmResize));
   worker.onmessage = (event: MessageEvent<unknown>) => {
     const { data } = event;
     const jobId = typeof (data as { jobId?: unknown })?.jobId === "number"
@@ -59,8 +62,9 @@ void init().then(() => {
       return;
     }
 
-    void wasmResize(data).then(
-      (response) => worker.postMessage(response satisfies WorkerResponseMessage, [response.pixels]),
+    void selector.resize(data).then(
+      (response: ResizeSuccessMessage) =>
+        worker.postMessage(response satisfies WorkerResponseMessage, [response.pixels]),
       (error: unknown) => postFailure(data.jobId, error),
     );
   };

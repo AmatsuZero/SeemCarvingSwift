@@ -27,6 +27,11 @@ export interface ResizeSuccessMessage {
   height: number;
 }
 
+/** Internal processor result contract used by Worker backend implementations. */
+export interface ResizeProcessor {
+  resize(request: ResizeRequestMessage): Promise<ResizeSuccessMessage>;
+}
+
 export interface ResizeFailureMessage {
   type: "failure";
   jobId: number;
