@@ -30,12 +30,12 @@ extension CPUBackend: SeamCarvingBackend {
 @_spi(Benchmark)
 extension CPUBackend: InstrumentedSeamCarvingBackend {
     public func benchmarkResize(_ image: RGBA8Image, to target: PixelSize, options: ResizeOptions) async throws -> (RGBA8Image, BackendPhaseDurations) {
-        let start = DispatchTime.now().uptimeNanoseconds
+        let clock = ContinuousClock()
+        let start = clock.now
         let recorder = BackendTimingRecorder()
         let result = try await engine.resizeInstrumented(image, to: target, options: options, recorder: recorder)
-        let end = DispatchTime.now().uptimeNanoseconds
         var durations = recorder.snapshot()
-        durations.totalNS = end - start
+        durations.totalNS = elapsedNanoseconds(start.duration(to: clock.now))
         let (pixelCount, overflow) = image.width.multipliedReportingOverflow(by: image.height)
         guard !overflow else { throw SeamCarvingError.invalidDimensions }
         let pixels = UInt64(pixelCount)

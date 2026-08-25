@@ -95,8 +95,11 @@ test gate** plus a macOS/Linux/Windows CI verification matrix. Linux and
 Windows should only be called verified when repository CI evidence exists for
 `swift build --target SeamCarvingCore` and the isolated Core test target. The
 gate validates the portable algorithm target, not complete image I/O or
-application support on those hosts. Wasm and Android have adapter boundaries
-ready for implementation, but neither is currently a supported platform.
+application support on those hosts. The repository also contains an
+[experimental static browser WASM demo](Examples/WasmDemo/README.md) that
+runs the CPU Core path locally in a Worker. It is not a declaration of general
+WASM platform, image-I/O library, CLI, or application support. Android remains
+an adapter boundary ready for implementation, not a supported platform.
 
 ### Run the CLI
 

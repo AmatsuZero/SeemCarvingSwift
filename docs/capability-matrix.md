@@ -28,6 +28,7 @@ Classification legend:
 | 14 | Seam debug artifacts | Core/CLI | Actual seam observations produce manifest and overlay sidecars with explicit coordinates/color/shape | verified; seam/debug tests pass; Metal debug explicitly falls back to CPU |
 | 15 | Typed CLI argument parsing | CLI | `swift-argument-parser` handles syntax while domain validation remains in CLI configuration | verified; parser regression and full package tests pass |
 | 16 | Capability-based platform modules | Core/Apple adapters | Core has no Apple-framework dependency; image-object bridges are separate Runtime/Imaging/CoreVideo/UIKit/AppKit products | verified by the Core-only macOS/Linux/Windows build gate and target separation; this does not claim full Windows/Linux application support |
+| 17 | Experimental browser WASM demo | Isolated WASM bridge / Canvas | Local PNG/JPEG browser workflow resizes RGBA8 pixels in a Worker and exports PNG without network upload | experimental; static-host browser E2E and manual Safari/Edge checklist are required; this is not general WASM, image-I/O, CLI, or app support |
 
 ## Face protection is a capability choice, not Pigo compatibility
 
@@ -58,8 +59,10 @@ The v2 `SeamCarvingApple` compatibility facade re-exports Runtime and Imaging
 for CGImage users only. UIKit and AppKit callers import their corresponding
 capability products explicitly. The Core cross-host CI gate validates only
 `SeamCarvingCore`; it is not a declaration that Windows or Linux image I/O, UI,
-or CLI support has shipped. Wasm and Android are architecture-ready adapter
-boundaries, not supported platforms.
+or CLI support has shipped. The isolated [experimental browser WASM demo](../Examples/WasmDemo/README.md)
+executes the CPU Core path locally in a Worker, but does not imply general WASM
+platform, image-I/O, CLI, or application support. Android remains an
+architecture-ready adapter boundary, not a supported platform.
 
 The current CLI uses Apple ImageIO/CoreGraphics codecs. Future cross-host work
 will split its model/pipeline layer into `SeamCarvingCLIModel` and the Apple

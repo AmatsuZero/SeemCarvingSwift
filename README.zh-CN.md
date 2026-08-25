@@ -91,8 +91,10 @@ Runtime、Imaging、UIKit 或 AppKit 依赖。
 macOS/Linux/Windows CI 验证矩阵共同保护。只有仓库 CI 实际记录了
 `swift build --target SeamCarvingCore` 与隔离后的 Core test target 成功，才应把
 Linux/Windows 记为“已验证”。该 gate 验证的是可移植算法 target，并不代表这些
-宿主的完整图像 I/O 或 App 已受支持。Wasm 与 Android 已预留 adapter 边界，但
-目前均不是已支持的平台。
+宿主的完整图像 I/O 或 App 已受支持。仓库还提供了一个在 Worker 中本地运行 CPU
+Core 的[实验性静态浏览器 WASM demo](Examples/WasmDemo/README.md)；这不表示已经支持
+通用 WASM 平台、图像 I/O library、CLI 或 application。Android 仍只是已预留的 adapter
+边界，尚不是已支持的平台。
 
 ### 使用 CLI
 

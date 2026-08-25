@@ -1,0 +1,77 @@
+name: WASM browser demo
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  wasm-demo:
+    name: WASM demo (${{ matrix.browser }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.3.3'
+
+      - name: Install pinned WebAssembly SDK
+        run: |
+          swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
+            --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+          swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+          cache-dependency-path: Examples/WasmDemo/web/package-lock.json
+
+      - name: Cache Swift package artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            Examples/WasmDemo/swift/.build
+            ~/.swiftpm/cache
+            ~/.cache/swiftly
+          key: ${{ runner.os }}-wasm-demo-swift-${{ hashFiles('Examples/WasmDemo/swift/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-wasm-demo-swift-
+
+      - name: Enforce WASM import boundaries
+        run: bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh
+
+      - name: Build browser WASM artifact
+        working-directory: Examples/WasmDemo
+        run: scripts/build-swift.sh
+
+      - name: Install Node dependencies
+        working-directory: Examples/WasmDemo/web
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: Examples/WasmDemo/web
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build static site
+        working-directory: Examples/WasmDemo/web
+        run: npm run build
+
+      - name: Run static-host browser tests
+        working-directory: Examples/WasmDemo/web
+        run: npx playwright test --project=${{ matrix.browser }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            Examples/WasmDemo/web/playwright-report
+            Examples/WasmDemo/web/test-results
+          if-no-files-found: ignore

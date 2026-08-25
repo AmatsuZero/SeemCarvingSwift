@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seam Carving WASM Demo</title>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <header>
+        <p class="eyebrow">Experimental · runs entirely in your browser</p>
+        <h1>Seam Carving, compiled to WebAssembly</h1>
+        <p>Choose a PNG or JPEG, set an exact output size, and resize it with the Swift CPU implementation.</p>
+      </header>
+
+      <section class="controls" aria-labelledby="controls-heading">
+        <h2 id="controls-heading">Image controls</h2>
+        <label for="source-file">Source image</label>
+        <input id="source-file" type="file" accept="image/png,image/jpeg" />
+
+        <div class="dimensions" role="group" aria-label="Target dimensions">
+          <label for="target-width">Target width</label>
+          <input id="target-width" type="number" min="1" step="1" inputmode="numeric" />
+          <label for="target-height">Target height</label>
+          <input id="target-height" type="number" min="1" step="1" inputmode="numeric" />
+        </div>
+
+        <div class="actions">
+          <button id="resize" type="button" disabled>Resize</button>
+          <button id="cancel" type="button" disabled>Cancel</button>
+          <button id="download" type="button" disabled>Download PNG</button>
+        </div>
+        <p id="status" role="status" aria-live="polite" tabindex="-1">Choose a PNG or JPEG to begin.</p>
+        <p class="worker-state">WASM worker: <output data-testid="worker-status">loading</output></p>
+      </section>
+
+      <section class="canvases" aria-label="Image previews">
+        <figure>
+          <figcaption>Source <span id="source-dimensions">—</span></figcaption>
+          <canvas id="source-canvas" width="1" height="1" aria-label="Source image preview"></canvas>
+        </figure>
+        <figure>
+          <figcaption>Result <span id="result-dimensions">—</span></figcaption>
+          <canvas id="result-canvas" width="1" height="1" aria-label="Resized image preview"></canvas>
+        </figure>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
