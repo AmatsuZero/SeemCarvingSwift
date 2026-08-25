@@ -100,6 +100,8 @@ test("reports source, target, and estimated-work limits through the focused live
 });
 
 test("locks source and dimensions during a resize, then restores them after UI cancellation", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
   await page.goto("/");
   await page.locator("#source-file").setInputFiles("tests/fixtures/work-limit-64x31250.png");
   await expect(page.locator("#source-canvas")).toHaveAttribute("width", "64");
@@ -112,11 +114,18 @@ test("locks source and dimensions during a resize, then restores them after UI c
   await expect(page.locator("#source-file")).toBeDisabled();
   await expect(page.locator("#target-width")).toBeDisabled();
   await expect(page.locator("#target-height")).toBeDisabled();
-  await page.getByRole("button", { name: "Cancel" }).click();
+  // Dispatch twice in one task to exercise the narrow period before the async
+  // resize handler has observed its AbortError and disabled the control.
+  await page.locator("#cancel").evaluate((button) => {
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
 
   await expect(page.locator("#status")).toContainText("Resize cancelled");
   await expect(page.locator("#source-file")).toBeEnabled();
   await expect(page.locator("#target-width")).toBeEnabled();
   await expect(page.locator("#target-height")).toBeEnabled();
   await expect(page.getByRole("button", { name: "Download PNG" })).toBeDisabled();
+  await expect(page.getByTestId("worker-status")).toHaveText("ready");
+  expect(pageErrors).toEqual([]);
 });

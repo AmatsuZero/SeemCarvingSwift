@@ -16,6 +16,7 @@ class ResizeWorkerClient {
   private worker = createResizeWorker();
   private nextJobId = 1;
   private lifecycleGeneration = 0;
+  private cancelling = false;
   private activeJobId: number | undefined;
   private pending:
     | { jobId: number; resolve: (result: ResizeResult) => void; reject: (error: Error) => void }
@@ -66,6 +67,8 @@ class ResizeWorkerClient {
   }
 
   cancel(): void {
+    if (this.cancelling) return;
+    this.cancelling = true;
     this.lifecycleGeneration += 1;
     const pending = this.pending;
     clearTimeout(this.readyTimeout);
@@ -104,6 +107,7 @@ class ResizeWorkerClient {
   private handleMessage(data: WorkerResponseMessage): void {
     if (data.type === "ready") {
       clearTimeout(this.readyTimeout);
+      this.cancelling = false;
       this.onStatus("ready");
       this.resolveReady();
       return;
@@ -123,6 +127,7 @@ class ResizeWorkerClient {
 
   private failInitialization(): void {
     clearTimeout(this.readyTimeout);
+    this.cancelling = false;
     console.error("WASM worker initialization failed");
     this.onStatus("error");
     this.rejectReady(new Error("WASM worker initialization failed"));
@@ -323,6 +328,9 @@ resizeButton.addEventListener("click", async () => {
 cancelButton.addEventListener("click", () => {
   if (!isRunning) return;
   client.cancel();
+  // Disable synchronously as well as through the eventual AbortError handler,
+  // so a rapid second activation cannot cancel the replacement Worker.
+  updateControls();
   // The client rejects the pending promise synchronously; keep the UI disabled
   // until its resize handler observes that rejection and installs the new worker.
   setStatus("Cancelling resize…");
