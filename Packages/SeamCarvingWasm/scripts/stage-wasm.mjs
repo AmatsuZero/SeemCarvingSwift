@@ -1,4 +1,4 @@
-import { cp, readdir, rm, stat } from "node:fs/promises";
+import { cp, rm, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -8,15 +8,25 @@ const artifactDir = path.resolve(
   "../../Examples/WasmDemo/swift/.build/plugins/PackageToJS/outputs/Package",
 );
 const generatedDir = path.join(packageDir, "src/generated");
+const requiredRuntimeFiles = [
+  "WasmBridgeWorker.wasm",
+  "index.js",
+  "instantiate.js",
+  "runtime.js",
+  "platforms/browser.js",
+  "platforms/browser.worker.js",
+  "platforms/node.js",
+];
 
-async function hasWasmFile(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory() && await hasWasmFile(entryPath)) return true;
-    if (entry.isFile() && entry.name.endsWith(".wasm")) return true;
+async function requireFile(relativePath) {
+  const filePath = path.join(generatedDir, relativePath);
+  try {
+    if (!(await stat(filePath)).isFile()) throw new Error("not a file");
+  } catch {
+    throw new Error(`PackageToJS runtime file is missing: ${filePath}`);
   }
-  return false;
 }
+
 
 await rm(generatedDir, { force: true, recursive: true });
 
@@ -31,17 +41,8 @@ try {
 
   await cp(artifactDir, generatedDir, { recursive: true });
 
-  const entryLoader = path.join(generatedDir, "index.js");
-  try {
-    if (!(await stat(entryLoader)).isFile()) {
-      throw new Error("not a file");
-    }
-  } catch {
-    throw new Error(`PackageToJS entry loader is missing: ${entryLoader}`);
-  }
-
-  if (!await hasWasmFile(generatedDir)) {
-    throw new Error(`PackageToJS artifact does not contain a WASM module: ${artifactDir}`);
+  for (const relativePath of requiredRuntimeFiles) {
+    await requireFile(relativePath);
   }
 } catch (error) {
   await rm(generatedDir, { force: true, recursive: true });

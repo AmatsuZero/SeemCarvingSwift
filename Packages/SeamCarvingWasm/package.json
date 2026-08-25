@@ -12,8 +12,7 @@
   },
   "files": [
     "dist",
-    "README.md",
-    "LICENSE"
+    "README.md"
   ],
   "scripts": {
     "stage-wasm": "node scripts/stage-wasm.mjs",
@@ -32,5 +31,6 @@
     "typescript": "5.9.2",
     "vite": "7.1.7",
     "vitest": "3.2.4"
-  }
+  },
+  "license": "UNLICENSED"
 }

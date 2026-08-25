@@ -6,8 +6,22 @@ import path from "node:path";
 import test from "node:test";
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const expectedFiles = new Set([
+  "package/README.md",
+  "package/package.json",
+  "package/dist/index.d.ts",
+  "package/dist/protocol.d.ts",
+  "package/dist/index.js",
+  "package/dist/worker.js",
+  "package/dist/WasmBridgeWorker.wasm",
+  "package/dist/instantiate.js",
+  "package/dist/runtime.js",
+  "package/dist/platforms/browser.js",
+  "package/dist/platforms/browser.worker.js",
+  "package/dist/platforms/node.js",
+]);
 
-test("packed package contains the runtime and type assets", () => {
+test("packed package contains exactly the public API and PackageToJS runtime", () => {
   const packed = JSON.parse(
     execFileSync("npm", ["pack", "--json"], { cwd: packageDir, encoding: "utf8" }),
   );
@@ -17,20 +31,9 @@ test("packed package contains the runtime and type assets", () => {
     const files = execFileSync("tar", ["-tf", filename], {
       cwd: packageDir,
       encoding: "utf8",
-    });
+    }).trim().split("\n");
 
-    for (const name of [
-      "package/dist/index.js",
-      "package/dist/worker.js",
-      "package/dist/WasmBridgeWorker.wasm",
-      "package/dist/index.d.ts",
-    ]) {
-      assert.match(files, new RegExp(`^${name}$`, "m"));
-    }
-
-    for (const name of files.trim().split("\n")) {
-      assert.match(name, /^package\/(?:dist\/.+|README\.md|LICENSE|package\.json)$/);
-    }
+    assert.deepEqual(new Set(files), expectedFiles);
   } finally {
     rmSync(path.join(packageDir, filename), { force: true });
   }
