@@ -5,6 +5,7 @@ script_dir="${0:A:h}"
 demo_dir="${script_dir:h}"
 swift_dir="${demo_dir}/swift"
 web_dir="${demo_dir}/web"
+package_dir="${demo_dir:h:h}/Packages/SeamCarvingWasm"
 sdk_id="swift-6.3.3-RELEASE_wasm"
 artifact_dir="${swift_dir}/.build/plugins/PackageToJS/outputs/Package"
 generated_dir="${web_dir}/src/generated"
@@ -34,6 +35,8 @@ if ! find "${artifact_dir}" -type f -name '*.wasm' -print -quit | grep -q .; the
   print -u2 "PackageToJS artifact does not contain a WASM module"
   exit 1
 fi
+
+node "${package_dir}/scripts/stage-wasm.mjs"
 
 cp -R "${artifact_dir}/." "${generated_dir}/"
 [[ -f "${generated_dir}/index.js" ]]

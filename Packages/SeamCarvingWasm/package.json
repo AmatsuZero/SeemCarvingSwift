@@ -1,0 +1,36 @@
+{
+  "name": "@seemcarving/wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly SDK for SeamCarvingSwift",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": "./dist/worker.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "stage-wasm": "node scripts/stage-wasm.mjs",
+    "build": "npm run stage-wasm && rm -rf dist && tsc --emitDeclarationOnly && vite build",
+    "test:unit": "vitest run",
+    "test:pack": "node --test tests/package-contents.spec.mjs"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "vite": "7.1.7",
+    "vitest": "3.2.4"
+  }
+}
