@@ -239,7 +239,7 @@ Replace `ResizeWorkerClient` and protocol imports in `main.ts` with `createSeamC
 
 - [ ] **Step 5: Run client tests and Chromium demo protocol tests.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/client.spec.ts && cd Examples/WasmDemo/web && npm install && npx playwright test tests/worker-protocol.spec.ts --project=chromium`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/client.spec.ts && cd Examples/WasmDemo/web && npm install && npx playwright test tests/worker-protocol.spec.ts --project=chromium`
 
 Expected: PASS and the demo reports `wasm-cpu`.
 
