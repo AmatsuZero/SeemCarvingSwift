@@ -6,7 +6,7 @@
 
 **Architecture:** Keep `SeamCarvingCore` and `WasmBridgeCore` CPU-only. A standalone TypeScript package owns the public API, module Worker, backend selector, WGSL shaders, GPU resources, and generated JavaScriptKit assets. The demo is a Vite consumer of that package; the Worker chooses WebGPU only for MVP-eligible requests and calls an exported Swift/WASM CPU function for every fallback.
 
-**Tech Stack:** Swift 6.3.3 WASM SDK, JavaScriptKit 0.56.1, TypeScript 5.9.2, WebGPU/WGSL, Vite 7.1.7, Playwright 1.55.0, npm 11.6.2, GitHub Actions, npm Trusted Publishing OIDC.
+**Tech Stack:** Swift 6.3.3 WASM SDK, JavaScriptKit 0.56.1, TypeScript 5.9.2, WebGPU/WGSL, Vite 7.1.7, Vitest 3.2.x, Playwright 1.55.0, npm 11.6.2, GitHub Actions, npm Trusted Publishing OIDC.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-webgpu-browser-backend-design.md`
 
@@ -172,7 +172,7 @@ export interface SeamCarver { resize(request: ResizeRequest): Promise<ResizeResu
 export async function createSeamCarver(): Promise<SeamCarver> { throw new Error("Worker client not installed"); }
 ```
 
-Configure Vite library mode to preserve Worker/WASM URL assets and emit declarations with `tsc --emitDeclarationOnly` before Vite bundling.
+Add `vitest@3.2.x` and `test:unit: vitest run` to the package dev dependencies. Configure Vite library mode to preserve Worker/WASM URL assets and emit declarations with `tsc --emitDeclarationOnly` before Vite bundling.
 
 - [ ] **Step 5: Build Swift generated assets, install package dependencies, run the pack test, and verify it passes.**
 
@@ -215,7 +215,7 @@ await expect(carver.resize(request)).rejects.toThrow("terminated");
 
 - [ ] **Step 2: Run the test and verify it fails because `createSeamCarver` throws.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/client.spec.ts`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/client.spec.ts`
 
 Expected: FAIL with `Worker client not installed`.
 
@@ -277,7 +277,7 @@ Use fakes where WebGPU initialization rejects and CPU returns a known result.
 
 - [ ] **Step 2: Run the test and verify it fails because no selector exists.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/selector.spec.ts`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/selector.spec.ts`
 
 Expected: FAIL with module-not-found.
 
@@ -293,7 +293,7 @@ Probe `navigator.gpu` lazily only for eligible requests. Cache a successful proc
 
 - [ ] **Step 4: Run focused selector tests and the existing WASM fallback browser tests.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/selector.spec.ts && cd Examples/WasmDemo/web && npx playwright test tests/worker-protocol.spec.ts --project=chromium`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/selector.spec.ts && cd Examples/WasmDemo/web && npx playwright test tests/worker-protocol.spec.ts --project=chromium`
 
 Expected: PASS; a no-WebGPU fake still gives the CPU image result.
 
@@ -310,7 +310,7 @@ git commit -m "feat: select WebGPU with WASM fallback"
 - Create: `Packages/SeamCarvingWasm/src/shaders.ts`
 - Create: `Packages/SeamCarvingWasm/src/webgpu.ts`
 - Modify: `Packages/SeamCarvingWasm/src/selector.ts`
-- Test: `Packages/SeamCarvingWasm/tests/webgpu-parity.spec.ts`
+- Test: `Examples/WasmDemo/web/tests/webgpu-parity.spec.ts`
 
 **Interfaces:**
 - Produces `WebGPUProcessor.initialize(): Promise<WebGPUProcessor>` and `resize(request): Promise<ResizeResult>`.
@@ -330,7 +330,7 @@ Skip only when `navigator.gpu` is unavailable; do not skip on a supported Chromi
 
 - [ ] **Step 2: Run it and verify it fails because the GPU processor is not implemented.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/webgpu-parity.spec.ts`
+Run: `cd Examples/WasmDemo/web && npx playwright test tests/webgpu-parity.spec.ts --project=chromium`
 
 Expected: FAIL with GPU processor unavailable/not implemented.
 
@@ -353,7 +353,7 @@ Match `SeamCarvingMetal/Shaders/SeamCarving.metal` and `BackwardEnergy.swift` fo
 
 - [ ] **Step 4: Run parity plus the CPU fallback test.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/webgpu-parity.spec.ts tests/selector.spec.ts`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/selector.spec.ts && cd Examples/WasmDemo/web && npx playwright test tests/webgpu-parity.spec.ts --project=chromium`
 
 Expected: PASS with exact pixels for GPU and CPU fixture results.
 
@@ -370,7 +370,7 @@ git commit -m "feat: add WebGPU seam energy pipeline"
 - Modify: `Packages/SeamCarvingWasm/src/webgpu.ts`
 - Modify: `Packages/SeamCarvingWasm/src/selector.ts`
 - Modify: `Packages/SeamCarvingWasm/src/shaders.ts`
-- Test: `Packages/SeamCarvingWasm/tests/webgpu-parity.spec.ts`
+- Test: `Examples/WasmDemo/web/tests/webgpu-parity.spec.ts`
 - Test: `Packages/SeamCarvingWasm/tests/selector.spec.ts`
 
 **Interfaces:**
@@ -388,7 +388,7 @@ await expect(selector.resize(req(8, 4, 5, 4))).resolves.toMatchObject({ backend:
 
 - [ ] **Step 2: Run tests and verify multi-seam fails after the first removal.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/webgpu-parity.spec.ts tests/selector.spec.ts`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/selector.spec.ts && cd Examples/WasmDemo/web && npx playwright test tests/webgpu-parity.spec.ts --project=chromium`
 
 Expected: FAIL on 8→5 output length or pixel mismatch.
 
@@ -406,7 +406,7 @@ Allocate for original input dimensions once; use `currentWidth` bounds in every 
 
 - [ ] **Step 4: Run parity on 3→2, 8→5, and a 64×32 fixture; run fallback coverage.**
 
-Run: `npm test --prefix Packages/SeamCarvingWasm -- --runInBand tests/webgpu-parity.spec.ts tests/selector.spec.ts`
+Run: `npm run test:unit --prefix Packages/SeamCarvingWasm -- tests/selector.spec.ts && cd Examples/WasmDemo/web && npx playwright test tests/webgpu-parity.spec.ts --project=chromium`
 
 Expected: PASS; all GPU output byte arrays equal CPU output and lost-device test returns CPU result.
 
@@ -548,7 +548,7 @@ git commit -m "ci: publish WASM SDK with OIDC"
 
 - [ ] **Step 1: Run source/boundary and all package tests.**
 
-Run: `bash Scripts/check-target-boundaries.sh && bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh && swift test --package-path Examples/WasmDemo/swift && npm test --prefix Packages/SeamCarvingWasm`
+Run: `bash Scripts/check-target-boundaries.sh && bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh && swift test --package-path Examples/WasmDemo/swift && npm run test:unit --prefix Packages/SeamCarvingWasm`
 
 Expected: PASS.
 
