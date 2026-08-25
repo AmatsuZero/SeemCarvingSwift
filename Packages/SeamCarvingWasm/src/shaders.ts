@@ -1,5 +1,5 @@
 /** WGSL compute stages for one backward-Sobel vertical seam removal. */
-const header = /* wgsl */ `
+const header = (parameterBinding: number): string => /* wgsl */ `
 struct Parameters {
   width: u32,
   height: u32,
@@ -7,12 +7,12 @@ struct Parameters {
   _padding: u32,
 };
 
-@group(0) @binding(2) var<uniform> parameters: Parameters;
+@group(0) @binding(${parameterBinding}) var<uniform> parameters: Parameters;
 `;
 
 /** Converts packed RGBA8 pixels to the Core backend's linear BT.709 luma. */
 export const rgbaToLumaWGSL = /* wgsl */ `
-${header}
+${header(2)}
 @group(0) @binding(0) var<storage, read> inputPixels: array<u32>;
 @group(0) @binding(1) var<storage, read_write> luma: array<f32>;
 
@@ -34,7 +34,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
 
 /** Clamp-to-edge, symmetric-difference Sobel energy, matching BackwardEnergy. */
 export const sobelWGSL = /* wgsl */ `
-${header}
+${header(2)}
 @group(0) @binding(0) var<storage, read> luma: array<f32>;
 @group(0) @binding(1) var<storage, read_write> energy: array<f32>;
 
@@ -61,7 +61,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
 
 /** Seeds the two-row dynamic-programming state with Sobel's first row. */
 export const initializeDPWGSL = /* wgsl */ `
-${header}
+${header(2)}
 @group(0) @binding(0) var<storage, read> energy: array<f32>;
 @group(0) @binding(1) var<storage, read_write> row: array<f32>;
 
@@ -74,7 +74,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
 
 /** Accumulates exactly one row, retaining left-center-right tie order. */
 export const accumulateDPWGSL = /* wgsl */ `
-${header}
+${header(4)}
 @group(0) @binding(0) var<storage, read> previous: array<f32>;
 @group(0) @binding(1) var<storage, read_write> current: array<f32>;
 @group(0) @binding(2) var<storage, read_write> parents: array<i32>;
@@ -102,7 +102,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
 
 /** Serial final-row argmin: the first equal minimum wins. */
 export const reduceWGSL = /* wgsl */ `
-${header}
+${header(2)}
 @group(0) @binding(0) var<storage, read> row: array<f32>;
 @group(0) @binding(1) var<storage, read_write> argmin: array<u32>;
 
@@ -121,7 +121,7 @@ fn main() {
 
 /** Walks the signed parent deltas from the final row to form the seam. */
 export const backtrackWGSL = /* wgsl */ `
-${header}
+${header(3)}
 @group(0) @binding(0) var<storage, read> parents: array<i32>;
 @group(0) @binding(1) var<storage, read_write> seam: array<u32>;
 @group(0) @binding(2) var<storage, read> argmin: array<u32>;
@@ -138,7 +138,7 @@ fn main() {
 
 /** Gathers every packed RGBA8 pixel except the selected vertical seam. */
 export const removeVerticalWGSL = /* wgsl */ `
-${header}
+${header(3)}
 @group(0) @binding(0) var<storage, read> inputPixels: array<u32>;
 @group(0) @binding(1) var<storage, read_write> outputPixels: array<u32>;
 @group(0) @binding(2) var<storage, read> seam: array<u32>;

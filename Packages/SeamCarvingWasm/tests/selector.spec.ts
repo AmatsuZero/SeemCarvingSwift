@@ -6,6 +6,7 @@ import {
   type GPUProcessor,
   type WasmCPUProcessor,
 } from "../src/selector.js";
+import { WebGPUProcessor } from "../src/webgpu.js";
 
 function request(
   sourceWidth: number,
@@ -93,6 +94,48 @@ describe("ResizeSelector", () => {
     await expect(selector.resize(value)).resolves.toMatchObject({ backend: "wasm-cpu" });
     expect(gpu.resize).toHaveBeenCalledOnce();
     expect(wasm.resize).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to WASM when asynchronous WebGPU pipeline validation rejects", async () => {
+    vi.stubGlobal("GPUBufferUsage", {
+      MAP_READ: 1,
+      COPY_SRC: 2,
+      COPY_DST: 4,
+      STORAGE: 8,
+      UNIFORM: 16,
+    });
+    try {
+      const pipelineFailure = vi.fn(async () => { throw new Error("WGSL validation failed"); });
+      const buffer = {
+        mapAsync: vi.fn(async () => {}),
+        getMappedRange: vi.fn(() => new ArrayBuffer(0)),
+        unmap: vi.fn(),
+        destroy: vi.fn(),
+      };
+      const processor = new WebGPUProcessor();
+      processor.device = {
+        queue: { writeBuffer: vi.fn(), submit: vi.fn() },
+        lost: new Promise(() => {}),
+        createBuffer: vi.fn(() => buffer),
+        createShaderModule: vi.fn(() => ({})),
+        createComputePipelineAsync: pipelineFailure,
+        createBindGroup: vi.fn(),
+        createCommandEncoder: vi.fn(),
+      } as never;
+      const wasm = cpu();
+      const gpu: GPUProcessor = {
+        initialize: vi.fn(async () => {}),
+        resize: (value) => processor.resize(value),
+      };
+      const value = request(3, 3, 2, 3);
+      const selector = new ResizeSelector(wasm, () => gpu, () => ({ gpu: {} }));
+
+      await expect(selector.resize(value)).resolves.toMatchObject({ backend: "wasm-cpu" });
+      expect(pipelineFailure).toHaveBeenCalledOnce();
+      expect(wasm.resize).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

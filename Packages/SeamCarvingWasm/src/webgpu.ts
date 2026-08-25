@@ -20,7 +20,9 @@ type GPUDeviceLike = {
   lost: Promise<unknown>;
   createBuffer(descriptor: { size: number; usage: number }): GPUBufferLike;
   createShaderModule(descriptor: { code: string }): unknown;
-  createComputePipeline(descriptor: unknown): unknown;
+  createComputePipelineAsync(descriptor: unknown): Promise<unknown>;
+  pushErrorScope(filter: "validation"): void;
+  popErrorScope(): Promise<unknown | null>;
   createBindGroup(descriptor: unknown): unknown;
   createCommandEncoder(): {
     beginComputePass(): { setPipeline(value: unknown): void; setBindGroup(index: number, value: unknown): void; dispatchWorkgroups(x: number): void; end(): void };
@@ -94,7 +96,7 @@ export class WebGPUProcessor {
       device.queue.writeBuffer(buffer, 0, new Uint32Array([width, height, row, 0]).buffer);
       return buffer;
     };
-    const pipeline = (code: string): unknown => device.createComputePipeline({
+    const pipeline = async (code: string): Promise<unknown> => device.createComputePipelineAsync({
       layout: "auto",
       compute: { module: device.createShaderModule({ code }), entryPoint: "main" },
     });
@@ -124,14 +126,15 @@ export class WebGPUProcessor {
       const readback = makeBuffer(outputBytes, usage("MAP_READ") | copyDestination);
       device.queue.writeBuffer(input, 0, request.pixels);
 
-      const lumaPipeline = pipeline(rgbaToLumaWGSL);
-      const sobelPipeline = pipeline(sobelWGSL);
-      const initializePipeline = pipeline(initializeDPWGSL);
-      const accumulatePipeline = pipeline(accumulateDPWGSL);
-      const reducePipeline = pipeline(reduceWGSL);
-      const backtrackPipeline = pipeline(backtrackWGSL);
-      const removePipeline = pipeline(removeVerticalWGSL);
+      const lumaPipeline = await pipeline(rgbaToLumaWGSL);
+      const sobelPipeline = await pipeline(sobelWGSL);
+      const initializePipeline = await pipeline(initializeDPWGSL);
+      const accumulatePipeline = await pipeline(accumulateDPWGSL);
+      const reducePipeline = await pipeline(reduceWGSL);
+      const backtrackPipeline = await pipeline(backtrackWGSL);
+      const removePipeline = await pipeline(removeVerticalWGSL);
       const encoder = device.createCommandEncoder();
+      device.pushErrorScope("validation");
       const baseParameters = parameters(0);
       encode(encoder, lumaPipeline, bindGroup(lumaPipeline, [input, luma, baseParameters]), dispatchCount(pixelCount));
       encode(encoder, sobelPipeline, bindGroup(sobelPipeline, [luma, energy, baseParameters]), dispatchCount(pixelCount));
@@ -154,6 +157,8 @@ export class WebGPUProcessor {
       encode(encoder, removePipeline, bindGroup(removePipeline, [input, output, seam, baseParameters]), dispatchCount((width - 1) * height));
       encoder.copyBufferToBuffer(output, 0, readback, 0, outputBytes);
       device.queue.submit([encoder.finish()]);
+      const validationError = await device.popErrorScope();
+      if (validationError) throw new Error(`WebGPU validation failed: ${String(validationError)}`);
       await readback.mapAsync(mapRead());
       const pixels = readback.getMappedRange().slice(0);
       readback.unmap();
