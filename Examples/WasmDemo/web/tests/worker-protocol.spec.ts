@@ -1,12 +1,18 @@
 import { expect, test } from "@playwright/test";
 
-test("worker returns the same job ID and resized dimensions", async ({ page }) => {
+test("CPU path returns wasm-cpu backend with resized dimensions", async ({ page }) => {
   await page.goto("/");
   const result = await page.evaluate(() =>
-    window.__testResizeRGBA8!(new Uint8Array([255, 0, 0, 255]), 1, 1, 1, 1),
+    window.__testResizeRGBA8!(new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255]), 2, 1, 1, 1),
   );
 
-  expect(result).toMatchObject({ type: "success", jobId: 1, width: 1, height: 1 });
+  expect(result).toMatchObject({
+    type: "success",
+    backend: "wasm-cpu",
+    jobId: 1,
+    width: 1,
+    height: 1,
+  });
 });
 
 test("terminating an active job rejects it and ignores its late response", async ({ page }) => {

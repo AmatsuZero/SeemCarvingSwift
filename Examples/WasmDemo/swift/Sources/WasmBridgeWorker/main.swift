@@ -18,32 +18,24 @@ private func validInteger(_ value: JSValue) -> Int? {
 }
 
 @MainActor
-private func postFailure(jobId: Int, message: String) {
-    let result = JSObject.global.Object.function!.new()
-    result["type"] = .string("failure")
-    result["jobId"] = .number(Double(jobId))
-    result["message"] = .string(message)
-    _ = JSObject.global.postMessage!(result)
-}
-
-@MainActor
-private func postSuccess(jobId: Int, response: ResizeRGBA8Response) {
+private func postableSuccess(jobId: Int, response: ResizeRGBA8Response) -> JSValue {
     let result = JSObject.global.Object.function!.new()
     let output = uint8ArrayConstructor.new(response.pixels.count)
     for (index, byte) in response.pixels.enumerated() {
         output[index] = .number(Double(byte))
     }
     result["type"] = .string("success")
+    result["backend"] = .string("wasm-cpu")
     result["jobId"] = .number(Double(jobId))
     result["width"] = .number(Double(response.width))
     result["height"] = .number(Double(response.height))
     result["pixels"] = output.buffer
-    _ = JSObject.global.postMessage!(result, JSObject.global.Array.function!.new(output.buffer))
+    return .object(result)
 }
 
 @MainActor
-private func request(from event: JSValue) -> (jobId: Int, request: ResizeRGBA8Request)? {
-    guard let data = event.object?.data.object,
+private func request(from value: JSValue) -> (jobId: Int, request: ResizeRGBA8Request)? {
+    guard let data = value.object,
           data.type.string == "resize",
           let jobId = validInteger(data.jobId),
           let sourceWidth = validInteger(data.sourceWidth),
@@ -72,21 +64,22 @@ private func request(from event: JSValue) -> (jobId: Int, request: ResizeRGBA8Re
     ))
 }
 
-let messageHandler = JSClosure { arguments in
-    guard let event = arguments.first, let parsed = request(from: event) else {
-        return .undefined
+let wasmResize = JSClosure { arguments in
+    guard let value = arguments.first, let parsed = request(from: value) else {
+        return JSPromise.reject(JSValue.string("Invalid resize request")).jsValue()
     }
-    Task { @MainActor in
-        do {
-            let response = try await resizeRGBA8(parsed.request)
-            postSuccess(jobId: parsed.jobId, response: response)
-        } catch {
-            postFailure(jobId: parsed.jobId, message: String(describing: error))
+    return JSPromise(resolver: { completion in
+        Task { @MainActor in
+            do {
+                let response = try await resizeRGBA8(parsed.request)
+                completion(.success(postableSuccess(jobId: parsed.jobId, response: response)))
+            } catch {
+                completion(.failure(.string(String(describing: error))))
+            }
         }
-    }
-    return .undefined
+    }).jsValue()
 }
-JSObject.global.onmessage = .object(messageHandler)
+JSObject.global.__seamCarvingWasmResize = .object(wasmResize)
 
 let readyMessage = JSObject.global.Object.function!.new()
 readyMessage["type"] = .string("ready")

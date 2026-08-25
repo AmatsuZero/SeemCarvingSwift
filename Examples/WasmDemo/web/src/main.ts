@@ -122,7 +122,14 @@ class ResizeWorkerClient {
   }
 
   injectStaleResponseForTest(): void {
-    this.handleMessage({ type: "success", jobId: 1, width: 1, height: 1, pixels: new ArrayBuffer(4) });
+    this.handleMessage({
+      type: "success",
+      backend: "wasm-cpu",
+      jobId: 1,
+      width: 1,
+      height: 1,
+      pixels: new ArrayBuffer(4),
+    });
   }
 
   private failInitialization(): void {

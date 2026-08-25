@@ -14,8 +14,11 @@ export interface WorkerReadyMessage {
   jobId: number;
 }
 
+export type BackendIdentifier = "wasm-cpu" | "webgpu";
+
 export interface ResizeSuccessMessage {
   type: "success";
+  backend: BackendIdentifier;
   jobId: number;
   pixels: ArrayBuffer;
   width: number;
@@ -29,6 +32,7 @@ export interface ResizeFailureMessage {
 }
 
 export type WorkerRequestMessage = ResizeRequestMessage;
+export type ResizeResponseMessage = ResizeSuccessMessage;
 export type WorkerResponseMessage =
   | WorkerReadyMessage
   | ResizeSuccessMessage

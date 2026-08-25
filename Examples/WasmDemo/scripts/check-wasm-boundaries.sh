@@ -50,4 +50,11 @@ require_allowed_imports "$swift_dir/Sources/WasmBridgeCore" SeamCarvingCore
 require_allowed_imports "$swift_dir/Sources/WasmBridgeWorker" \
   WasmBridgeCore JavaScriptKit JavaScriptEventLoop
 
+worker_main="$swift_dir/Sources/WasmBridgeWorker/main.swift"
+grep -Fq 'JSObject.global.__seamCarvingWasmResize' "$worker_main" ||
+  fail "WASM worker does not expose the CPU resize callable."
+if grep -Fq 'JSObject.global.onmessage' "$worker_main"; then
+  fail "WASM worker must not own the message dispatcher."
+fi
+
 printf 'WASM bridge import boundaries passed.\n'

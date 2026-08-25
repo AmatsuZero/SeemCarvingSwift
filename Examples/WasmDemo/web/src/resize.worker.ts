@@ -1,7 +1,10 @@
 import { init } from "./generated/index.js";
-import type { ResizeRequestMessage } from "./protocol";
+import type { ResizeRequestMessage, ResizeResponseMessage } from "./protocol";
 
 const worker = self as DedicatedWorkerGlobalScope;
+type WasmResizeGlobal = DedicatedWorkerGlobalScope & {
+  __seamCarvingWasmResize?: (request: ResizeRequestMessage) => Promise<ResizeResponseMessage>;
+};
 
 function isSafePositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
@@ -28,17 +31,29 @@ function isResizeRequest(value: unknown): value is ResizeRequestMessage {
     message.pixels.byteLength === sourcePixels * 4;
 }
 
-// Register before Swift installs `onmessage`, so malformed values never cross
-// the JS/WASM boundary. Valid messages continue to Swift's listener.
-worker.addEventListener("message", (event: MessageEvent<unknown>) => {
-  if (isResizeRequest(event.data)) return;
-  event.stopImmediatePropagation();
-  const jobId = typeof (event.data as { jobId?: unknown })?.jobId === "number"
-    ? (event.data as { jobId: number }).jobId
-    : 0;
-  worker.postMessage({ type: "failure", jobId, message: "Invalid resize request" });
-});
+function postFailure(jobId: number, error: unknown): void {
+  worker.postMessage({ type: "failure", jobId, message: String(error) });
+}
 
-void init().catch((error: unknown) => {
-  worker.postMessage({ type: "failure", jobId: 0, message: String(error) });
+void init().then(() => {
+  const wasmResize = (worker as WasmResizeGlobal).__seamCarvingWasmResize;
+  if (!wasmResize) throw new Error("WASM CPU resize callable is unavailable");
+
+  worker.onmessage = (event: MessageEvent<unknown>) => {
+    const { data } = event;
+    const jobId = typeof (data as { jobId?: unknown })?.jobId === "number"
+      ? (data as { jobId: number }).jobId
+      : 0;
+    if (!isResizeRequest(data)) {
+      postFailure(jobId, "Invalid resize request");
+      return;
+    }
+
+    void wasmResize(data).then(
+      (response) => worker.postMessage(response, [response.pixels]),
+      (error: unknown) => postFailure(data.jobId, error),
+    );
+  };
+}).catch((error: unknown) => {
+  postFailure(0, error);
 });
