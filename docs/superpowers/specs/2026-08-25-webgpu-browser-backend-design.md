@@ -52,11 +52,12 @@ can add GPU transpose for horizontal shrink, masks, forward energy, and full
 ### Package topology
 
 The root remains exclusively a Swift Package; it must not gain a root
-`package.json`. Add an npm workspace package at `packages/seam-carving-wasm`
+`package.json`. Add a standalone npm package at `Packages/SeamCarvingWasm`
 with published name `@seemcarving/wasm`. `Examples/WasmDemo/web` becomes a
-thin Vite example application that depends on this workspace package using an
-npm workspace reference. This avoids making an experimental demo the public
-library boundary and permits package tests independent of the app.
+thin Vite example application that depends on that package through a local
+`file:` dependency during repository development. This avoids making an
+experimental demo the public library boundary, avoids a root npm workspace,
+and permits package tests independent of the app.
 
 The package contains:
 
@@ -69,7 +70,7 @@ The package contains:
 - `dist/`: ESM JavaScript, declarations, a Worker module entry point, and the
   generated WASM/runtime assets produced by the package build.
 
-The package build invokes the existing Swift artifact build/copy script before
+The package build invokes a relocated Swift artifact build/copy script before
 bundling. Generated artifacts are build inputs but not hand-authored sources.
 `files` in `package.json` is an explicit allow-list of `dist/**`, README, and
 LICENSE so the module and all runtime assets publish together.
@@ -100,7 +101,7 @@ browser requirement is documented rather than polyfilling WebGPU or Worker.
 
 ### Demo migration
 
-The Vite app imports the workspace SDK and retains Canvas-only image decode and
+The Vite app imports the local package SDK and retains Canvas-only image decode and
 PNG export. It may display the selected backend but cannot reach internal GPU
 or WASM objects. Existing Playwright tests migrate to public API behavior and
 keep a small number of package-internal worker protocol tests.
@@ -179,15 +180,14 @@ fallback policy.
 
 Extend `.github/workflows/wasm-demo.yml`; it remains the cross-browser browser
 quality gate. After the existing pinned Swift WASM build, CI must install the
-npm workspace dependencies, build `@seemcarving/wasm`, build the demo against
-that workspace package, and run Playwright as today. It also runs an
+the standalone package dependencies, build `@seemcarving/wasm`, build the demo
+against its local `file:` package dependency, and run Playwright as today. It also runs an
 `npm pack --json` smoke test: install the produced tarball into a temporary,
 non-workspace Vite consumer, build it, and run a browser smoke test. This
 proves the published artifact contains its Worker, WASM, JavaScriptKit runtime,
 and declarations rather than accidentally resolving repository sources.
 
-The cache key follows every package lockfile that participates in the workspace,
-not just the demo lockfile. The existing Swift build cache and WASM-boundary
+The cache key follows both the package and demo lockfiles. The existing Swift build cache and WASM-boundary
 check remain required.
 
 ### npm publishing
