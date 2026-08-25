@@ -9,15 +9,17 @@ fallback. WebGL2 is explicitly out of scope for this iteration.
 
 ## Goals
 
-1. Accelerate supported seam-carving shrink operations in the browser with
+1. Publish `@seemcarving/wasm`, a browser SDK that projects can install from
+   the npm registry instead of copying this repository's demo.
+2. Accelerate supported seam-carving shrink operations in the browser with
    WebGPU, without changing the browser page-to-worker request/response API.
-2. Keep all intermediate GPU data on the GPU and read pixels back only once per
+3. Keep all intermediate GPU data on the GPU and read pixels back only once per
    completed job.
-3. Preserve a deterministic, compatible CPU fallback through the current
+4. Preserve a deterministic, compatible CPU fallback through the current
    Swift/WASM `WasmBridgeCore` implementation.
-4. Make actual backend selection observable and testable.
-5. Establish browser tests for GPU selection, fallback, and output parity on
-   small deterministic images.
+5. Make actual backend selection observable and testable.
+6. Establish browser tests for package consumption, GPU selection, fallback,
+   and output parity on small deterministic images.
 
 ## Non-goals
 
@@ -25,6 +27,8 @@ fallback. WebGL2 is explicitly out of scope for this iteration.
 - Changing the root Swift package's platform/dependency boundaries.
 - General browser image I/O, progress reporting, cooperative cancellation, or
   multi-threaded WASM.
+- npm registry credential setup, publishing an actual release, or a CDN build;
+  these occur only after the package and release checks are approved.
 - First-iteration support for enlargement, adaptive dimension order, masks,
   forward energy, or horizontal seams. These use the existing WASM CPU fallback.
 
@@ -41,6 +45,64 @@ existing Swift/WASM worker bridge instead. Both paths return the existing
 This narrow scope isolates the highest-value Metal-like path. Later milestones
 can add GPU transpose for horizontal shrink, masks, forward energy, and full
 2-D order while retaining the same selector interface.
+
+## npm package architecture
+
+### Package topology
+
+The root remains exclusively a Swift Package; it must not gain a root
+`package.json`. Add an npm workspace package at `packages/seam-carving-wasm`
+with published name `@seemcarving/wasm`. `Examples/WasmDemo/web` becomes a
+thin Vite example application that depends on this workspace package using an
+npm workspace reference. This avoids making an experimental demo the public
+library boundary and permits package tests independent of the app.
+
+The package contains:
+
+- `src/index.ts`: public, typed SDK entry point.
+- `src/worker.ts`: Worker protocol host, backend selector, and WebGPU/WASM
+  processor internals.
+- `src/generated/`: build-time copied JavaScriptKit output, including
+  `WasmBridgeWorker.wasm`, `runtime.js`, `instantiate.js`, and browser WASI
+  platform files.
+- `dist/`: ESM JavaScript, declarations, a Worker module entry point, and the
+  generated WASM/runtime assets produced by the package build.
+
+The package build invokes the existing Swift artifact build/copy script before
+bundling. Generated artifacts are build inputs but not hand-authored sources.
+`files` in `package.json` is an explicit allow-list of `dist/**`, README, and
+LICENSE so the module and all runtime assets publish together.
+
+### Public API
+
+The public API has two layers:
+
+```ts
+import { createSeamCarver } from "@seemcarving/wasm";
+
+const carver = await createSeamCarver();
+const result = await carver.resize({ pixels, width, height, targetWidth, targetHeight });
+```
+
+`createSeamCarver()` creates an isolated module Worker through an exported
+`createWorker()` helper. It accepts a bundler-safe Worker factory override for
+environments whose bundler cannot resolve package worker assets automatically.
+`resize()` transfers an `ArrayBuffer` and resolves with tightly packed RGBA8
+pixels, dimensions, and the selected backend (`webgpu` or `wasm-cpu`).
+`terminate()` releases Worker resources. The public package does not expose
+JavaScriptKit globals, raw GPU objects, or internal protocol messages.
+
+An export-map separates the main API and a documented worker entry. ESM is the
+first supported format; no CommonJS build is required for browser-oriented
+modern tooling. `types` points at generated declarations. A `peer` or runtime
+browser requirement is documented rather than polyfilling WebGPU or Worker.
+
+### Demo migration
+
+The Vite app imports the workspace SDK and retains Canvas-only image decode and
+PNG export. It may display the selected backend but cannot reach internal GPU
+or WASM objects. Existing Playwright tests migrate to public API behavior and
+keep a small number of package-internal worker protocol tests.
 
 ## Architecture
 
@@ -103,20 +165,27 @@ silently substitute perceptual comparison.
 
 ## API and observability
 
-The page protocol remains compatible. Add a non-breaking `backend` field to a
-successful worker result (`webgpu` or `wasm-cpu`) and display it in the demo
-status for manual verification. Test-only worker hooks may force WebGPU
-unavailable/unsupported conditions; production code must not expose a user
-switch that bypasses normal fallback policy.
+The package keeps a compatible internal page/worker protocol. Add a
+non-breaking `backend` field to a successful result (`webgpu` or `wasm-cpu`)
+and expose it on the public typed result; display it in the demo for manual
+verification. Test-only worker hooks may force WebGPU unavailable/unsupported
+conditions; production code must not expose a user switch that bypasses normal
+fallback policy.
 
 ## Test and benchmark plan
 
-1. Unit-test eligibility, fallback classification, byte-layout helpers, and
-   output validation in the web test environment.
-2. Browser integration tests: existing WASM path, unavailable WebGPU fallback,
+1. Unit-test package export resolution, eligibility, fallback classification,
+   byte-layout helpers, and output validation in the web test environment.
+2. Run an `npm pack` smoke test that installs the packed tarball in a temporary
+   Vite consumer, verifies type resolution, Worker asset resolution, and WASM
+   loading without workspace source access.
+3. Browser integration tests: existing WASM path, unavailable WebGPU fallback,
    unsupported-request fallback, WebGPU result dimensions/pixels, and no change
    to transferred-buffer ownership.
-3. Add a benchmark page/script that reports end-to-end and GPU-only durations
+4. Add a benchmark page/script that reports end-to-end and GPU-only durations
+    for fixed generated images/seam counts. Compare a warmed WebGPU run against
+    the current Worker/WASM baseline.
+4. Run production Vite build and Playwright Chromium tests; manually check
    for fixed generated images/seam counts. Compare a warmed WebGPU run against
    the current Worker/WASM baseline.
 4. Run production Vite build and Playwright Chromium tests; manually check
@@ -129,15 +198,21 @@ switch that bypasses normal fallback policy.
   fixtures.
 - Unavailable, lost, failed, and unsupported GPU cases successfully use WASM
   without API changes or page hangs.
-- Existing WASM boundary check, web build, and all browser tests pass.
+- The packed `@seemcarving/wasm` tarball works in a clean Vite consumer and
+  contains all WASM/JavaScriptKit assets needed at runtime.
+- Existing WASM boundary check, package build, demo build, and all browser
+  tests pass.
 - Measurements demonstrate an end-to-end benefit for at least one realistic
   large-image/seam-count bucket; if they do not, retain the selector/fallback
   work but do not claim a performance improvement.
 
 ## Rollout order
 
-1. Selector/protocol/observability and tests, preserving WASM behavior.
-2. WebGPU vertical backward-Sobel shrink implementation with CPU parity tests.
-3. Benchmarks and workgroup/buffer tuning.
-4. Only after measured success: horizontal shrink via GPU transpose, then other
+1. Add npm workspace/package structure, stable API, generated artifact staging,
+   and packed-consumer test, preserving current demo behavior.
+2. Move the demo to consume the package and retain existing WASM behavior.
+3. Add selector/protocol/observability and tests.
+4. WebGPU vertical backward-Sobel shrink implementation with CPU parity tests.
+5. Benchmarks and workgroup/buffer tuning.
+6. Only after measured success: horizontal shrink via GPU transpose, then other
    modes. WebGL2 remains a separately approved future project.
