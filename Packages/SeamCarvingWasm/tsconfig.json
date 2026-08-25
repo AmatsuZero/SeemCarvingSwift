@@ -10,5 +10,9 @@
     "target": "ES2022",
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/index.ts",
+    "src/client.ts",
+    "src/protocol.ts"
+  ]
 }

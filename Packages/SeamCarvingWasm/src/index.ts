@@ -1,5 +1,7 @@
+import { WorkerSeamCarver, type CreateSeamCarverOptions } from "./client.js";
 import type { BackendIdentifier } from "./protocol.js";
 
+export type { CreateSeamCarverOptions } from "./client.js";
 export type { BackendIdentifier } from "./protocol.js";
 
 export interface ResizeRequest {
@@ -22,9 +24,8 @@ export interface SeamCarver {
   terminate(): void;
 }
 
-/**
- * Creates a seam carver once the Worker client is installed in the next SDK step.
- */
-export async function createSeamCarver(): Promise<SeamCarver> {
-  throw new Error("Worker client not installed");
+export async function createSeamCarver(options: CreateSeamCarverOptions = {}): Promise<SeamCarver> {
+  return new WorkerSeamCarver(
+    options.worker ?? new Worker(new URL("./worker.js", import.meta.url), { type: "module" }),
+  );
 }

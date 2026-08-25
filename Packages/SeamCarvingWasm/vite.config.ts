@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
 
-const generatedDir = resolve(import.meta.dirname, "src/generated");
+const packageRoot = import.meta.dirname;
+const generatedDir = resolve(packageRoot, "src/generated");
 
 async function generatedRuntimeFiles(directory = generatedDir, relativePath = ""): Promise<string[]> {
   const files: string[] = [];
@@ -19,19 +20,14 @@ async function generatedRuntimeFiles(directory = generatedDir, relativePath = ""
   return files;
 }
 
-/**
- * PackageToJS resolves its runtime modules and WASM file relative to index.js.
- * Keep those files byte-for-byte in dist rather than allowing library mode to
- * inline or rename their URLs. Task 3 replaces the loader export with the SDK
- * Worker implementation.
- */
+/** Keep PackageToJS modules and its WASM binary relative to the SDK worker. */
 function preservePackageToJSRuntime(): Plugin {
   return {
     name: "preserve-package-to-js-runtime",
     async generateBundle() {
       for (const relativePath of await generatedRuntimeFiles()) {
         this.emitFile({
-          fileName: relativePath === "index.js" ? "worker.js" : relativePath,
+          fileName: `generated/${relativePath}`,
           source: await readFile(resolve(generatedDir, relativePath)),
           type: "asset",
         });
@@ -40,16 +36,26 @@ function preservePackageToJSRuntime(): Plugin {
   };
 }
 
+const generatedIndex = "./generated/index.js";
+
 export default defineConfig({
+  base: "./",
   plugins: [preservePackageToJSRuntime()],
   test: {
     passWithNoTests: true,
     exclude: ["tests/package-contents.spec.mjs"],
   },
+  worker: {
+    format: "es",
+    rollupOptions: {
+      external: (id) => id === generatedIndex,
+      output: { entryFileNames: "worker.js" },
+    },
+  },
   build: {
     emptyOutDir: false,
     lib: {
-      entry: resolve(import.meta.dirname, "src/index.ts"),
+      entry: resolve(packageRoot, "src/index.ts"),
       formats: ["es"],
       fileName: () => "index.js",
     },

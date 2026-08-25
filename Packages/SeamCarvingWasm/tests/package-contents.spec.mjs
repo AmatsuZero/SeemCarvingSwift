@@ -9,16 +9,18 @@ const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const expectedFiles = new Set([
   "package/README.md",
   "package/package.json",
+  "package/dist/client.d.ts",
   "package/dist/index.d.ts",
   "package/dist/protocol.d.ts",
   "package/dist/index.js",
   "package/dist/worker.js",
-  "package/dist/WasmBridgeWorker.wasm",
-  "package/dist/instantiate.js",
-  "package/dist/runtime.js",
-  "package/dist/platforms/browser.js",
-  "package/dist/platforms/browser.worker.js",
-  "package/dist/platforms/node.js",
+  "package/dist/generated/WasmBridgeWorker.wasm",
+  "package/dist/generated/index.js",
+  "package/dist/generated/instantiate.js",
+  "package/dist/generated/runtime.js",
+  "package/dist/generated/platforms/browser.js",
+  "package/dist/generated/platforms/browser.worker.js",
+  "package/dist/generated/platforms/node.js",
 ]);
 
 test("packed package contains exactly the public API and PackageToJS runtime", () => {
