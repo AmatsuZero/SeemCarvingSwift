@@ -27,8 +27,9 @@ fallback. WebGL2 is explicitly out of scope for this iteration.
 - Changing the root Swift package's platform/dependency boundaries.
 - General browser image I/O, progress reporting, cooperative cancellation, or
   multi-threaded WASM.
-- npm registry credential setup, publishing an actual release, or a CDN build;
-  these occur only after the package and release checks are approved.
+- Configuring the npm organization/trusted-publisher relationship or publishing
+  an actual release; these are repository-owner operations after workflow merge.
+- A CDN build.
 - First-iteration support for enlargement, adaptive dimension order, masks,
   forward energy, or horizontal seams. These use the existing WASM CPU fallback.
 
@@ -172,6 +173,44 @@ verification. Test-only worker hooks may force WebGPU unavailable/unsupported
 conditions; production code must not expose a user switch that bypasses normal
 fallback policy.
 
+## CI and release automation
+
+### Continuous integration
+
+Extend `.github/workflows/wasm-demo.yml`; it remains the cross-browser browser
+quality gate. After the existing pinned Swift WASM build, CI must install the
+npm workspace dependencies, build `@seemcarving/wasm`, build the demo against
+that workspace package, and run Playwright as today. It also runs an
+`npm pack --json` smoke test: install the produced tarball into a temporary,
+non-workspace Vite consumer, build it, and run a browser smoke test. This
+proves the published artifact contains its Worker, WASM, JavaScriptKit runtime,
+and declarations rather than accidentally resolving repository sources.
+
+The cache key follows every package lockfile that participates in the workspace,
+not just the demo lockfile. The existing Swift build cache and WASM-boundary
+check remain required.
+
+### npm publishing
+
+Add `.github/workflows/publish-npm.yml`, triggered only by tags matching
+`wasm-v*` (for example `wasm-v0.1.0`). It checks out the tag, installs the
+pinned Node version and Swift WASM SDK, rebuilds the generated artifact and
+package from source, runs the packed-consumer verification, validates that the
+tag version and `@seemcarving/wasm` `package.json` version match, and runs
+`npm publish --access public` from the package directory.
+
+Publishing uses npm Trusted Publishing through GitHub Actions OIDC, with only
+`contents: read` and `id-token: write` permissions. It stores no long-lived
+`NPM_TOKEN`. Before first release, the package owner must configure npm's
+trusted-publisher relation for `@seemcarving/wasm`, this repository, and the
+exact `publish-npm.yml` filename. A protected GitHub environment named `npm`
+may add human release approval. Tag-triggered jobs reject prerelease/version
+mismatches and never publish from ordinary branch pushes or pull requests.
+
+The publish workflow uploads the packed tarball and a build manifest as release
+artifacts. Its primary source of provenance is npm's OIDC trusted-publishing
+attestation; it does not use a separate token-derived publish path.
+
 ## Test and benchmark plan
 
 1. Unit-test package export resolution, eligibility, fallback classification,
@@ -214,5 +253,7 @@ fallback policy.
 3. Add selector/protocol/observability and tests.
 4. WebGPU vertical backward-Sobel shrink implementation with CPU parity tests.
 5. Benchmarks and workgroup/buffer tuning.
-6. Only after measured success: horizontal shrink via GPU transpose, then other
+6. Add CI package validation and an OIDC-protected `wasm-v*` npm release
+   workflow.
+7. Only after measured success: horizontal shrink via GPU transpose, then other
    modes. WebGL2 remains a separately approved future project.
