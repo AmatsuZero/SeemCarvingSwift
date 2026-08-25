@@ -15,6 +15,7 @@ type ResizeResult = ResizeSuccessMessage | ResizeFailureMessage;
 class ResizeWorkerClient {
   private worker = createResizeWorker();
   private nextJobId = 1;
+  private lifecycleGeneration = 0;
   private activeJobId: number | undefined;
   private pending:
     | { jobId: number; resolve: (result: ResizeResult) => void; reject: (error: Error) => void }
@@ -39,7 +40,14 @@ class ResizeWorkerClient {
     targetWidth: number,
     targetHeight: number,
   ): Promise<ResizeResult> {
+    const generation = this.lifecycleGeneration;
     return this.readyPromise.then(() => {
+      // A cancel can happen after the page marks the UI running but before
+      // this ready callback posts its request. Reject that stale invocation
+      // instead of starting a job on the replacement worker.
+      if (generation !== this.lifecycleGeneration) {
+        return Promise.reject(new DOMException("Resize cancelled", "AbortError"));
+      }
       if (this.pending) {
         this.cancel();
         return this.resize(pixels, sourceWidth, sourceHeight, targetWidth, targetHeight);
@@ -58,8 +66,13 @@ class ResizeWorkerClient {
   }
 
   cancel(): void {
+    this.lifecycleGeneration += 1;
     const pending = this.pending;
     clearTimeout(this.readyTimeout);
+    // Also settle a resize which is still waiting for the Worker ready event.
+    // Without this, cancelling in the narrow loading window leaves the UI's
+    // await suspended forever and its status at "Cancelling…".
+    this.rejectReady(new DOMException("Resize cancelled", "AbortError"));
     this.worker.terminate();
     this.pending = undefined;
     this.activeJobId = undefined;
