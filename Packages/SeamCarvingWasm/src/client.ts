@@ -6,9 +6,15 @@ import type {
 } from "./protocol.js";
 
 export interface CreateSeamCarverOptions {
-  /** Supply a Worker when embedding or testing the SDK. */
+  /** Supply a Worker directly when testing or embedding the SDK. */
   worker?: Worker;
+  /** Create a Worker through the host application's bundler. */
+  workerFactory?: WorkerFactory;
+  /** Cancel Worker initialization before a carver is exposed. */
+  signal?: AbortSignal;
 }
+
+export type WorkerFactory = () => Worker;
 
 type PendingResize = {
   jobId: number;

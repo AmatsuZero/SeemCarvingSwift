@@ -6,12 +6,22 @@ if (!workerStatus) throw new Error("Missing worker status output");
 
 let client: SeamCarver | undefined;
 let clientGeneration = 0;
-let clientPromise = createClient();
+type ClientHandle = {
+  promise: Promise<SeamCarver>;
+  cancel(): void;
+};
 
-function createClient(): Promise<SeamCarver> {
+let clientHandle = createClient();
+
+function createDemoWorker(): Worker {
+  return new Worker(new URL("@seemcarving/wasm/worker", import.meta.url), { type: "module" });
+}
+
+function createClient(): ClientHandle {
   const generation = ++clientGeneration;
+  const controller = new AbortController();
   workerStatus.textContent = "loading";
-  return createSeamCarver().then(
+  const promise = createSeamCarver({ workerFactory: createDemoWorker, signal: controller.signal }).then(
     (carver) => {
       if (generation !== clientGeneration) {
         carver.terminate();
@@ -26,12 +36,18 @@ function createClient(): Promise<SeamCarver> {
       throw error;
     },
   );
+  return { promise, cancel: () => controller.abort() };
 }
 
-function replaceClient(): void {
+function replaceClient(): Promise<SeamCarver> {
+  const staleHandle = clientHandle;
   client?.terminate();
   client = undefined;
-  clientPromise = createClient();
+  staleHandle.cancel();
+  // A cancelled initialization has no resize handler left to await it.
+  void staleHandle.promise.catch(() => {});
+  clientHandle = createClient();
+  return staleHandle.promise;
 }
 
 declare global {
@@ -40,12 +56,13 @@ declare global {
       pixels: Uint8Array, sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number,
     ) => Promise<ResizeResult>;
     __testTerminateActiveWorker?: () => void;
+    __testCancelInitializingWorker?: () => Promise<string>;
   }
 }
 
 if (import.meta.env.MODE === "test") {
   window.__testResizeRGBA8 = async (pixels, sourceWidth, sourceHeight, targetWidth, targetHeight) =>
-    (await clientPromise).resize({
+    (await clientHandle.promise).resize({
       pixels,
       width: sourceWidth,
       height: sourceHeight,
@@ -53,6 +70,13 @@ if (import.meta.env.MODE === "test") {
       targetHeight,
     });
   window.__testTerminateActiveWorker = () => replaceClient();
+  window.__testCancelInitializingWorker = () => {
+    replaceClient();
+    return replaceClient().then(
+      () => "resolved",
+      (error: unknown) => error instanceof Error ? error.message : String(error),
+    );
+  };
 }
 
 type ImageState = {
@@ -200,7 +224,7 @@ resizeButton.addEventListener("click", async () => {
   setStatus("Resizing image…");
   updateControls();
   try {
-    const response = await (await clientPromise).resize({
+    const response = await (await clientHandle.promise).resize({
       pixels: source.pixels,
       width: source.width,
       height: source.height,

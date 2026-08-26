@@ -33,3 +33,16 @@ test("terminating an active job rejects it and a replacement client can resize",
   );
   expect(replacement).toMatchObject({ backend: "wasm-cpu", width: 1, height: 1 });
 });
+
+test("cancelling an initializing client terminates and rejects its stale creation", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+  await page.goto("/");
+  await expect(page.getByTestId("worker-status")).toHaveText("ready");
+
+  const cancellation = await page.evaluate(() => window.__testCancelInitializingWorker!());
+
+  expect(cancellation).toContain("terminated");
+  await expect(page.getByTestId("worker-status")).toHaveText("ready");
+  expect(pageErrors).toEqual([]);
+});

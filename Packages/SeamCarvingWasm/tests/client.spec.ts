@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createSeamCarver, type ResizeRequest } from "../src/index.js";
+import { describe, expect, it, vi } from "vitest";
+import { createSeamCarver, createWorker, type ResizeRequest } from "../src/index.js";
 import type { WorkerResponseMessage } from "../src/protocol.js";
 
 class FakeWorker {
@@ -65,6 +65,66 @@ async function readyCarver(worker = new FakeWorker()) {
 }
 
 describe("createSeamCarver", () => {
+  it("creates its module Worker through the public package helper", () => {
+    const created: unknown[][] = [];
+    class PackageWorker {
+      constructor(...arguments_: unknown[]) {
+        created.push(arguments_);
+      }
+    }
+    vi.stubGlobal("Worker", PackageWorker);
+
+    try {
+      expect(createWorker()).toBeInstanceOf(PackageWorker);
+      expect(created).toHaveLength(1);
+      expect(created[0]?.[0]).toBeInstanceOf(URL);
+      expect((created[0]?.[0] as URL).pathname).toMatch(/worker\.js$/);
+      expect(created[0]?.[1]).toEqual({ type: "module" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("uses a Worker factory override while retaining direct Worker injection", async () => {
+    const factory = vi.fn(() => new FakeWorker());
+    const creation = createSeamCarver({ workerFactory: factory });
+    const worker = factory.mock.results[0]?.value;
+    expect(worker).toBeInstanceOf(FakeWorker);
+    (worker as FakeWorker).emitReady();
+
+    await expect(creation).resolves.toBeDefined();
+    expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it("terminates and rejects initialization when its abort signal fires", async () => {
+    const worker = new FakeWorker();
+    const controller = new AbortController();
+    const creation = createSeamCarver({
+      workerFactory: () => worker as unknown as Worker,
+      signal: controller.signal,
+    });
+
+    controller.abort();
+
+    await expect(creation).rejects.toThrow("terminated");
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("does not expose a just-ready carver after initialization is aborted", async () => {
+    const worker = new FakeWorker();
+    const controller = new AbortController();
+    const creation = createSeamCarver({
+      worker: worker as unknown as Worker,
+      signal: controller.signal,
+    });
+
+    worker.emitReady();
+    controller.abort();
+
+    await expect(creation).rejects.toThrow("terminated");
+    expect(worker.terminated).toBe(true);
+  });
+
   it("waits for the Worker handshake, transfers a copied buffer, and resolves the result", async () => {
     const { carver, worker } = await readyCarver();
 
