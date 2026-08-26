@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
@@ -83,12 +83,70 @@ test("npm child commands ignore a polluted user configuration", () => {
 
       assert.equal(effectiveUserConfig, isolatedNpm.userConfig);
       assert.notEqual(allowedScripts, "oh-my-codex");
-      assert.equal(ignoresLifecycleScripts, "true");
+      assert.equal(ignoresLifecycleScripts, "false");
     } finally {
       isolatedNpm.cleanup();
     }
   } finally {
     rmSync(pollutedConfigDir, { force: true, recursive: true });
+  }
+});
+
+test("isolated npm runs build hooks but blocks installed tarball lifecycle scripts", () => {
+  const testDirectory = mkdtempSync(join(tmpdir(), "seemcarving-npm-lifecycle-"));
+  const consumerDir = join(testDirectory, "consumer");
+  const packageRoot = join(testDirectory, "package-root");
+  const untrustedPackageDir = join(packageRoot, "package");
+  const packedTarball = join(testDirectory, "untrusted-package.tgz");
+  const buildMarker = join(testDirectory, "build-lifecycle.txt");
+  const installMarker = join(testDirectory, "install-lifecycle.txt");
+  const appendMarker = (phase) =>
+    `node -e \"require('node:fs').appendFileSync(process.env.SEEMCARVING_BUILD_MARKER, '${phase}\\n')\"`;
+
+  mkdirSync(consumerDir);
+  mkdirSync(untrustedPackageDir, { recursive: true });
+  writeFileSync(join(consumerDir, "package.json"), JSON.stringify({
+    name: "isolated-npm-consumer",
+    private: true,
+    scripts: {
+      prebuild: appendMarker("prebuild"),
+      build: appendMarker("build"),
+      postbuild: appendMarker("postbuild"),
+    },
+  }));
+  writeFileSync(join(untrustedPackageDir, "package.json"), JSON.stringify({
+    name: "untrusted-lifecycle-package",
+    version: "1.0.0",
+    scripts: {
+      postinstall: "node -e \"require('node:fs').writeFileSync(process.env.SEEMCARVING_INSTALL_MARKER, 'ran')\"",
+    },
+  }));
+
+  const isolatedNpm = createIsolatedNpmEnvironment();
+  try {
+    execFileSync("tar", ["-czf", packedTarball, "package"], { cwd: packageRoot });
+    execFileSync("npm", ["run", "build"], {
+      cwd: consumerDir,
+      env: {
+        ...isolatedNpm.env,
+        SEEMCARVING_BUILD_MARKER: buildMarker,
+        SEEMCARVING_INSTALL_MARKER: installMarker,
+      },
+    });
+    assert.equal(readFileSync(buildMarker, "utf8"), "prebuild\nbuild\npostbuild\n");
+
+    execFileSync("npm", ["install", "--ignore-scripts", "--no-save", packedTarball], {
+      cwd: consumerDir,
+      env: {
+        ...isolatedNpm.env,
+        SEEMCARVING_BUILD_MARKER: buildMarker,
+        SEEMCARVING_INSTALL_MARKER: installMarker,
+      },
+    });
+    assert.equal(existsSync(installMarker), false);
+  } finally {
+    isolatedNpm.cleanup();
+    rmSync(testDirectory, { force: true, recursive: true });
   }
 });
 
@@ -104,7 +162,7 @@ test("a Vite app runs a packed SDK CPU fallback without repository source import
     isolatedNpm = createIsolatedNpmEnvironment();
     packedTarball = packPackage(isolatedNpm.env);
 
-    execFileSync("npm", ["install", "--no-save", packedTarball], {
+    execFileSync("npm", ["install", "--ignore-scripts", "--no-save", packedTarball], {
       cwd: consumerDir,
       env: isolatedNpm.env,
       stdio: "inherit",
