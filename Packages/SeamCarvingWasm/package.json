@@ -18,7 +18,7 @@
     "stage-wasm": "node scripts/stage-wasm.mjs",
     "build": "npm run stage-wasm && rm -rf dist && tsc --emitDeclarationOnly && vite build",
     "test:unit": "vitest run",
-    "test:pack": "node --test tests/package-contents.spec.mjs"
+    "test:pack": "node --test tests/package-contents.spec.mjs tests/packed-consumer.spec.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

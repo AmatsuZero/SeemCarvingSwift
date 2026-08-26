@@ -1,13 +1,15 @@
 # Experimental browser WASM demo
 
-This is an **experimental**, static browser demo, not general WebAssembly
-platform support. It runs the CPU-only `SeamCarvingCore` path locally in a
-browser Worker. Source images and results stay in browser memory: the demo has
-no server endpoints and never uploads or persists image bytes.
+This is an **experimental static browser app**, not the published SDK. The app
+consumes [`@seemcarving/wasm`](../../Packages/SeamCarvingWasm), whose public
+`createSeamCarver()` API owns the browser module Worker and the generated Swift
+WASM runtime. Source images and results stay in browser memory: the demo has no
+server endpoints and never uploads or persists image bytes.
 
 The demo does **not** add a portable image-I/O library, CLI, or application
-support. Browser Canvas owns PNG/JPEG decode and PNG export; the isolated Swift
-package only resizes compact RGBA8 pixels.
+support. Browser Canvas owns PNG/JPEG decode and PNG export; the SDK accepts
+only compact RGBA8 pixels. See the package README for its browser ESM, Worker,
+WebGPU-first/WASM-CPU-fallback, and cancellation contract.
 
 ## Prerequisites
 
@@ -76,9 +78,11 @@ backend configuration, image upload endpoint, or persistent storage required.
 - Estimated seam work is limited to **80,000,000 pixel-visits**:
   `(abs(sourceWidth - targetWidth) * sourceHeight) +
   (abs(sourceHeight - targetHeight) * targetWidth)`.
-- Processing is single-threaded and CPU-only inside a module Worker.
-- Cancel terminates and recreates that Worker; it is not cooperative in-algorithm
-  cancellation. No live progress is reported.
+- A supported vertical shrink uses WebGPU when available; all other requests,
+  and every unavailable or failed GPU attempt, use the Swift/WASM CPU fallback.
+  There is no WebGL2 implementation.
+- Cancel terminates and recreates the SDK Worker; it is not cooperative
+  in-algorithm cancellation. No live progress is reported.
 - Pixels are tightly packed, top-left-origin, sRGB, straight-alpha RGBA8. Canvas
   performs decode and PNG export.
 
@@ -92,7 +96,8 @@ swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js --produc
 ```
 
 Its generated tree is copied unchanged by `scripts/build-swift.sh` from
-`.build/plugins/PackageToJS/outputs/Package/` into `web/src/generated/`:
+`.build/plugins/PackageToJS/outputs/Package/` into the staged
+`Packages/SeamCarvingWasm/src/generated/` tree before the package build:
 
 ```text
 Package/
@@ -106,9 +111,9 @@ Package/
     └── node.js
 ```
 
-`index.js` exports `init`, which the Vite module Worker invokes with `await
-init()`. The generated JavaScriptKit runtime and browser-side WASI shim must
-remain together with the `.wasm` file.
+The package preserves these generated files next to its Worker in `dist/`. The
+demo Vite configuration copies them beside the emitted SDK Worker, so the
+PackageToJS relative imports and WASM URL remain valid.
 
 ## Boundary check
 
