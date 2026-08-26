@@ -164,12 +164,17 @@ export class WebGPUProcessor {
         [currentImage, nextImage] = [nextImage, currentImage];
       }
       encoder.copyBufferToBuffer(currentImage, 0, readback, 0, targetBytes);
+      // Race both post-submit waits with loss. A lost device must not leave the
+      // Worker waiting on an implementation-specific validation or map promise.
+      const deviceLost = device.lost.then(() => {
+        throw new Error("WebGPU device was lost before final readback");
+      });
       device.queue.submit([encoder.finish()]);
-      const validationError = await device.popErrorScope();
+      const validationError = await Promise.race([device.popErrorScope(), deviceLost]);
       if (validationError) throw new Error(`WebGPU validation failed: ${String(validationError)}`);
 
       // Mapping happens once, after all seam passes and the final device copy.
-      await readback.mapAsync(mapRead());
+      await Promise.race([readback.mapAsync(mapRead()), deviceLost]);
       const pixels = readback.getMappedRange().slice(0);
       readback.unmap();
       return {

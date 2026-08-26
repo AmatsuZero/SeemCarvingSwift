@@ -249,3 +249,72 @@ describe("WebGPU multi-seam encoding", () => {
     }
   });
 });
+
+describe("ResizeSelector concrete WebGPU device loss", () => {
+  it("uses CPU without a WebGPU success when device loss interrupts final mapping, then reinitializes", async () => {
+    vi.stubGlobal("GPUBufferUsage", {
+      MAP_READ: 1,
+      COPY_SRC: 2,
+      COPY_DST: 4,
+      STORAGE: 8,
+      UNIFORM: 16,
+    });
+    vi.stubGlobal("GPUMapMode", { READ: 1 });
+    try {
+      let resolveLost!: () => void;
+      const lost = new Promise<void>((resolve) => { resolveLost = resolve; });
+      const pass = { setPipeline: vi.fn(), setBindGroup: vi.fn(), dispatchWorkgroups: vi.fn(), end: vi.fn() };
+      const encoder = {
+        beginComputePass: vi.fn(() => pass),
+        copyBufferToBuffer: vi.fn(),
+        finish: vi.fn(() => ({})),
+      };
+      const pipeline = { getBindGroupLayout: vi.fn(() => ({})) };
+      const first = new WebGPUProcessor();
+      first.device = {
+        queue: { writeBuffer: vi.fn(), submit: vi.fn() },
+        lost,
+        createBuffer: vi.fn(({ size, usage }: { size: number; usage: number }) => ({
+          mapAsync: usage & 1
+            ? vi.fn(() => {
+              resolveLost();
+              return new Promise<void>(() => {});
+            })
+            : vi.fn(async () => {}),
+          getMappedRange: vi.fn(() => new ArrayBuffer(size)),
+          unmap: vi.fn(),
+          destroy: vi.fn(),
+        })),
+        createShaderModule: vi.fn(() => ({})),
+        createComputePipelineAsync: vi.fn(async () => pipeline),
+        pushErrorScope: vi.fn(),
+        popErrorScope: vi.fn(async () => null),
+        createBindGroup: vi.fn(() => ({})),
+        createCommandEncoder: vi.fn(() => encoder),
+      } as never;
+      const second: GPUProcessor = {
+        initialize: vi.fn(async () => {}),
+        resize: vi.fn(async (value: ResizeRequestMessage) => success(value, "webgpu")),
+      };
+      const createGPUProcessor = vi.fn()
+        .mockReturnValueOnce(first)
+        .mockReturnValueOnce(second);
+      const wasm = cpu();
+      const selector = new ResizeSelector(wasm, createGPUProcessor, () => ({ gpu: {} }));
+      const value = request(3, 2, 2, 2);
+
+      await expect(Promise.race([
+        selector.resize(value),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("device loss did not stop WebGPU mapping")), 100)),
+      ])).resolves.toMatchObject({ backend: "wasm-cpu" });
+      expect(wasm.resize).toHaveBeenCalledTimes(1);
+      expect(wasm.resize).toHaveBeenCalledWith(value);
+
+      await expect(selector.resize({ ...value, jobId: 2 })).resolves.toMatchObject({ backend: "webgpu" });
+      expect(createGPUProcessor).toHaveBeenCalledTimes(2);
+      expect(second.initialize).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

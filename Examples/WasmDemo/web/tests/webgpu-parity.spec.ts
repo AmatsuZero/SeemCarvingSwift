@@ -86,7 +86,13 @@ test("WebGPU removes backward-Sobel seams with exact WASM CPU parity", async ({ 
   try {
     await Promise.all([cpuPage.goto("/"), gpuPage.goto("/")]);
     const webGPUSupported = await gpuPage.evaluate(() => navigator.gpu !== undefined);
-    test.skip(!webGPUSupported, "navigator.gpu is unavailable in this Chromium browser");
+    if (process.env.CI) {
+      // The required Chromium CI gate must prove the GPU path, not silently
+      // pass after a skip caused by a browser/runtime regression.
+      expect(webGPUSupported).toBe(true);
+    } else {
+      test.skip(!webGPUSupported, "navigator.gpu is unavailable in this Chromium browser");
+    }
 
     for (const fixture of fixtures) {
       const cpu = await cpuPage.evaluate(({ pixels, width, height, targetWidth }) =>
