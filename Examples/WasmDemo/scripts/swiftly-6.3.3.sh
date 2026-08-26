@@ -26,8 +26,17 @@ fi
 [[ -x "${swiftly_bin}" ]] ||
   fail "Swiftly executable not found: ${swiftly_bin}. Set SWIFTLY_BIN to an executable Swiftly binary."
 
+swiftly_selector_parsing_disabled=0
 for argument in "$@"; do
-  if [[ "${argument}" == +* ]]; then
+  if [[ "${swiftly_selector_parsing_disabled}" -eq 1 ]]; then
+    continue
+  fi
+
+  if [[ "${argument}" == '++' ]]; then
+    swiftly_selector_parsing_disabled=1
+  elif [[ "${argument}" == ++* ]]; then
+    :
+  elif [[ "${argument}" == +* ]]; then
     fail "WASM Swift toolchain mismatch: required selector is ${required_selector}; received ${argument}."
   fi
 done
@@ -40,4 +49,4 @@ if ! grep -Eq "^Swift ${required_toolchain//./\\.}([[:space:]]|$)" <<< "${instal
   fail "Required Swiftly toolchain ${required_toolchain} is not installed. Run: ${swiftly_bin} install ${required_toolchain}"
 fi
 
-exec "${swiftly_bin}" run "$@" "${required_selector}"
+exec "${swiftly_bin}" run "$1" "${required_selector}" "${@:2}"

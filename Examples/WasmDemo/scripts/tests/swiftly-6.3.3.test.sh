@@ -25,6 +25,32 @@ if [[ "$1" == "list" ]]; then
 fi
 
 printf '%s\n' "$@" > "${SWIFTLY_INVOCATION_LOG}"
+
+[[ "$1" == 'run' ]] || exit 0
+shift
+command="$1"
+shift
+selector_processing_enabled=1
+selected_toolchain=''
+forwarded_argv=("${command}")
+for argument in "$@"; do
+  if [[ "${selector_processing_enabled}" -eq 0 ]]; then
+    forwarded_argv+=("${argument}")
+  elif [[ "${argument}" == '++' ]]; then
+    selector_processing_enabled=0
+  elif [[ "${argument}" == ++* ]]; then
+    forwarded_argv+=("${argument:1}")
+  elif [[ "${argument}" == +* ]]; then
+    selected_toolchain="${argument}"
+  else
+    forwarded_argv+=("${argument}")
+  fi
+done
+
+[[ -z "${SWIFTLY_SELECTED_TOOLCHAIN_LOG:-}" ]] ||
+  print -r -- "${selected_toolchain}" > "${SWIFTLY_SELECTED_TOOLCHAIN_LOG}"
+[[ -z "${SWIFTLY_FORWARDED_ARGV_LOG:-}" ]] ||
+  printf '%s\n' "${forwarded_argv[@]}" > "${SWIFTLY_FORWARDED_ARGV_LOG}"
 FAKE_SWIFTLY
 chmod +x "${fake_swiftly}"
 
@@ -32,10 +58,30 @@ SWIFTLY_BIN="${fake_swiftly}" \
 SWIFTLY_INVOCATION_LOG="${invocation_log}" \
   "${wrapper}" swift package describe
 
-expected_invocation=$'run\nswift\npackage\ndescribe\n+6.3.3'
+expected_invocation=$'run\nswift\n+6.3.3\npackage\ndescribe'
 actual_invocation="$(<"${invocation_log}")"
 [[ "${actual_invocation}" == "${expected_invocation}" ]] ||
   fail "expected Swiftly invocation ${expected_invocation@q}, got ${actual_invocation@q}"
+
+escaped_invocation_log="${temporary_dir}/escaped-invocation.log"
+escaped_selected_toolchain_log="${temporary_dir}/escaped-selected-toolchain.log"
+escaped_forwarded_argv_log="${temporary_dir}/escaped-forwarded-argv.log"
+SWIFTLY_BIN="${fake_swiftly}" \
+SWIFTLY_INVOCATION_LOG="${escaped_invocation_log}" \
+SWIFTLY_SELECTED_TOOLCHAIN_LOG="${escaped_selected_toolchain_log}" \
+SWIFTLY_FORWARDED_ARGV_LOG="${escaped_forwarded_argv_log}" \
+  "${wrapper}" swift package describe ++literal ++ +literal
+
+expected_escaped_invocation=$'run\nswift\n+6.3.3\npackage\ndescribe\n++literal\n++\n+literal'
+actual_escaped_invocation="$(<"${escaped_invocation_log}")"
+[[ "${actual_escaped_invocation}" == "${expected_escaped_invocation}" ]] ||
+  fail "expected escaped invocation ${expected_escaped_invocation@q}, got ${actual_escaped_invocation@q}"
+[[ "$(<"${escaped_selected_toolchain_log}")" == '+6.3.3' ]] ||
+  fail 'escaped literal arguments replaced the required Swiftly toolchain selector'
+expected_forwarded_argv=$'swift\npackage\ndescribe\n+literal\n+literal'
+actual_forwarded_argv="$(<"${escaped_forwarded_argv_log}")"
+[[ "${actual_forwarded_argv}" == "${expected_forwarded_argv}" ]] ||
+  fail "expected escaped literals to reach Swift as ${expected_forwarded_argv@q}, got ${actual_forwarded_argv@q}"
 
 missing_toolchain_output="${temporary_dir}/missing-toolchain.out"
 if SWIFTLY_BIN="${fake_swiftly}" \
