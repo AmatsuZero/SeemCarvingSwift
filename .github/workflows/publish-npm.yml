@@ -15,9 +15,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: swift-actions/setup-swift@v3
+      - uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3
         with:
           swift-version: '6.3.3'
 
@@ -27,13 +27,9 @@ jobs:
             --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
           swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.11.1'
-          cache: npm
-          cache-dependency-path: |
-            Examples/WasmDemo/web/package-lock.json
-            Packages/SeamCarvingWasm/package-lock.json
 
       - name: Pin npm with Trusted Publishing support
         run: |
@@ -45,17 +41,6 @@ jobs:
             throw new Error(`npm 11.5.1 or newer is required; found ${major}.${minor}.${patch}`);
           }
           NODE
-
-      - name: Cache Swift package artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            Examples/WasmDemo/swift/.build
-            ~/.swiftpm/cache
-            ~/.cache/swiftly
-          key: ${{ runner.os }}-wasm-publish-swift-${{ hashFiles('Examples/WasmDemo/swift/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-wasm-publish-swift-
 
       - name: Enforce WASM import boundaries
         run: bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh
@@ -121,7 +106,7 @@ jobs:
           NODE
 
       - name: Upload package and release manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wasm-npm-package-${{ github.ref_name }}
           path: |
@@ -130,5 +115,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish public package through npm OIDC
+        # Prerequisite: the package owner configures npm Trusted Publishing for
+        # this repository and the wasm-v* tag workflow in npm's settings.
         working-directory: Packages/SeamCarvingWasm
         run: npm publish --access public

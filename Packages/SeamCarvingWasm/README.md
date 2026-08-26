@@ -1,6 +1,6 @@
 # @seemcarving/wasm
 
-Browser ESM SDK for [SeamCarvingSwift](https://github.com/samzhangjy/SeamCarvingSwift).
+Browser ESM SDK for [SeamCarvingSwift](https://github.com/AmatsuZero/SeemCarvingSwift).
 It performs seam-carving on tightly packed RGBA8 image data in a module Worker.
 
 ## Install and use
@@ -54,14 +54,25 @@ The command writes one JSON record per generated input/target/backend. Each
 record includes the selected backend, input and target dimensions, warmup and
 iteration counts, raw end-to-end resize samples, and nearest-rank p50/p95
 milliseconds. It uses a normal Chromium launch for the WebGPU record and a
-separate `--disable-webgpu` launch for the WASM CPU record; it fails rather than
-mislabeling a CPU fallback as WebGPU when WebGPU is unavailable.
+separate `--disable-gpu --disable-software-rasterizer` launch for the WASM CPU
+record; it fails rather than mislabeling a CPU fallback as WebGPU when WebGPU
+is unavailable. A missing WebGPU capability is reported after the CPU record,
+so it does not discard the CPU measurement.
 
 These are end-to-end SDK request timings after Worker initialization (including
 the input copy, Worker messaging, processing, and output transfer), not a claim
 that either backend is faster. Do not make a performance-improvement claim until
 the same fixed matrix has completed in physical browsers with the recorded JSON
 evidence.
+
+## Publishing prerequisites
+
+The repository/package owner must configure npm Trusted Publishing for
+`@seemcarving/wasm` and this repository's `wasm-v*` tag workflow before the
+first release. That npm-side association is an external owner action; this
+repository deliberately does not attempt to create it and does not use an npm
+automation token. Once it exists, the tag-only workflow validates the tag and
+package version before publishing with GitHub OIDC.
 
 ## Input, limits, and lifecycle
 

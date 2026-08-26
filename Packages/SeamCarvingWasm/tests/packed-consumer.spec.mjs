@@ -103,7 +103,7 @@ test("a Vite app runs a packed SDK CPU fallback without repository source import
 
     const requireFromConsumer = createRequire(join(consumerDir, "package.json"));
     const { chromium } = requireFromConsumer("playwright");
-    browser = await chromium.launch({ args: ["--disable-webgpu"] });
+    browser = await chromium.launch({ args: ["--disable-gpu", "--disable-software-rasterizer"] });
     const page = await browser.newPage();
     await page.goto(previewURL);
     await page.locator("#result[data-status='complete'][data-backend='wasm-cpu']").waitFor();

@@ -175,7 +175,9 @@ async function measureBackend(
   warmup: number,
   iterations: number,
 ): Promise<BrowserBenchmarkResult> {
-  const browser = await chromium.launch(backend === "wasm-cpu" ? { args: ["--disable-webgpu"] } : {});
+  const browser = await chromium.launch(
+    backend === "wasm-cpu" ? { args: ["--disable-gpu", "--disable-software-rasterizer"] } : {},
+  );
   try {
     const browserPage = await browser.newPage();
     await browserPage.goto(url, { waitUntil: "networkidle" });
@@ -200,10 +202,20 @@ async function main(): Promise<void> {
   }
   const server = await startServer();
   try {
+    const unavailableWebGPU: Error[] = [];
     for (const [index, input] of options.inputs.entries()) {
       const target = options.targets[index];
       for (const backend of ["webgpu", "wasm-cpu"] as const) {
-        const result = await measureBackend(server.url, backend, input, target, options.warmup, options.iterations);
+        let result: BrowserBenchmarkResult;
+        try {
+          result = await measureBackend(server.url, backend, input, target, options.warmup, options.iterations);
+        } catch (error) {
+          if (backend === "webgpu") {
+            unavailableWebGPU.push(error instanceof Error ? error : new Error(String(error)));
+            continue;
+          }
+          throw error;
+        }
         const record: BenchmarkRecord = {
           backend: result.backend,
           input,
@@ -216,6 +228,9 @@ async function main(): Promise<void> {
         };
         process.stdout.write(`${JSON.stringify(record)}\n`);
       }
+    }
+    if (unavailableWebGPU.length > 0) {
+      throw new AggregateError(unavailableWebGPU, "WebGPU was unavailable; WASM CPU benchmark records were still emitted");
     }
   } finally {
     await server.close();
