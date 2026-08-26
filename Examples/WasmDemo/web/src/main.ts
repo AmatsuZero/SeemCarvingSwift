@@ -1,142 +1,54 @@
 import "./styles.css";
-import {
-  type ResizeFailureMessage,
-  type ResizeRequestMessage,
-  type ResizeSuccessMessage,
-  type WorkerResponseMessage,
-} from "./protocol";
+import { createSeamCarver, type ResizeResult, type SeamCarver } from "@seemcarving/wasm";
 
-export function createResizeWorker(): Worker {
-  return new Worker(new URL("./resize.worker.ts", import.meta.url), { type: "module" });
+const workerStatus = document.querySelector<HTMLOutputElement>("[data-testid=worker-status]");
+if (!workerStatus) throw new Error("Missing worker status output");
+
+let client: SeamCarver | undefined;
+let clientGeneration = 0;
+type ClientHandle = {
+  promise: Promise<SeamCarver>;
+  cancel(): void;
+};
+
+let clientHandle = createClient();
+
+function createDemoWorker(): Worker {
+  return new Worker(new URL("@seemcarving/wasm/worker", import.meta.url), { type: "module" });
 }
 
-type ResizeResult = ResizeSuccessMessage | ResizeFailureMessage;
-
-class ResizeWorkerClient {
-  private worker = createResizeWorker();
-  private nextJobId = 1;
-  private lifecycleGeneration = 0;
-  private cancelling = false;
-  private activeJobId: number | undefined;
-  private pending:
-    | { jobId: number; resolve: (result: ResizeResult) => void; reject: (error: Error) => void }
-    | undefined;
-  private readyPromise: Promise<void>;
-  private resolveReady!: () => void;
-  private rejectReady!: (error: Error) => void;
-  private readyTimeout: ReturnType<typeof setTimeout> | undefined;
-
-  constructor(private readonly onStatus: (status: "loading" | "ready" | "error") => void) {
-    this.readyPromise = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve;
-      this.rejectReady = reject;
-    });
-    this.installWorkerHandlers();
-  }
-
-  resize(
-    pixels: Uint8Array,
-    sourceWidth: number,
-    sourceHeight: number,
-    targetWidth: number,
-    targetHeight: number,
-  ): Promise<ResizeResult> {
-    const generation = this.lifecycleGeneration;
-    return this.readyPromise.then(() => {
-      // A cancel can happen after the page marks the UI running but before
-      // this ready callback posts its request. Reject that stale invocation
-      // instead of starting a job on the replacement worker.
-      if (generation !== this.lifecycleGeneration) {
-        return Promise.reject(new DOMException("Resize cancelled", "AbortError"));
+function createClient(): ClientHandle {
+  const generation = ++clientGeneration;
+  const controller = new AbortController();
+  workerStatus.textContent = "loading";
+  const promise = createSeamCarver({ workerFactory: createDemoWorker, signal: controller.signal }).then(
+    (carver) => {
+      if (generation !== clientGeneration) {
+        carver.terminate();
+        throw new Error("Seam carver has been terminated");
       }
-      if (this.pending) {
-        this.cancel();
-        return this.resize(pixels, sourceWidth, sourceHeight, targetWidth, targetHeight);
-      }
-      const jobId = this.nextJobId++;
-      this.activeJobId = jobId;
-      const buffer = pixels.buffer.slice(pixels.byteOffset, pixels.byteOffset + pixels.byteLength) as ArrayBuffer;
-      const message: ResizeRequestMessage = {
-        type: "resize", jobId, pixels: buffer, sourceWidth, sourceHeight, targetWidth, targetHeight,
-      };
-      return new Promise<ResizeResult>((resolve, reject) => {
-        this.pending = { jobId, resolve, reject };
-        this.worker.postMessage(message, [buffer]);
-      });
-    });
-  }
-
-  cancel(): void {
-    if (this.cancelling) return;
-    this.cancelling = true;
-    this.lifecycleGeneration += 1;
-    const pending = this.pending;
-    clearTimeout(this.readyTimeout);
-    // Also settle a resize which is still waiting for the Worker ready event.
-    // Without this, cancelling in the narrow loading window leaves the UI's
-    // await suspended forever and its status at "Cancelling…".
-    this.rejectReady(new DOMException("Resize cancelled", "AbortError"));
-    this.worker.terminate();
-    this.pending = undefined;
-    this.activeJobId = undefined;
-    pending?.reject(new DOMException("Resize cancelled", "AbortError"));
-    this.worker = createResizeWorker();
-    this.resetReady();
-    this.installWorkerHandlers();
-  }
-
-  private resetReady(): void {
-    this.onStatus("loading");
-    this.readyPromise = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve;
-      this.rejectReady = reject;
-    });
-  }
-
-  private installWorkerHandlers(): void {
-    this.readyTimeout = setTimeout(() => this.failInitialization(), 10_000);
-    const installedWorker = this.worker;
-    this.worker.onmessage = ({ data }: MessageEvent<WorkerResponseMessage>) => {
-      if (this.worker === installedWorker) this.handleMessage(data);
-    };
-    this.worker.onerror = () => {
-      if (this.worker === installedWorker) this.failInitialization();
-    };
-  }
-
-  private handleMessage(data: WorkerResponseMessage): void {
-    if (data.type === "ready") {
-      clearTimeout(this.readyTimeout);
-      this.cancelling = false;
-      this.onStatus("ready");
-      this.resolveReady();
-      return;
-    }
-    // A terminated worker can still have an already-queued message. Only the
-    // currently active job is allowed to settle the current promise.
-    if (data.jobId !== this.activeJobId || !this.pending || data.jobId !== this.pending.jobId) return;
-    const pending = this.pending;
-    this.pending = undefined;
-    this.activeJobId = undefined;
-    pending.resolve(data);
-  }
-
-  injectStaleResponseForTest(): void {
-    this.handleMessage({ type: "success", jobId: 1, width: 1, height: 1, pixels: new ArrayBuffer(4) });
-  }
-
-  private failInitialization(): void {
-    clearTimeout(this.readyTimeout);
-    this.cancelling = false;
-    console.error("WASM worker initialization failed");
-    this.onStatus("error");
-    this.rejectReady(new Error("WASM worker initialization failed"));
-  }
+      client = carver;
+      workerStatus.textContent = "ready";
+      return carver;
+    },
+    (error: unknown) => {
+      if (generation === clientGeneration) workerStatus.textContent = "error";
+      throw error;
+    },
+  );
+  return { promise, cancel: () => controller.abort() };
 }
 
-const status = document.querySelector<HTMLOutputElement>("[data-testid=worker-status]");
-if (!status) throw new Error("Missing worker status output");
-const client = new ResizeWorkerClient((value) => { status.textContent = value; });
+function replaceClient(): Promise<SeamCarver> {
+  const staleHandle = clientHandle;
+  client?.terminate();
+  client = undefined;
+  staleHandle.cancel();
+  // A cancelled initialization has no resize handler left to await it.
+  void staleHandle.promise.catch(() => {});
+  clientHandle = createClient();
+  return staleHandle.promise;
+}
 
 declare global {
   interface Window {
@@ -144,17 +56,28 @@ declare global {
       pixels: Uint8Array, sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number,
     ) => Promise<ResizeResult>;
     __testTerminateActiveWorker?: () => void;
-    __testInjectStaleResponse?: () => void;
+    __testCancelInitializingWorker?: () => Promise<string>;
   }
 }
 
 if (import.meta.env.MODE === "test") {
-  window.__testResizeRGBA8 = (pixels, sourceWidth, sourceHeight, targetWidth, targetHeight) =>
-    client.resize(pixels, sourceWidth, sourceHeight, targetWidth, targetHeight);
-  window.__testTerminateActiveWorker = () => client.cancel();
-  window.__testInjectStaleResponse = () => client.injectStaleResponseForTest();
+  window.__testResizeRGBA8 = async (pixels, sourceWidth, sourceHeight, targetWidth, targetHeight) =>
+    (await clientHandle.promise).resize({
+      pixels,
+      width: sourceWidth,
+      height: sourceHeight,
+      targetWidth,
+      targetHeight,
+    });
+  window.__testTerminateActiveWorker = () => replaceClient();
+  window.__testCancelInitializingWorker = () => {
+    replaceClient();
+    return replaceClient().then(
+      () => "resolved",
+      (error: unknown) => error instanceof Error ? error.message : String(error),
+    );
+  };
 }
-
 
 type ImageState = {
   pixels: Uint8ClampedArray;
@@ -301,8 +224,13 @@ resizeButton.addEventListener("click", async () => {
   setStatus("Resizing image…");
   updateControls();
   try {
-    const response = await client.resize(source.pixels, source.width, source.height, width, height);
-    if (response.type === "failure") throw new Error(response.message);
+    const response = await (await clientHandle.promise).resize({
+      pixels: source.pixels,
+      width: source.width,
+      height: source.height,
+      targetWidth: width,
+      targetHeight: height,
+    });
     const pixels = new Uint8ClampedArray(response.pixels);
     const expectedLength = response.width * response.height * 4;
     if (pixels.length !== expectedLength) throw new Error("WASM worker returned invalid pixel data.");
@@ -311,9 +239,9 @@ resizeButton.addEventListener("click", async () => {
     resultContext.putImageData(new ImageData(pixels, response.width, response.height), 0, 0);
     result = { pixels, width: response.width, height: response.height };
     resultDimensions.textContent = `${response.width} × ${response.height}`;
-    setStatus("Resize complete. Download the PNG when ready.");
+    setStatus(`Resize complete with ${response.backend}. Download the PNG when ready.`);
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (error instanceof Error && error.message.includes("terminated")) {
       setStatus("Resize cancelled.");
     } else {
       console.error("WASM resize failed", error);
@@ -327,12 +255,9 @@ resizeButton.addEventListener("click", async () => {
 
 cancelButton.addEventListener("click", () => {
   if (!isRunning) return;
-  client.cancel();
-  // Disable synchronously as well as through the eventual AbortError handler,
-  // so a rapid second activation cannot cancel the replacement Worker.
+  replaceClient();
+  // Keep the UI disabled until the terminated request settles in its resize handler.
   updateControls();
-  // The client rejects the pending promise synchronously; keep the UI disabled
-  // until its resize handler observes that rejection and installs the new worker.
   setStatus("Cancelling resize…");
 });
 

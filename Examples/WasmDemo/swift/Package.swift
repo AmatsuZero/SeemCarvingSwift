@@ -8,14 +8,14 @@ let package = Package(
         .executable(name: "WasmBridgeWorker", targets: ["WasmBridgeWorker"]),
     ],
     dependencies: [
-        .package(path: "../../.."),
+        .package(name: "SeamCarvingSwift", path: "../../.."),
         .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.56.1"),
     ],
     targets: [
         .target(
             name: "WasmBridgeCore",
             dependencies: [
-                .product(name: "SeamCarvingCore", package: "wasm-browser-demo"),
+                .product(name: "SeamCarvingCore", package: "SeamCarvingSwift"),
             ]
         ),
         .testTarget(name: "WasmBridgeCoreTests", dependencies: ["WasmBridgeCore"]),

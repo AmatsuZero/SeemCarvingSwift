@@ -16,21 +16,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: '6.3.3'
+      - name: Install pinned Swiftly toolchain
+        run: |
+          brew install swiftly
+          swiftly init --skip-install --assume-yes --no-modify-profile
+          swiftly install 6.3.3
+          Examples/WasmDemo/scripts/swiftly-6.3.3.sh swift --version | grep -F 'Swift version 6.3.3'
 
       - name: Install pinned WebAssembly SDK
         run: |
-          swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
+          Examples/WasmDemo/scripts/swiftly-6.3.3.sh swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
             --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
-          swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
+          Examples/WasmDemo/scripts/swiftly-6.3.3.sh swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24.11.1'
           cache: npm
-          cache-dependency-path: Examples/WasmDemo/web/package-lock.json
+          cache-dependency-path: |
+            Examples/WasmDemo/web/package-lock.json
+            Packages/SeamCarvingWasm/package-lock.json
 
       - name: Cache Swift package artifacts
         uses: actions/cache@v4
@@ -46,9 +51,28 @@ jobs:
       - name: Enforce WASM import boundaries
         run: bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh
 
+      - name: Test pinned Swiftly wrapper
+        run: zsh Examples/WasmDemo/scripts/tests/swiftly-6.3.3.test.sh
+
       - name: Build browser WASM artifact
         working-directory: Examples/WasmDemo
         run: scripts/build-swift.sh
+
+      # Rebuild the publishable SDK from the PackageToJS runtime staged above.
+      # The browser gate below therefore exercises the real Swift/WASM worker,
+      # not an ignored fixture or a stale local dist directory.
+      - name: Install WASM SDK build dependencies
+        working-directory: Packages/SeamCarvingWasm
+        run: npm ci
+
+      - name: Build staged WASM SDK
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run build
+
+      - name: Run WASM SDK unit tests
+        if: matrix.browser == 'chromium'
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run test:unit
 
       - name: Install Node dependencies
         working-directory: Examples/WasmDemo/web
@@ -58,13 +82,30 @@ jobs:
         working-directory: Examples/WasmDemo/web
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
+      - name: Verify packed SDK contents
+        if: matrix.browser == 'chromium'
+        working-directory: Packages/SeamCarvingWasm
+        run: node --test tests/package-contents.spec.mjs
+
+      - name: Verify packed Vite SDK consumer
+        if: matrix.browser == 'chromium'
+        working-directory: Packages/SeamCarvingWasm
+        run: node --test tests/packed-consumer.spec.mjs
+
       - name: Build static site
         working-directory: Examples/WasmDemo/web
         run: npm run build
 
+      # This is intentionally a required, separate Chromium step. Do not add
+      # continue-on-error: a real multi-seam WebGPU/CPU pixel mismatch blocks CI.
+      - name: Required WebGPU multi-seam CPU parity gate
+        if: matrix.browser == 'chromium'
+        working-directory: Examples/WasmDemo/web
+        run: npx playwright test tests/webgpu-parity.spec.ts --project=chromium
+
       - name: Run static-host browser tests
         working-directory: Examples/WasmDemo/web
-        run: npx playwright test --project=${{ matrix.browser }}
+        run: npx playwright test --project=${{ matrix.browser }} --grep-invert 'WebGPU removes backward-Sobel seams with exact WASM CPU parity'
 
       - name: Upload Playwright report
         if: failure()

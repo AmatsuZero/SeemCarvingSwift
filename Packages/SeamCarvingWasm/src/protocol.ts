@@ -1,4 +1,7 @@
-/** Messages sent from the page to the isolated Swift/WASM worker. */
+/** The implementation selected for a resize operation. */
+export type BackendIdentifier = "wasm-cpu" | "webgpu";
+
+/** Message sent from the SDK client to its isolated worker. */
 export interface ResizeRequestMessage {
   type: "resize";
   jobId: number;
@@ -11,15 +14,22 @@ export interface ResizeRequestMessage {
 
 export interface WorkerReadyMessage {
   type: "ready";
-  jobId: number;
+  /** Distinguishes the TypeScript dispatcher handshake from Swift legacy ready events. */
+  ready: true;
 }
 
 export interface ResizeSuccessMessage {
   type: "success";
+  backend: BackendIdentifier;
   jobId: number;
   pixels: ArrayBuffer;
   width: number;
   height: number;
+}
+
+/** Internal processor result contract used by Worker backend implementations. */
+export interface ResizeProcessor {
+  resize(request: ResizeRequestMessage): Promise<ResizeSuccessMessage>;
 }
 
 export interface ResizeFailureMessage {

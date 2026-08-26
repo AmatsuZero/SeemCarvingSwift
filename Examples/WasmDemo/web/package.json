@@ -19,6 +19,6 @@
     "vite": "7.1.7"
   },
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "0.3.0"
+    "@seemcarving/wasm": "file:../../../Packages/SeamCarvingWasm"
   }
 }

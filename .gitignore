@@ -39,3 +39,9 @@ Examples/WasmDemo/web/dist/
 Examples/WasmDemo/web/src/generated/
 Examples/WasmDemo/web/playwright-report/
 Examples/WasmDemo/web/test-results/
+
+# Publishable WASM SDK build artifacts
+Packages/SeamCarvingWasm/src/generated/
+Packages/SeamCarvingWasm/dist/
+Packages/SeamCarvingWasm/node_modules/
+Packages/SeamCarvingWasm/*.tgz

@@ -1,0 +1,13 @@
+{
+  "name": "seemcarving-packed-vite-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "playwright": "1.55.0",
+    "vite": "7.1.7"
+  }
+}
