@@ -20,6 +20,11 @@ async function resizeWithCpuFallback(): Promise<void> {
     if (result.width !== 1 || result.height !== 1 || result.pixels.byteLength !== 4) {
       throw new Error("Unexpected 2×1 → 1×1 resize result");
     }
+    if (result.backend !== "wasm-cpu") {
+      throw new Error(`Expected wasm-cpu fallback, received ${result.backend}`);
+    }
+    output.dataset.backend = result.backend;
+    output.dataset.status = "complete";
     output.textContent = `Resized with ${result.backend}`;
   } finally {
     carver.terminate();
@@ -27,5 +32,6 @@ async function resizeWithCpuFallback(): Promise<void> {
 }
 
 void resizeWithCpuFallback().catch((error: unknown) => {
+  output.dataset.status = "error";
   output.textContent = error instanceof Error ? error.message : String(error);
 });

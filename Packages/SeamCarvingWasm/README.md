@@ -25,9 +25,10 @@ The SDK is browser-only ESM. It requires module Worker support and a bundler or
 static host that serves the generated `.wasm` file as `application/wasm`; it
 does not provide a CommonJS, Node.js, or SSR implementation. The package
 creates its module Worker automatically. If an application bundler relocates
-the Worker, keep `dist/generated/` beside the emitted Worker: those generated
-PackageToJS modules and the WASM binary use relative URLs. The included Vite
-demo shows that runtime-copy setup.
+the Worker, copy `node_modules/@seemcarving/wasm/dist/generated/` to
+`assets/generated/` in the build output: those generated PackageToJS modules and
+the WASM binary use relative URLs from Vite's emitted Worker. The included Vite
+consumer fixture and demo contain that runtime-copy plugin.
 
 ## Backend selection
 

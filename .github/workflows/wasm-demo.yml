@@ -71,6 +71,11 @@ jobs:
         working-directory: Examples/WasmDemo/web
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
+      - name: Verify packed Vite SDK consumer
+        if: matrix.browser == 'chromium'
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run test:pack
+
       - name: Build static site
         working-directory: Examples/WasmDemo/web
         run: npm run build
