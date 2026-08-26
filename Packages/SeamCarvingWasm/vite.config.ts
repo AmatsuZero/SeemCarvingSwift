@@ -43,7 +43,11 @@ export default defineConfig({
   plugins: [preservePackageToJSRuntime()],
   test: {
     passWithNoTests: true,
-    exclude: ["tests/package-contents.spec.mjs", "tests/packed-consumer.spec.mjs"],
+    exclude: [
+      "tests/package-contents.spec.mjs",
+      "tests/packed-consumer.spec.mjs",
+      "tests/publish-version.spec.mjs",
+    ],
   },
   worker: {
     format: "es",

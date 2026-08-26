@@ -26,7 +26,7 @@
   "scripts": {
     "stage-wasm": "node scripts/stage-wasm.mjs",
     "build": "npm run stage-wasm && rm -rf dist && tsc --emitDeclarationOnly && vite build",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run && node --test tests/publish-version.spec.mjs",
     "test:pack": "node --test tests/package-contents.spec.mjs && node --test tests/packed-consumer.spec.mjs",
     "benchmark": "node --experimental-strip-types bench/benchmark.ts"
   },

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ResizeRequestMessage, ResizeSuccessMessage } from "../src/protocol.js";
 import {
+  ESTIMATED_WORK_LIMIT,
   isWebGPUEligible,
+  isWithinResourceLimits,
+  PIXEL_LIMIT,
   ResizeSelector,
   type GPUProcessor,
   type WasmCPUProcessor,
@@ -48,6 +51,27 @@ describe("isWebGPUEligible", () => {
     expect(isWebGPUEligible(request(8, 4, 8, 4))).toBe(false);
     expect(isWebGPUEligible(request(8, 4, 0, 4))).toBe(false);
   });
+
+  it("rejects requests outside the shared source and target pixel limits", () => {
+    expect(isWebGPUEligible(request(2_001, 1_000, 2_000, 1_000))).toBe(false);
+    expect(isWithinResourceLimits(request(2_000, 1_000, 2_001, 1_000))).toBe(false);
+    expect(PIXEL_LIMIT).toBe(2_000_000);
+  });
+
+  it("rejects requests outside the shared estimated-work limit", () => {
+    const value: ResizeRequestMessage = {
+      type: "resize",
+      jobId: 1,
+      pixels: new ArrayBuffer(0),
+      sourceWidth: 1,
+      sourceHeight: PIXEL_LIMIT,
+      targetWidth: PIXEL_LIMIT,
+      targetHeight: 1,
+    };
+
+    expect(isWithinResourceLimits(value)).toBe(false);
+    expect(ESTIMATED_WORK_LIMIT).toBe(80_000_000);
+  });
 });
 
 describe("ResizeSelector", () => {
@@ -64,6 +88,22 @@ describe("ResizeSelector", () => {
     expect(gpu.initialize).not.toHaveBeenCalled();
     expect(gpu.resize).not.toHaveBeenCalled();
     expect(wasm.resize).toHaveBeenCalledOnce();
+  });
+
+  it("does not initialize WebGPU when an otherwise supported shrink exceeds the source pixel limit", async () => {
+    const wasm = cpu();
+    const gpu: GPUProcessor = {
+      initialize: vi.fn(async () => {}),
+      resize: vi.fn(async (value: ResizeRequestMessage) => success(value, "webgpu")),
+    };
+    const selector = new ResizeSelector(wasm, () => gpu, () => ({ gpu: {} }));
+    const value = request(2_001, 1_000, 2_000, 1_000);
+
+    await expect(selector.resize(value)).resolves.toMatchObject({ backend: "wasm-cpu" });
+    expect(gpu.initialize).not.toHaveBeenCalled();
+    expect(gpu.resize).not.toHaveBeenCalled();
+    expect(wasm.resize).toHaveBeenCalledOnce();
+    expect(wasm.resize).toHaveBeenCalledWith(value);
   });
 
   it("falls back exactly once when eligible GPU initialization fails", async () => {

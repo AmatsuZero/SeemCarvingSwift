@@ -22,9 +22,50 @@ export type GPUProcessorFactory = () => GPUProcessor | undefined;
 type NavigatorHost = { gpu?: unknown };
 type NavigatorGetter = () => NavigatorHost | undefined;
 
+/** Resource bounds shared with the Swift/WASM bridge contract. */
+export const PIXEL_LIMIT = 2_000_000;
+export const ESTIMATED_WORK_LIMIT = 80_000_000;
+
+function isSafePositiveInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+/**
+ * Mirrors WasmBridgeCore's resource validation before a request can be sent to
+ * WebGPU. The CPU bridge remains the authority for its own error reporting;
+ * this guard prevents a GPU-eligible shape from bypassing that public limit.
+ */
+export function isWithinResourceLimits(request: ResizeRequestMessage): boolean {
+  const {
+    sourceWidth,
+    sourceHeight,
+    targetWidth,
+    targetHeight,
+  } = request;
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every(isSafePositiveInteger)) {
+    return false;
+  }
+
+  const sourcePixels = sourceWidth * sourceHeight;
+  const targetPixels = targetWidth * targetHeight;
+  if (!Number.isSafeInteger(sourcePixels) || !Number.isSafeInteger(targetPixels) ||
+      sourcePixels > PIXEL_LIMIT || targetPixels > PIXEL_LIMIT) {
+    return false;
+  }
+
+  const widthWork = Math.abs(sourceWidth - targetWidth) * sourceHeight;
+  const heightWork = Math.abs(sourceHeight - targetHeight) * targetWidth;
+  const estimatedWork = widthWork + heightWork;
+  return Number.isSafeInteger(widthWork) &&
+    Number.isSafeInteger(heightWork) &&
+    Number.isSafeInteger(estimatedWork) &&
+    estimatedWork <= ESTIMATED_WORK_LIMIT;
+}
+
 /** MVP support is only a positive-width vertical shrink with unchanged height. */
 export function isWebGPUEligible(request: ResizeRequestMessage): boolean {
-  return request.targetWidth > 0 &&
+  return isWithinResourceLimits(request) &&
+    request.targetWidth > 0 &&
     request.targetHeight === request.sourceHeight &&
     request.targetWidth < request.sourceWidth;
 }

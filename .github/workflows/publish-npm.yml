@@ -69,17 +69,9 @@ jobs:
         working-directory: Packages/SeamCarvingWasm
         run: npm run test:pack
 
-      - name: Verify tag matches package version
+      - name: Verify stable tag matches package version
         working-directory: Packages/SeamCarvingWasm
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFile } from "node:fs/promises";
-          const tagVersion = process.env.GITHUB_REF_NAME.slice("wasm-v".length);
-          const { version } = JSON.parse(await readFile("package.json", "utf8"));
-          if (!tagVersion || tagVersion !== version) {
-            throw new Error(`Tag wasm-v${tagVersion || "<missing>"} does not match package version ${version}`);
-          }
-          NODE
+        run: node scripts/validate-publish-version.mjs
 
       - name: Create release artifact manifest
         working-directory: Packages/SeamCarvingWasm
