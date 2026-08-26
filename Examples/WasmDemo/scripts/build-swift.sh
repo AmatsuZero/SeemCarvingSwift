@@ -10,8 +10,9 @@ sdk_id="swift-6.3.3-RELEASE_wasm"
 artifact_dir="${swift_dir}/.build/plugins/PackageToJS/outputs/Package"
 generated_dir="${web_dir}/src/generated"
 entry_loader="${artifact_dir}/index.js"
+swiftly_swift="${script_dir}/swiftly-6.3.3.sh"
 
-if ! swift sdk list | grep -Fqx "${sdk_id}"; then
+if ! "${swiftly_swift}" swift sdk list | grep -Fqx "${sdk_id}"; then
   print -u2 "Missing required Swift SDK: ${sdk_id}"
   exit 1
 fi
@@ -20,7 +21,7 @@ rm -rf "${generated_dir}"
 mkdir -p "${generated_dir}"
 (
   cd "${swift_dir}"
-  swift package --disable-sandbox --swift-sdk "${sdk_id}" js --product WasmBridgeWorker
+  "${swiftly_swift}" swift package --disable-sandbox --swift-sdk "${sdk_id}" js --product WasmBridgeWorker
 )
 
 if [[ ! -d "${artifact_dir}" ]]; then

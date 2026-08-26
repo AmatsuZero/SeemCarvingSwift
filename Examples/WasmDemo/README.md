@@ -13,19 +13,28 @@ WebGPU-first/WASM-CPU-fallback, and cancellation contract.
 
 ## Prerequisites
 
-- Swift **6.3.3** and the exact `swift-6.3.3-RELEASE_wasm` SDK.
+- [Swiftly](https://www.swift.org/install/) with Swift **6.3.3** installed,
+  and the exact `swift-6.3.3-RELEASE_wasm` SDK.
 - Node **24.11.1** (see `web/.nvmrc`) and its bundled npm.
 - Playwright browser binaries for each browser being tested.
 
-Install the pinned SDK with the official artifact and checksum:
+Install Swiftly from the official Swift installation page, then install the
+pinned toolchain and SDK with the wrapper. The wrapper always runs its command
+through Swiftly's `+6.3.3` selector; it never falls back to the host/Xcode
+Swift toolchain.
 
 ```sh
-swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
+swiftly install 6.3.3
+
+cd Examples/WasmDemo
+scripts/swiftly-6.3.3.sh swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
   --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
-swift sdk list
+scripts/swiftly-6.3.3.sh swift sdk list
 ```
 
-The second command must list `swift-6.3.3-RELEASE_wasm`.
+The final command must list `swift-6.3.3-RELEASE_wasm`. If Swiftly is not in
+your shell's `PATH`, the wrapper also checks `~/.swiftly/bin/swiftly`; set
+`SWIFTLY_BIN` to an executable Swiftly binary to override that lookup.
 
 ## Build, run, and test
 
@@ -92,7 +101,7 @@ The command below is the compatibility contract for JavaScriptKit 0.56.1:
 
 ```sh
 cd Examples/WasmDemo/swift
-swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js --product WasmBridgeWorker
+../scripts/swiftly-6.3.3.sh swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js --product WasmBridgeWorker
 ```
 
 Its generated tree is copied unchanged by `scripts/build-swift.sh` from
