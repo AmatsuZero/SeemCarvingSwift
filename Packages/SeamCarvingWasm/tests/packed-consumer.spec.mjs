@@ -1,19 +1,20 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createIsolatedNpmEnvironment } from "../scripts/isolated-npm.mjs";
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureDir = join(packageDir, "tests", "fixtures", "vite-consumer");
 
-function packPackage() {
+function packPackage(env) {
   const packed = JSON.parse(
-    execFileSync("npm", ["pack", "--json"], { cwd: packageDir, encoding: "utf8" }),
+    execFileSync("npm", ["pack", "--json"], { cwd: packageDir, encoding: "utf8", env }),
   );
   const { filename } = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
   return resolve(packageDir, filename);
@@ -53,21 +54,66 @@ async function stopPreview(preview) {
   await exited;
 }
 
+test("npm child commands ignore a polluted user configuration", () => {
+  const pollutedConfigDir = mkdtempSync(join(tmpdir(), "seemcarving-polluted-npm-config-"));
+  const pollutedUserConfig = join(pollutedConfigDir, "npmrc");
+  writeFileSync(pollutedUserConfig, "allow-scripts=oh-my-codex\n");
+
+  try {
+    const isolatedNpm = createIsolatedNpmEnvironment({
+      ...process.env,
+      NPM_CONFIG_USERCONFIG: pollutedUserConfig,
+      NPM_CONFIG_ALLOW_SCRIPTS: "oh-my-codex",
+      npm_config_ignore_scripts: "false",
+    });
+
+    try {
+      const effectiveUserConfig = execFileSync("npm", ["config", "get", "userconfig"], {
+        encoding: "utf8",
+        env: isolatedNpm.env,
+      }).trim();
+      const allowedScripts = execFileSync("npm", ["config", "get", "allow-scripts"], {
+        encoding: "utf8",
+        env: isolatedNpm.env,
+      }).trim();
+      const ignoresLifecycleScripts = execFileSync("npm", ["config", "get", "ignore-scripts"], {
+        encoding: "utf8",
+        env: isolatedNpm.env,
+      }).trim();
+
+      assert.equal(effectiveUserConfig, isolatedNpm.userConfig);
+      assert.notEqual(allowedScripts, "oh-my-codex");
+      assert.equal(ignoresLifecycleScripts, "true");
+    } finally {
+      isolatedNpm.cleanup();
+    }
+  } finally {
+    rmSync(pollutedConfigDir, { force: true, recursive: true });
+  }
+});
+
 test("a Vite app runs a packed SDK CPU fallback without repository source imports", async () => {
   const consumerDir = mkdtempSync(join(tmpdir(), "seemcarving-vite-consumer-"));
   let packedTarball;
   let preview;
   let browser;
+  let isolatedNpm;
 
   try {
     cpSync(fixtureDir, consumerDir, { recursive: true });
-    packedTarball = packPackage();
+    isolatedNpm = createIsolatedNpmEnvironment();
+    packedTarball = packPackage(isolatedNpm.env);
 
     execFileSync("npm", ["install", "--no-save", packedTarball], {
       cwd: consumerDir,
+      env: isolatedNpm.env,
       stdio: "inherit",
     });
-    execFileSync("npm", ["run", "build"], { cwd: consumerDir, stdio: "inherit" });
+    execFileSync("npm", ["run", "build"], {
+      cwd: consumerDir,
+      env: isolatedNpm.env,
+      stdio: "inherit",
+    });
 
     const assetDir = join(consumerDir, "dist", "assets");
     assert.ok(existsSync(assetDir));
@@ -97,6 +143,7 @@ test("a Vite app runs a packed SDK CPU fallback without repository source import
     const previewURL = `http://127.0.0.1:${port}`;
     preview = spawn("npm", ["run", "preview", "--", "--host", "127.0.0.1", "--port", String(port)], {
       cwd: consumerDir,
+      env: isolatedNpm.env,
       stdio: "inherit",
     });
     await waitForPreview(previewURL, preview);
@@ -116,6 +163,7 @@ test("a Vite app runs a packed SDK CPU fallback without repository source import
         await stopPreview(preview);
       } finally {
         if (packedTarball) rmSync(packedTarball, { force: true });
+        isolatedNpm?.cleanup();
         rmSync(consumerDir, { force: true, recursive: true });
       }
     }
