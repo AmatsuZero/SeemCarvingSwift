@@ -39,6 +39,30 @@ outside that MVP path, the same request runs through the Swift/WASM CPU backend
 and returns `backend: "wasm-cpu"`. The CPU backend supports the bridge's full
 resize operation. There is **no WebGL2 implementation**.
 
+## Benchmarking
+
+After staging the real Swift/WASM runtime and building the package, run a
+physical Chromium benchmark (install Chromium first with `npx playwright install
+chromium`):
+
+```sh
+npm run benchmark --prefix Packages/SeamCarvingWasm -- \
+  --sizes 1280x720 --targets 1272x720 --warmup 3 --iterations 10
+```
+
+The command writes one JSON record per generated input/target/backend. Each
+record includes the selected backend, input and target dimensions, warmup and
+iteration counts, raw end-to-end resize samples, and nearest-rank p50/p95
+milliseconds. It uses a normal Chromium launch for the WebGPU record and a
+separate `--disable-webgpu` launch for the WASM CPU record; it fails rather than
+mislabeling a CPU fallback as WebGPU when WebGPU is unavailable.
+
+These are end-to-end SDK request timings after Worker initialization (including
+the input copy, Worker messaging, processing, and output transfer), not a claim
+that either backend is faster. Do not make a performance-improvement claim until
+the same fixed matrix has completed in physical browsers with the recorded JSON
+evidence.
+
 ## Input, limits, and lifecycle
 
 - `pixels` must contain exactly `width * height * 4` bytes: tightly packed,

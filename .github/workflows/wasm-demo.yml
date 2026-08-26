@@ -63,6 +63,10 @@ jobs:
         working-directory: Packages/SeamCarvingWasm
         run: npm run build
 
+      - name: Run WASM SDK unit tests
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run test:unit
+
       - name: Install Node dependencies
         working-directory: Examples/WasmDemo/web
         run: npm ci
@@ -71,10 +75,15 @@ jobs:
         working-directory: Examples/WasmDemo/web
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
+      - name: Verify packed SDK contents
+        if: matrix.browser == 'chromium'
+        working-directory: Packages/SeamCarvingWasm
+        run: node --test tests/package-contents.spec.mjs
+
       - name: Verify packed Vite SDK consumer
         if: matrix.browser == 'chromium'
         working-directory: Packages/SeamCarvingWasm
-        run: npm run test:pack
+        run: node --test tests/packed-consumer.spec.mjs
 
       - name: Build static site
         working-directory: Examples/WasmDemo/web

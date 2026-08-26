@@ -1,0 +1,134 @@
+name: Publish WASM npm package
+
+on:
+  push:
+    tags:
+      - "wasm-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Verify and publish @seemcarving/wasm
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: '6.3.3'
+
+      - name: Install pinned WebAssembly SDK
+        run: |
+          swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz \
+            --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+          swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+          cache: npm
+          cache-dependency-path: |
+            Examples/WasmDemo/web/package-lock.json
+            Packages/SeamCarvingWasm/package-lock.json
+
+      - name: Pin npm with Trusted Publishing support
+        run: |
+          npm install --global npm@11.6.2
+          node --input-type=module <<'NODE'
+          const [major, minor, patch] = (await import("node:child_process"))
+            .execFileSync("npm", ["--version"], { encoding: "utf8" }).trim().split(".").map(Number);
+          if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+            throw new Error(`npm 11.5.1 or newer is required; found ${major}.${minor}.${patch}`);
+          }
+          NODE
+
+      - name: Cache Swift package artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            Examples/WasmDemo/swift/.build
+            ~/.swiftpm/cache
+            ~/.cache/swiftly
+          key: ${{ runner.os }}-wasm-publish-swift-${{ hashFiles('Examples/WasmDemo/swift/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-wasm-publish-swift-
+
+      - name: Enforce WASM import boundaries
+        run: bash Examples/WasmDemo/scripts/check-wasm-boundaries.sh
+
+      - name: Build and stage browser WASM artifact
+        working-directory: Examples/WasmDemo
+        run: scripts/build-swift.sh
+
+      - name: Install package dependencies
+        working-directory: Packages/SeamCarvingWasm
+        run: npm ci
+
+      - name: Run package unit tests
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run test:unit
+
+      - name: Build publishable package
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run build
+
+      - name: Install Chromium for clean packed-consumer verification
+        working-directory: Packages/SeamCarvingWasm
+        run: npx playwright install chromium
+
+      - name: Verify clean packed package consumer
+        working-directory: Packages/SeamCarvingWasm
+        run: npm run test:pack
+
+      - name: Verify tag matches package version
+        working-directory: Packages/SeamCarvingWasm
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const tagVersion = process.env.GITHUB_REF_NAME.slice("wasm-v".length);
+          const { version } = JSON.parse(await readFile("package.json", "utf8"));
+          if (!tagVersion || tagVersion !== version) {
+            throw new Error(`Tag wasm-v${tagVersion || "<missing>"} does not match package version ${version}`);
+          }
+          NODE
+
+      - name: Create release artifact manifest
+        working-directory: Packages/SeamCarvingWasm
+        run: |
+          rm -rf ../../release-artifacts
+          mkdir -p ../../release-artifacts
+          npm pack --json --pack-destination ../../release-artifacts
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readdir, readFile, writeFile } from "node:fs/promises";
+          const artifactsDirectory = "../../release-artifacts";
+          const tarballs = (await readdir(artifactsDirectory)).filter((name) => name.endsWith(".tgz"));
+          if (tarballs.length !== 1) throw new Error(`Expected exactly one package tarball, found ${tarballs.length}`);
+          const tarball = tarballs[0];
+          const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+          const sha256 = createHash("sha256").update(await readFile(`${artifactsDirectory}/${tarball}`)).digest("hex");
+          await writeFile(`${artifactsDirectory}/manifest.json`, `${JSON.stringify({
+            package: packageJson.name,
+            version: packageJson.version,
+            tag: process.env.GITHUB_REF_NAME,
+            tarball,
+            sha256,
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Upload package and release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-npm-package-${{ github.ref_name }}
+          path: |
+            release-artifacts/*.tgz
+            release-artifacts/manifest.json
+          if-no-files-found: error
+
+      - name: Publish public package through npm OIDC
+        working-directory: Packages/SeamCarvingWasm
+        run: npm publish --access public
