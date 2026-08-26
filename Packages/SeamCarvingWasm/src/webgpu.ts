@@ -51,9 +51,8 @@ function dispatchCount(items: number): number {
 }
 
 /**
- * WebGPU implementation of exactly one backward-Sobel vertical seam removal.
- * It keeps every intermediate buffer on the device and maps only the final RGBA8
- * output buffer after the one command encoder has completed.
+ * WebGPU implementation of backward-Sobel vertical shrink. It keeps every
+ * intermediate seam buffer on the device and maps only the final RGBA8 output.
  */
 export class WebGPUProcessor {
   device: GPUDeviceLike | undefined;
@@ -74,14 +73,15 @@ export class WebGPUProcessor {
 
   async resize(request: ResizeRequestMessage): Promise<ResizeSuccessMessage> {
     if (!this.device) throw new Error("WebGPU processor has not initialized");
-    if (request.targetHeight !== request.sourceHeight || request.targetWidth !== request.sourceWidth - 1) {
-      throw new RangeError("WebGPU currently supports exactly one vertical seam removal");
+    if (request.targetHeight !== request.sourceHeight || request.targetWidth <= 0 || request.targetWidth >= request.sourceWidth) {
+      throw new RangeError("WebGPU supports only positive-width vertical shrink requests");
     }
 
-    const width = request.sourceWidth;
+    const sourceWidth = request.sourceWidth;
     const height = request.sourceHeight;
-    const pixelCount = width * height;
-    const outputBytes = (width - 1) * height * 4;
+    const sourcePixelCount = sourceWidth * height;
+    const sourceBytes = sourcePixelCount * 4;
+    const targetBytes = request.targetWidth * height * 4;
     const device = this.device;
     const storage = usage("STORAGE");
     const copyDestination = usage("COPY_DST");
@@ -91,7 +91,7 @@ export class WebGPUProcessor {
       buffers.push(buffer);
       return buffer;
     };
-    const parameters = (row: number): GPUBufferLike => {
+    const parameters = (width: number, row: number): GPUBufferLike => {
       const buffer = makeBuffer(16, usage("UNIFORM") | copyDestination);
       device.queue.writeBuffer(buffer, 0, new Uint32Array([width, height, row, 0]).buffer);
       return buffer;
@@ -114,17 +114,19 @@ export class WebGPUProcessor {
     };
 
     try {
-      const input = makeBuffer(request.pixels.byteLength, storage | copyDestination);
-      const luma = makeBuffer(pixelCount * 4, storage);
-      const energy = makeBuffer(pixelCount * 4, storage);
-      const rowA = makeBuffer(width * 4, storage);
-      const rowB = makeBuffer(width * 4, storage);
-      const parents = makeBuffer(pixelCount * 4, storage);
+      // Both images retain source capacity. Each removal writes a densely packed
+      // current-width-minus-one image, then swaps roles without a CPU round trip.
+      const imageA = makeBuffer(sourceBytes, storage | copyDestination | usage("COPY_SRC"));
+      const imageB = makeBuffer(sourceBytes, storage | usage("COPY_SRC"));
+      const luma = makeBuffer(sourcePixelCount * 4, storage);
+      const energy = makeBuffer(sourcePixelCount * 4, storage);
+      const rowA = makeBuffer(sourceWidth * 4, storage);
+      const rowB = makeBuffer(sourceWidth * 4, storage);
+      const parents = makeBuffer(sourcePixelCount * 4, storage);
       const argmin = makeBuffer(4, storage);
       const seam = makeBuffer(height * 4, storage);
-      const output = makeBuffer(outputBytes, storage | usage("COPY_SRC"));
-      const readback = makeBuffer(outputBytes, usage("MAP_READ") | copyDestination);
-      device.queue.writeBuffer(input, 0, request.pixels);
+      const readback = makeBuffer(targetBytes, usage("MAP_READ") | copyDestination);
+      device.queue.writeBuffer(imageA, 0, request.pixels);
 
       const lumaPipeline = await pipeline(rgbaToLumaWGSL);
       const sobelPipeline = await pipeline(sobelWGSL);
@@ -133,32 +135,40 @@ export class WebGPUProcessor {
       const reducePipeline = await pipeline(reduceWGSL);
       const backtrackPipeline = await pipeline(backtrackWGSL);
       const removePipeline = await pipeline(removeVerticalWGSL);
+
+      let currentImage = imageA;
+      let nextImage = imageB;
       const encoder = device.createCommandEncoder();
       device.pushErrorScope("validation");
-      const baseParameters = parameters(0);
-      encode(encoder, lumaPipeline, bindGroup(lumaPipeline, [input, luma, baseParameters]), dispatchCount(pixelCount));
-      encode(encoder, sobelPipeline, bindGroup(sobelPipeline, [luma, energy, baseParameters]), dispatchCount(pixelCount));
-      encode(encoder, initializePipeline, bindGroup(initializePipeline, [energy, rowA, baseParameters]), dispatchCount(width));
+      for (let currentWidth = sourceWidth; currentWidth > request.targetWidth; currentWidth--) {
+        const baseParameters = parameters(currentWidth, 0);
+        encode(encoder, lumaPipeline, bindGroup(lumaPipeline, [currentImage, luma, baseParameters]), dispatchCount(currentWidth * height));
+        encode(encoder, sobelPipeline, bindGroup(sobelPipeline, [luma, energy, baseParameters]), dispatchCount(currentWidth * height));
+        encode(encoder, initializePipeline, bindGroup(initializePipeline, [energy, rowA, baseParameters]), dispatchCount(currentWidth));
 
-      let previous = rowA;
-      let current = rowB;
-      for (let y = 1; y < height; y++) {
-        const rowParameters = parameters(y);
-        encode(
-          encoder,
-          accumulatePipeline,
-          bindGroup(accumulatePipeline, [previous, current, parents, energy, rowParameters]),
-          dispatchCount(width),
-        );
-        [previous, current] = [current, previous];
+        let previous = rowA;
+        let current = rowB;
+        for (let y = 1; y < height; y++) {
+          const rowParameters = parameters(currentWidth, y);
+          encode(
+            encoder,
+            accumulatePipeline,
+            bindGroup(accumulatePipeline, [previous, current, parents, energy, rowParameters]),
+            dispatchCount(currentWidth),
+          );
+          [previous, current] = [current, previous];
+        }
+        encode(encoder, reducePipeline, bindGroup(reducePipeline, [previous, argmin, baseParameters]), 1);
+        encode(encoder, backtrackPipeline, bindGroup(backtrackPipeline, [parents, seam, argmin, baseParameters]), 1);
+        encode(encoder, removePipeline, bindGroup(removePipeline, [currentImage, nextImage, seam, baseParameters]), dispatchCount((currentWidth - 1) * height));
+        [currentImage, nextImage] = [nextImage, currentImage];
       }
-      encode(encoder, reducePipeline, bindGroup(reducePipeline, [previous, argmin, baseParameters]), 1);
-      encode(encoder, backtrackPipeline, bindGroup(backtrackPipeline, [parents, seam, argmin, baseParameters]), 1);
-      encode(encoder, removePipeline, bindGroup(removePipeline, [input, output, seam, baseParameters]), dispatchCount((width - 1) * height));
-      encoder.copyBufferToBuffer(output, 0, readback, 0, outputBytes);
+      encoder.copyBufferToBuffer(currentImage, 0, readback, 0, targetBytes);
       device.queue.submit([encoder.finish()]);
       const validationError = await device.popErrorScope();
       if (validationError) throw new Error(`WebGPU validation failed: ${String(validationError)}`);
+
+      // Mapping happens once, after all seam passes and the final device copy.
       await readback.mapAsync(mapRead());
       const pixels = readback.getMappedRange().slice(0);
       readback.unmap();

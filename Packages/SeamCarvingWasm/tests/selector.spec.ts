@@ -82,11 +82,17 @@ describe("ResizeSelector", () => {
     expect(wasm.resize).toHaveBeenCalledWith(value);
   });
 
-  it("falls back exactly once when an initialized GPU fails before producing a result", async () => {
+  it("routes once to CPU when the device is lost before GPU submission completes", async () => {
+    let resolveLost!: () => void;
+    const lost = new Promise<void>((resolve) => { resolveLost = resolve; });
     const wasm = cpu();
     const gpu: GPUProcessor = {
       initialize: vi.fn(async () => {}),
-      resize: vi.fn(async () => { throw new Error("mapAsync failed"); }),
+      device: { lost },
+      resize: vi.fn(async () => {
+        resolveLost();
+        throw new Error("device lost before submit");
+      }),
     };
     const selector = new ResizeSelector(wasm, () => gpu, () => ({ gpu: {} }));
     const value = request(8, 4, 7, 4);
@@ -94,6 +100,7 @@ describe("ResizeSelector", () => {
     await expect(selector.resize(value)).resolves.toMatchObject({ backend: "wasm-cpu" });
     expect(gpu.resize).toHaveBeenCalledOnce();
     expect(wasm.resize).toHaveBeenCalledTimes(1);
+    expect(wasm.resize).toHaveBeenCalledWith(value);
   });
 
   it("falls back to WASM when asynchronous WebGPU pipeline validation rejects", async () => {
@@ -180,5 +187,65 @@ describe("ResizeSelector GPU lifecycle", () => {
     expect(createGPUProcessor).toHaveBeenCalledTimes(2);
     expect(first.initialize).toHaveBeenCalledOnce();
     expect(second.initialize).toHaveBeenCalledOnce();
+  });
+});
+
+describe("WebGPU multi-seam encoding", () => {
+  it("keeps multi-seam intermediates on the device and maps only the final target", async () => {
+    vi.stubGlobal("GPUBufferUsage", {
+      MAP_READ: 1,
+      COPY_SRC: 2,
+      COPY_DST: 4,
+      STORAGE: 8,
+      UNIFORM: 16,
+    });
+    vi.stubGlobal("GPUMapMode", { READ: 1 });
+    try {
+      const buffers: Array<{ size: number; mapAsync: ReturnType<typeof vi.fn>; getMappedRange: ReturnType<typeof vi.fn>; unmap: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> = [];
+      const pass = { setPipeline: vi.fn(), setBindGroup: vi.fn(), dispatchWorkgroups: vi.fn(), end: vi.fn() };
+      const encoder = {
+        beginComputePass: vi.fn(() => pass),
+        copyBufferToBuffer: vi.fn(),
+        finish: vi.fn(() => ({})),
+      };
+      const pipeline = { getBindGroupLayout: vi.fn(() => ({})) };
+      const processor = new WebGPUProcessor();
+      processor.device = {
+        queue: { writeBuffer: vi.fn(), submit: vi.fn() },
+        lost: new Promise(() => {}),
+        createBuffer: vi.fn(({ size }: { size: number }) => {
+          const buffer = {
+            size,
+            mapAsync: vi.fn(async () => {}),
+            getMappedRange: vi.fn(() => new ArrayBuffer(size)),
+            unmap: vi.fn(),
+            destroy: vi.fn(),
+          };
+          buffers.push(buffer);
+          return buffer;
+        }),
+        createShaderModule: vi.fn(() => ({})),
+        createComputePipelineAsync: vi.fn(async () => pipeline),
+        pushErrorScope: vi.fn(),
+        popErrorScope: vi.fn(async () => null),
+        createBindGroup: vi.fn(() => ({})),
+        createCommandEncoder: vi.fn(() => encoder),
+      } as never;
+
+      const value = request(4, 2, 2, 2);
+      await expect(processor.resize(value)).resolves.toMatchObject({
+        backend: "webgpu",
+        width: 2,
+        height: 2,
+      });
+
+      expect(processor.device.queue.submit).toHaveBeenCalledOnce();
+      expect(pass.dispatchWorkgroups).toHaveBeenCalledTimes(14);
+      expect(encoder.copyBufferToBuffer).toHaveBeenCalledOnce();
+      expect(buffers.filter((buffer) => buffer.mapAsync.mock.calls.length > 0)).toHaveLength(1);
+      expect(buffers.flatMap((buffer) => buffer.mapAsync.mock.calls)).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
