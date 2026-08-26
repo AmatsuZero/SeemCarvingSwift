@@ -36,8 +36,6 @@ function preservePackageToJSRuntime(): Plugin {
   };
 }
 
-const generatedIndex = "./generated/index.js";
-
 export default defineConfig({
   base: "./",
   plugins: [preservePackageToJSRuntime()],
@@ -52,7 +50,6 @@ export default defineConfig({
   worker: {
     format: "es",
     rollupOptions: {
-      external: (id) => id === generatedIndex,
       output: { entryFileNames: "worker.js" },
     },
   },

@@ -196,6 +196,13 @@ test("a Vite app runs a packed SDK CPU fallback without repository source import
       .map((entry) => readFileSync(join(assetDir, entry), "utf8"));
     assert.ok(bundledScripts.length > 0, "Vite must emit JavaScript assets");
     assert.doesNotMatch(bundledScripts.join("\n"), /SeamCarvingWasm\/src/);
+    const workerBundle = bundledScripts.find((script) => script.includes("__seamCarvingWasmResize"));
+    assert.ok(workerBundle, "Vite must emit the SDK worker bundle");
+    assert.doesNotMatch(
+      workerBundle,
+      /@bjorn3\/browser_wasi_shim/,
+      "the worker bundle must not leave PackageToJS's bare browser dependency unresolved",
+    );
 
     const port = await availablePort();
     const previewURL = `http://127.0.0.1:${port}`;

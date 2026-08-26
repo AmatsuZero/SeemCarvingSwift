@@ -38,10 +38,13 @@
     "registry": "https://registry.npmjs.org"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "typescript": "5.9.2",
     "vite": "7.1.7",
-    "vitest": "3.2.4",
-    "@playwright/test": "1.55.0"
+    "vitest": "3.2.4"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "0.3.0"
+  }
 }
