@@ -7,3 +7,7 @@ repositories {
     mavenCentral()
     gradlePluginPortal()
 }
+
+dependencies {
+    implementation("com.android.tools.build:gradle:8.10.1")
+}
