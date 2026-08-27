@@ -29,6 +29,13 @@ jobs:
             --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
           Examples/WasmDemo/scripts/swiftly-6.3.3.sh swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
 
+      # PackageToJS uses wasm-opt when available. Without it the generated
+      # worker can exceed Rollup's practical array-size limit in the demo build.
+      - name: Install WebAssembly optimizer
+        run: |
+          brew install binaryen
+          wasm-opt --version
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24.11.1'

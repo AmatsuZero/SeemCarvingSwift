@@ -30,6 +30,12 @@ jobs:
             --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
           Examples/WasmDemo/scripts/swiftly-6.3.3.sh swift sdk list | grep -Fx 'swift-6.3.3-RELEASE_wasm'
 
+      # Keep the release artifact optimized and consistent with the demo CI.
+      - name: Install WebAssembly optimizer
+        run: |
+          brew install binaryen
+          wasm-opt --version
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.11.1'
