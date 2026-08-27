@@ -72,26 +72,42 @@ const fixtures = [
   },
 ];
 
-test("WebGPU removes backward-Sobel seams with exact WASM CPU parity", async ({ browser }) => {
-  // The SDK probes WebGPU inside its Worker, so disabling it in the page alone
-  // would not exercise the CPU path. A second Chromium process disables it for
-  // both the page and its Worker.
+test("WebGPU removes backward-Sobel seams with exact WASM CPU parity", async () => {
+  // Headless Chromium exposes navigator.gpu even when its adapter blocklist
+  // leaves requestAdapter() null. The unsafe flag is deliberately test-only:
+  // it enables a CI software adapter without changing SDK production behavior.
+  // The SDK probes WebGPU inside its Worker, so the CPU launch must disable it
+  // for both the page and its Worker.
   const cpuBrowser = await chromium.launch({
     args: ["--disable-gpu", "--disable-software-rasterizer"],
   });
+  const gpuBrowser = await chromium.launch({
+    args: ["--enable-unsafe-webgpu"],
+  });
   const cpuContext = await cpuBrowser.newContext();
+  const gpuContext = await gpuBrowser.newContext();
   const cpuPage = await cpuContext.newPage();
-  const gpuPage = await browser.newPage();
+  const gpuPage = await gpuContext.newPage();
 
   try {
     await Promise.all([cpuPage.goto("/"), gpuPage.goto("/")]);
-    const webGPUSupported = await gpuPage.evaluate(() => navigator.gpu !== undefined);
+    const webGPUProbe = await gpuPage.evaluate(async () => {
+      const available = navigator.gpu !== undefined;
+      const adapter = await navigator.gpu?.requestAdapter();
+      if (!adapter) return { available, adapter: false, device: false };
+      try {
+        await adapter.requestDevice();
+        return { available, adapter: true, device: true };
+      } catch (error) {
+        return { available, adapter: true, device: false, error: String(error) };
+      }
+    });
     if (process.env.CI) {
-      // The required Chromium CI gate must prove the GPU path, not silently
-      // pass after a skip caused by a browser/runtime regression.
-      expect(webGPUSupported).toBe(true);
+      // The required Chromium CI gate must prove a real adapter/device, not
+      // silently pass because the browser merely exposes navigator.gpu.
+      expect(webGPUProbe).toEqual({ available: true, adapter: true, device: true });
     } else {
-      test.skip(!webGPUSupported, "navigator.gpu is unavailable in this Chromium browser");
+      test.skip(!webGPUProbe.device, "a usable WebGPU adapter/device is unavailable in Chromium");
     }
 
     for (const fixture of fixtures) {
@@ -111,7 +127,8 @@ test("WebGPU removes backward-Sobel seams with exact WASM CPU parity", async ({ 
     }
   } finally {
     await cpuContext.close();
+    await gpuContext.close();
     await cpuBrowser.close();
-    await gpuPage.close();
+    await gpuBrowser.close();
   }
 });

@@ -108,9 +108,9 @@ ${header(2)}
 
 @compute @workgroup_size(1)
 fn main() {
-  var best = bitcast<f32>(0x7f800000u);
+  var best = row[0];
   var bestX = 0u;
-  for (var x = 0u; x < parameters.width; x = x + 1u) {
+  for (var x = 1u; x < parameters.width; x = x + 1u) {
     if (row[x] < best) {
       best = row[x];
       bestX = x;
