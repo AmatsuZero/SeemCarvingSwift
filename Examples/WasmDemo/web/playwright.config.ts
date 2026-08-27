@@ -13,6 +13,12 @@ const previewURL = "http://127.0.0.1:4174";
 
 export default defineConfig({
   testDir: "./tests",
+  // The Swift/WASM runtime is deliberately loaded in a module Worker. Even
+  // after wasm-opt, its first compilation can take longer than Playwright's
+  // 5-second assertion default on Firefox/WebKit CI runners. Keep readiness
+  // mandatory, but give the browser a bounded, realistic cold-start budget.
+  timeout: 90_000,
+  expect: { timeout: 60_000 },
   webServer: {
     command: "npm run build -- --mode test && npm run preview -- --host 127.0.0.1 --port 4174",
     url: previewURL,
