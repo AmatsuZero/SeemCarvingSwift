@@ -21,7 +21,7 @@ rm -rf "${generated_dir}"
 mkdir -p "${generated_dir}"
 (
   cd "${swift_dir}"
-  "${swiftly_swift}" swift package --disable-sandbox --swift-sdk "${sdk_id}" js --product WasmBridgeWorker
+  "${swiftly_swift}" swift package --disable-sandbox --swift-sdk "${sdk_id}" js -c release --product WasmBridgeWorker
 )
 
 if [[ ! -d "${artifact_dir}" ]]; then
