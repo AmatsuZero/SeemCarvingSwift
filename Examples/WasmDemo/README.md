@@ -101,7 +101,7 @@ The command below is the compatibility contract for JavaScriptKit 0.56.1:
 
 ```sh
 cd Examples/WasmDemo/swift
-../scripts/swiftly-6.3.3.sh swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js --product WasmBridgeWorker
+../scripts/swiftly-6.3.3.sh swift package --disable-sandbox --swift-sdk swift-6.3.3-RELEASE_wasm js -c release --product WasmBridgeWorker
 ```
 
 Its generated tree is copied unchanged by `scripts/build-swift.sh` from
