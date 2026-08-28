@@ -1,5 +1,4 @@
 pluginManagement {
-    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
@@ -10,12 +9,12 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        maven {
+            url = uri(providers.gradleProperty("seamcarvingRepository").get())
+        }
         google()
         mavenCentral()
     }
 }
 
-rootProject.name = "SeamCarvingAndroid"
-include(":swiftkit-core")
-include(":seamcarving-android-bridge")
-include(":seamcarving-android-core")
+rootProject.name = "SeamCarvingCoreMavenConsumer"

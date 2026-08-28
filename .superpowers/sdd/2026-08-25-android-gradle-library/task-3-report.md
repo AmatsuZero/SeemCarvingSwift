@@ -4,8 +4,8 @@
 
 Complete. The Android library now builds and packages the real generated
 Swift-Java runtime, stages a strict native dependency closure for debug and
-release, and passes connected JNI tests plus release AAR verification from a
-clean module build.
+release, keeps generated Java classes outside the core AAR, and passes clean
+connected JNI, release-boundary, and external Maven-consumer verification.
 
 ## Reviewer findings resolved
 
@@ -28,9 +28,23 @@ clean module build.
 - **Public package:** the Kotlin API is `io.github.seamcarving`. The AAR test
   verifies all five public API classes are emitted there and that no legacy
   `com/seamcarving/android/core` bytecode remains.
-- **Internal generated API:** the generated JNI bridge is emitted only in
-  `io.github.seamcarving.internal`; public Kotlin signatures do not expose it.
-  The obsolete checked-in SwiftKit stub surface was deleted.
+- **Internal generated API:** JExtract emits the bridge into the facade's
+  `io.github.seamcarving` JVM package and the build rewrites every generated
+  top-level bridge class to package-private. This lets the same-package Kotlin
+  implementation call it without making it consumer-visible. The bridge is a
+  separate runtime-only Maven JAR; the core AAR contains neither generated
+  bridge classes nor `org.swift.swiftkit.core` classes. The obsolete checked-in
+  SwiftKit stub surface was deleted.
+- **Hermetic package migration:** before JExtract runs, Gradle removes SwiftPM's
+  incremental plugin output directory. This prevents source files from an old
+  `javaPackage` value from surviving beside the current bindings. The release
+  regression rejects any legacy `io.github.seamcarving.internal` bridge class.
+- **Resolvable non-conflicting runtime coordinates:** the pinned Android subset
+  of upstream SwiftKitCore is published as
+  `io.github.seamcarving:seamcarving-swiftkit-runtime:$VERSION_NAME`, not under
+  the upstream project's `org.swift.swiftkit:*:1.0-SNAPSHOT` namespace. Core's
+  POM carries both private helper artifacts with runtime scope, and an external
+  Android application resolves and dexes them solely from local Maven.
 - **Strict `DT_NEEDED` closure:** for each ABI, staging recursively scans the
   bridge and every copied library with the pinned NDK's `llvm-readelf`.
   Dependencies are copied from the bridge output, Swift runtime, or NDK C++
@@ -56,6 +70,13 @@ The first task-graph dry run found a self-cycle in the x86 build ordering. The
 previous task provider is now captured before registering each next ABI build;
 the corrected graph passes.
 
+The boundary regression was then extended before the final fix. Against the
+in-progress implementation it failed 3 of 8 tests: one for stale
+`io.github.seamcarving.internal` classes, one for the colliding upstream
+snapshot coordinate, and one for the incorrect POM dependency. Clearing the
+SwiftPM plugin output at its source and assigning a project-owned runtime
+coordinate made the same 8 tests pass.
+
 ## Verification
 
 Environment:
@@ -69,16 +90,28 @@ Clean decisive verification:
 ```text
 ANDROID_HOME=/Users/samzhjiang/Library/Android/sdk \
 ANDROID_NDK_HOME=/Users/samzhjiang/Library/org.swift.swiftpm/swift-sdks/swift-6.3.3-RELEASE_android.artifactbundle/swift-android/android-ndk-r27d \
-rtk ./gradlew :seamcarving-android-core:clean \
+rtk ./gradlew clean \
   :seamcarving-android-core:connectedDebugAndroidTest \
-  :seamcarving-android-core:testReleaseUnitTest --no-daemon
+  :seamcarving-android-core:testReleaseUnitTest \
+  :seamcarving-android-core:verifyExternalMavenConsumer --no-daemon
 ```
 
-Result: `BUILD SUCCESSFUL in 29m 31s`; 102 actionable tasks (93 executed, 9
+Result: `BUILD SUCCESSFUL in 41m 52s`; 120 actionable tasks (106 executed, 14
 up-to-date). All three native builds and strict closure stages completed:
 `arm64-v8a`, `armeabi-v7a`, and `x86_64`. Debug connected tests passed 2/2:
 canonical 2x2-to-1x2 JNI parity and real Swift arena destruction. Release JVM
-tests passed 6/6: cancellation 1, RGBA validation 3, and AAR contents 2.
+tests passed 8/8: cancellation 1, RGBA validation 3, and AAR/POM boundary 4.
+The nested external consumer build passed 35/35 actionable tasks, assembled a
+debug APK, and resolved core, bridge, and SwiftKit runtime from
+`Android/build/local-maven` without project dependencies.
+
+After tightening the generator boundary check and bumping its declared
+post-processor input, the connected, release, and external-consumer gates were
+run once more without relying on the earlier generator output. The generator
+reran, the connected tests still passed 2/2, the release suite still passed
+8/8, and the nested consumer still passed 35/35 tasks. The combined build was
+`BUILD SUCCESSFUL in 2m 9s` with 117 actionable tasks (103 executed, 14
+up-to-date).
 
 Additional verification:
 

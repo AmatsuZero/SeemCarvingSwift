@@ -1,6 +1,5 @@
 package io.github.seamcarving
 
-import io.github.seamcarving.internal.AndroidResizeBridge
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine

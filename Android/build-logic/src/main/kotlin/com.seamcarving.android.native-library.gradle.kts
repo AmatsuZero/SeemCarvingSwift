@@ -32,22 +32,9 @@ val minimumAndroidApi = 28
 val swiftScratchDirectory = layout.buildDirectory.dir("swiftpm")
 val generatedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
 val generatedSwiftJavaSources = layout.buildDirectory.dir("generated/swift-java")
-val swiftKitCoreRuntimeSources = listOf(
-    "org/swift/swiftkit/core/AutoSwiftMemorySession.java",
-    "org/swift/swiftkit/core/CallTraces.java",
-    "org/swift/swiftkit/core/ClosableSwiftArena.java",
-    "org/swift/swiftkit/core/ConfinedSwiftMemorySession.java",
-    "org/swift/swiftkit/core/JNISwiftInstance.java",
-    "org/swift/swiftkit/core/JNISwiftInstanceCleanup.java",
-    "org/swift/swiftkit/core/SwiftArena.java",
-    "org/swift/swiftkit/core/SwiftInstance.java",
-    "org/swift/swiftkit/core/SwiftInstanceCleanup.java",
-    "org/swift/swiftkit/core/SwiftLibraries.java",
-    "org/swift/swiftkit/core/SwiftMemoryManagement.java",
-    "org/swift/swiftkit/core/SwiftObjects.java",
-    "org/swift/swiftkit/core/ref/PhantomCleanable.java",
-    "org/swift/swiftkit/core/ref/SwiftCleaner.java",
-    "org/swift/swiftkit/core/util/PlatformUtils.java",
+val swiftPluginOutputs = swiftScratchDirectory.map { it.dir("plugins/outputs") }
+val generatedBridgeClassDeclaration = Regex(
+    "^public final class (AndroidResizeBridge|AndroidResizeResult|BridgeProbe|SeamCarvingAndroidBridge)(.*)$",
 )
 
 pluginManager.apply("com.android.library")
@@ -68,7 +55,6 @@ extensions.configure<LibraryExtension> {
     }
 
     sourceSets.getByName("main").jniLibs.srcDir(generatedJniLibs)
-    sourceSets.getByName("main").java.srcDir(generatedSwiftJavaSources)
 }
 
 val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
@@ -76,10 +62,17 @@ val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
     description = "Generates the internal Java bindings for the Swift Android bridge."
     dependsOn("verifySwiftAndroidToolchain")
     inputs.file(File(swiftPackageDirectory, "Package.swift"))
+    inputs.file(File(swiftPackageDirectory, "Package.resolved"))
     inputs.dir(File(swiftPackageDirectory, "Sources/SeamCarvingAndroidBridge"))
+    inputs.property("generatedJavaPackage", "io.github.seamcarving")
+    inputs.property("bindingPostProcessorVersion", 3)
     outputs.dir(generatedSwiftJavaSources)
 
     doLast {
+        // SwiftPM's plugin output directory is incremental and retains source
+        // files from a previous javaPackage. Regenerate it from an empty
+        // boundary so an old public/internal package cannot leak into the JAR.
+        swiftPluginOutputs.get().asFile.deleteRecursively()
         project.exec {
             workingDir(swiftPackageDirectory)
             commandLine(
@@ -109,12 +102,6 @@ val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
             ?: throw GradleException(
                 "swift-java did not produce exactly one generated Java source directory for SeamCarvingAndroidBridge.",
             )
-        val swiftKitCoreSource = scratchDirectory.resolve("checkouts")
-            .listFiles()
-            ?.map { checkout -> checkout.resolve("SwiftKitCore/src/main/java") }
-            ?.singleOrNull(File::isDirectory)
-            ?: throw GradleException("The pinned swift-java checkout did not contain SwiftKitCore sources.")
-
         val destination = generatedSwiftJavaSources.get().asFile
         destination.deleteRecursively()
         copy {
@@ -127,23 +114,20 @@ val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
                     .replace("import org.swift.swiftkit.core.annotations.*;", "")
                     .replace("@Unsigned ", "")
                     .replace("@Unsigned", "")
-            }
+                    .replace(generatedBridgeClassDeclaration, "final class $1$2")
+                }
         }
-        copy {
-            from(swiftKitCoreSource) {
-                include(swiftKitCoreRuntimeSources)
-            }
-            into(destination)
+        val unexpectedSources = destination.walkTopDown()
+            .filter(File::isFile)
+            .filter { it.extension == "java" }
+            .map { it.relativeTo(destination).invariantSeparatorsPath }
+            .filterNot { it.substringBeforeLast('/') == "io/github/seamcarving" }
+            .toList()
+        check(unexpectedSources.isEmpty()) {
+            "Generated bridge sources escaped the private bridge package boundary: " +
+                unexpectedSources.joinToString()
         }
     }
-}
-
-tasks.matching { it.name.startsWith("compile") && it.name.endsWith("JavaWithJavac") }.configureEach {
-    dependsOn(generateSwiftJavaBindings)
-}
-
-tasks.matching { it.name.startsWith("compile") && it.name.endsWith("Kotlin") }.configureEach {
-    dependsOn(generateSwiftJavaBindings)
 }
 
 fun androidNdkHome(): File = providers.environmentVariable("ANDROID_NDK_HOME").orNull
