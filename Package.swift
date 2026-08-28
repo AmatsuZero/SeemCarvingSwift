@@ -41,6 +41,9 @@ let package = Package(
                 .product(name: "SwiftJava", package: "swift-java"),
             ],
             exclude: ["swift-java.config"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ],
             plugins: [
                 .plugin(name: "JExtractSwiftPlugin", package: "swift-java"),
             ]

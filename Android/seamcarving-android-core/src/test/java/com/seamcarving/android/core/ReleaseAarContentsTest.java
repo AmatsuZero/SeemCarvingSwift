@@ -26,6 +26,7 @@ public final class ReleaseAarContentsTest {
             for (String abi : new String[] {"arm64-v8a", "armeabi-v7a", "x86_64"}) {
                 for (String library : new String[] {
                     "libSeamCarvingAndroidBridge.so",
+                    "libSwiftJava.so",
                     "libc++_shared.so",
                     "libswiftCore.so",
                 }) {
