@@ -1,4 +1,4 @@
-package com.seamcarving.android.core
+package io.github.seamcarving
 
 data class ResizeRequest(
     val image: RgbaImage,

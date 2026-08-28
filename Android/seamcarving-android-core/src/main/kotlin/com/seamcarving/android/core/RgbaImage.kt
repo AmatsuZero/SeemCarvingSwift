@@ -1,4 +1,4 @@
-package com.seamcarving.android.core
+package io.github.seamcarving
 
 data class RgbaImage(val width: Int, val height: Int, val bytes: ByteArray) {
     init {

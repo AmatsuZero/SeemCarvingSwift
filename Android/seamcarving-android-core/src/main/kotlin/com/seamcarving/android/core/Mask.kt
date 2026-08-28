@@ -1,4 +1,4 @@
-package com.seamcarving.android.core
+package io.github.seamcarving
 
 data class Mask(val width: Int, val height: Int, val values: FloatArray) {
     init {

@@ -1,7 +1,10 @@
-package com.seamcarving.android.core
+package io.github.seamcarving
 
 import io.github.seamcarving.internal.AndroidResizeBridge
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import java.util.concurrent.ExecutionException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -26,18 +29,26 @@ class SeamCarver {
             } finally {
                 arena.close()
             }
-        } catch (error: Throwable) {
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
             throw SeamCarvingException("Seam carving resize failed.", error)
         }
     }
 }
 
-private suspend fun <T> CompletableFuture<T>.awaitResult(): T = suspendCoroutine { continuation ->
+internal suspend fun <T> CompletableFuture<T>.awaitResult(): T = suspendCoroutine { continuation ->
     whenComplete { result, error ->
         if (error == null) {
             continuation.resume(result)
         } else {
-            continuation.resumeWithException(error)
+            continuation.resumeWithException(error.unwrapCompletionCause())
         }
     }
 }
+
+private fun Throwable.unwrapCompletionCause(): Throwable =
+    when (this) {
+        is CompletionException, is ExecutionException -> cause?.unwrapCompletionCause() ?: this
+        else -> this
+    }

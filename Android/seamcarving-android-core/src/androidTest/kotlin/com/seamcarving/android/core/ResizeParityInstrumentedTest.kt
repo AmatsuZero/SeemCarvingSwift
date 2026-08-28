@@ -1,12 +1,17 @@
-package com.seamcarving.android.core
+package io.github.seamcarving
 
+import io.github.seamcarving.internal.AndroidResizeBridge
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.swift.swiftkit.core.SwiftArena
 
 class ResizeParityInstrumentedTest {
     @Test
@@ -39,6 +44,30 @@ class ResizeParityInstrumentedTest {
             ),
             result.bytes,
         )
+    }
+
+    @Test
+    fun closingTheArenaDestroysTheNativeSwiftResult() {
+        val arena = SwiftArena.ofConfined()
+        val result = AndroidResizeBridge.resize(
+            2,
+            2,
+            byteArrayOf(
+                0, 0, 0, -1,
+                -1, 0, 0, -1,
+                0, -1, 0, -1,
+                0, 0, -1, -1,
+            ),
+            1,
+            2,
+            FloatArray(0),
+            FloatArray(0),
+            arena,
+        ).get(30, TimeUnit.SECONDS)
+
+        assertFalse(result.`$statusDestroyedFlag`().get())
+        arena.close()
+        assertTrue(result.`$statusDestroyedFlag`().get())
     }
 }
 
