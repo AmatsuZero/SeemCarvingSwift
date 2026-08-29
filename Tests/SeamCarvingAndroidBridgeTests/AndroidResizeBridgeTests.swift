@@ -80,6 +80,66 @@ final class AndroidResizeBridgeTests: XCTestCase {
         }
     }
 
+    func testCancellationActionRunsOnlyOnceWhenCancellationSourcesRace() {
+        let recorder = AndroidCancellationRecorder()
+        let state = AndroidResizeOperationState()
+        state.install(cancellationAction: {
+            recorder.recordCancellation()
+        })
+
+        DispatchQueue.concurrentPerform(iterations: 32) { index in
+            if index.isMultiple(of: 2) {
+                state.cancelFromProgressCallback()
+            } else {
+                state.cancelAndWaitForProgressDelivery()
+            }
+        }
+
+        XCTAssertEqual(recorder.cancellationCount, 1)
+    }
+
+    func testCancellationBeforeInstallCancelsInstalledTaskOnlyOnce() {
+        let recorder = AndroidCancellationRecorder()
+        let state = AndroidResizeOperationState()
+
+        state.cancelAndWaitForProgressDelivery()
+        state.cancelFromProgressCallback()
+        XCTAssertEqual(recorder.cancellationCount, 0)
+
+        state.install(cancellationAction: {
+            recorder.recordCancellation()
+        })
+        state.cancelAndWaitForProgressDelivery()
+        state.cancelFromProgressCallback()
+
+        XCTAssertEqual(recorder.cancellationCount, 1)
+    }
+
+    func testCancellationDuringProgressWaitsAndCallbackStopDoesNotCancelAgain() {
+        let recorder = AndroidCancellationRecorder()
+        let state = AndroidResizeOperationState()
+        state.install(cancellationAction: {
+            recorder.recordCancellation()
+        })
+        XCTAssertTrue(state.beginProgressDelivery())
+
+        let cancellationFinished = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            state.cancelAndWaitForProgressDelivery()
+            cancellationFinished.signal()
+        }
+
+        XCTAssertEqual(recorder.waitForFirstCancellation(), .success)
+        XCTAssertEqual(cancellationFinished.wait(timeout: .now() + 0.05), .timedOut)
+
+        state.endProgressDelivery()
+        state.cancelFromProgressCallback()
+
+        XCTAssertEqual(cancellationFinished.wait(timeout: .now() + 1), .success)
+        XCTAssertEqual(recorder.cancellationCount, 1)
+        XCTAssertFalse(state.beginProgressDelivery())
+    }
+
     private static func gradientBytes(width: Int, height: Int) -> [UInt8] {
         var bytes = [UInt8]()
         bytes.reserveCapacity(width * height * 4)
@@ -107,5 +167,31 @@ private final class AndroidProgressRecorder: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return recordedValues
+    }
+}
+
+private final class AndroidCancellationRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private let firstCancellation = DispatchSemaphore(value: 0)
+    private var count = 0
+
+    func recordCancellation() {
+        lock.lock()
+        count += 1
+        let isFirstCancellation = count == 1
+        lock.unlock()
+        if isFirstCancellation {
+            firstCancellation.signal()
+        }
+    }
+
+    func waitForFirstCancellation() -> DispatchTimeoutResult {
+        firstCancellation.wait(timeout: .now() + 1)
+    }
+
+    var cancellationCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
     }
 }

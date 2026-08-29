@@ -129,7 +129,9 @@ public final class AndroidResizeOperation: @unchecked Sendable {
                 }
             )
         }
-        state.install(operationTask)
+        state.install(cancellationAction: {
+            operationTask.cancel()
+        })
         defer { state.finish() }
 
         return try await withTaskCancellationHandler {
@@ -144,25 +146,30 @@ public final class AndroidResizeOperation: @unchecked Sendable {
     }
 }
 
-private final class AndroidResizeOperationState: @unchecked Sendable {
+final class AndroidResizeOperationState: @unchecked Sendable {
+    typealias CancellationAction = () -> Void
+
     private let condition = NSCondition()
-    private var task: Task<AndroidResizeResult, Error>?
+    private var cancellationAction: CancellationAction?
     private var cancellationRequested = false
     private var activeProgressDeliveries = 0
 
-    func install(_ task: Task<AndroidResizeResult, Error>) {
+    func install(cancellationAction: @escaping CancellationAction) {
         condition.lock()
-        self.task = task
+        self.cancellationAction = cancellationAction
         let shouldCancel = cancellationRequested
+        if shouldCancel {
+            self.cancellationAction = nil
+        }
         condition.unlock()
         if shouldCancel {
-            task.cancel()
+            cancellationAction()
         }
     }
 
     func finish() {
         condition.lock()
-        self.task = nil
+        cancellationAction = nil
         condition.unlock()
     }
 
@@ -184,13 +191,11 @@ private final class AndroidResizeOperationState: @unchecked Sendable {
     }
 
     func cancelFromProgressCallback() {
-        let task = markCancelled()
-        task?.cancel()
+        markCancelled()?()
     }
 
     func cancelAndWaitForProgressDelivery() {
-        let task = markCancelled()
-        task?.cancel()
+        markCancelled()?()
 
         condition.lock()
         while activeProgressDeliveries > 0 {
@@ -199,11 +204,16 @@ private final class AndroidResizeOperationState: @unchecked Sendable {
         condition.unlock()
     }
 
-    private func markCancelled() -> Task<AndroidResizeResult, Error>? {
+    private func markCancelled() -> CancellationAction? {
         condition.lock()
+        guard !cancellationRequested else {
+            condition.unlock()
+            return nil
+        }
         cancellationRequested = true
-        let task = task
+        let cancellationAction = cancellationAction
+        self.cancellationAction = nil
         condition.unlock()
-        return task
+        return cancellationAction
     }
 }
