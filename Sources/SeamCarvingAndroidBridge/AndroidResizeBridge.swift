@@ -1,3 +1,4 @@
+import Foundation
 import SeamCarvingCore
 
 public struct AndroidResizeResult {
@@ -22,6 +23,28 @@ public enum AndroidResizeBridge {
         protectionMask: [Float],
         removalMask: [Float]
     ) async throws -> AndroidResizeResult {
+        try await performResize(
+            width: width,
+            height: height,
+            bytes: bytes,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight,
+            protectionMask: protectionMask,
+            removalMask: removalMask,
+            progress: nil
+        )
+    }
+
+    fileprivate static func performResize(
+        width: Int32,
+        height: Int32,
+        bytes: [UInt8],
+        targetWidth: Int32,
+        targetHeight: Int32,
+        protectionMask: [Float],
+        removalMask: [Float],
+        progress: (@Sendable (SeamCarvingCore.ResizeProgress) -> Void)?
+    ) async throws -> AndroidResizeResult {
         let source = try RGBA8Image(
             width: Int(width),
             height: Int(height),
@@ -43,7 +66,7 @@ public enum AndroidResizeBridge {
         let result = try await SeamCarver().resize(
             source,
             to: target,
-            options: ResizeOptions(masks: masks)
+            options: ResizeOptions(masks: masks, progress: progress)
         )
         return AndroidResizeResult(
             width: try checkedDimension(result.width),
@@ -52,10 +75,135 @@ public enum AndroidResizeBridge {
         )
     }
 
-    private static func checkedDimension(_ value: Int) throws -> Int32 {
+    fileprivate static func checkedDimension(_ value: Int) throws -> Int32 {
         guard let dimension = Int32(exactly: value) else {
             throw SeamCarvingError.invalidDimensions
         }
         return dimension
+    }
+}
+
+/// A single-use Android resize operation whose lifecycle can be cancelled from
+/// the Kotlin coroutine that owns it.
+public final class AndroidResizeOperation: @unchecked Sendable {
+    private let state = AndroidResizeOperationState()
+
+    public init() {}
+
+    public func resize(
+        width: Int32,
+        height: Int32,
+        bytes: [UInt8],
+        targetWidth: Int32,
+        targetHeight: Int32,
+        protectionMask: [Float],
+        removalMask: [Float],
+        progress: @escaping @Sendable (
+            Int32,
+            Int32,
+            Int32,
+            Int32
+        ) -> Bool
+    ) async throws -> AndroidResizeResult {
+        let operationTask = Task {
+            try await AndroidResizeBridge.performResize(
+                width: width,
+                height: height,
+                bytes: bytes,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                protectionMask: protectionMask,
+                removalMask: removalMask,
+                progress: { [state] update in
+                    guard state.beginProgressDelivery() else { return }
+                    let shouldContinue = progress(
+                        Int32(update.completedEdits),
+                        Int32(update.totalEdits),
+                        Int32(update.size.width),
+                        Int32(update.size.height)
+                    )
+                    state.endProgressDelivery()
+                    if !shouldContinue {
+                        state.cancelFromProgressCallback()
+                    }
+                }
+            )
+        }
+        state.install(operationTask)
+        defer { state.finish() }
+
+        return try await withTaskCancellationHandler {
+            try await operationTask.value
+        } onCancel: { [state] in
+            state.cancelAndWaitForProgressDelivery()
+        }
+    }
+
+    public func cancel() {
+        state.cancelAndWaitForProgressDelivery()
+    }
+}
+
+private final class AndroidResizeOperationState: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var task: Task<AndroidResizeResult, Error>?
+    private var cancellationRequested = false
+    private var activeProgressDeliveries = 0
+
+    func install(_ task: Task<AndroidResizeResult, Error>) {
+        condition.lock()
+        self.task = task
+        let shouldCancel = cancellationRequested
+        condition.unlock()
+        if shouldCancel {
+            task.cancel()
+        }
+    }
+
+    func finish() {
+        condition.lock()
+        self.task = nil
+        condition.unlock()
+    }
+
+    func beginProgressDelivery() -> Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        guard !cancellationRequested else { return false }
+        activeProgressDeliveries += 1
+        return true
+    }
+
+    func endProgressDelivery() {
+        condition.lock()
+        activeProgressDeliveries -= 1
+        if activeProgressDeliveries == 0 {
+            condition.broadcast()
+        }
+        condition.unlock()
+    }
+
+    func cancelFromProgressCallback() {
+        let task = markCancelled()
+        task?.cancel()
+    }
+
+    func cancelAndWaitForProgressDelivery() {
+        let task = markCancelled()
+        task?.cancel()
+
+        condition.lock()
+        while activeProgressDeliveries > 0 {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    private func markCancelled() -> Task<AndroidResizeResult, Error>? {
+        condition.lock()
+        cancellationRequested = true
+        let task = task
+        condition.unlock()
+        return task
     }
 }

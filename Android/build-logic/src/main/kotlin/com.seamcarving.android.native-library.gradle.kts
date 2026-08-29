@@ -186,6 +186,9 @@ val stageNativeLibraries = triples.map { (abi, triple) ->
         group = "build"
         description = "Stages the required Android native libraries for $abi."
         dependsOn(buildBridge)
+        // Task ordering alone does not invalidate an existing staged directory
+        // when the Swift product changes.
+        inputs.file(bridgeLibrary)
         outputs.dir(generatedJniLibs.map { it.dir(abi) })
 
         doLast {

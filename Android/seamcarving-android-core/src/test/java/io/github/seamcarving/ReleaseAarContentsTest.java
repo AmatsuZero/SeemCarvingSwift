@@ -74,7 +74,7 @@ public final class ReleaseAarContentsTest {
             }
 
             for (String publicType : new String[] {
-                "Mask", "ResizeRequest", "RgbaImage", "SeamCarver", "SeamCarvingException"
+                "Mask", "ResizeProgress", "ResizeRequest", "RgbaImage", "SeamCarver", "SeamCarvingException"
             }) {
                 assertTrue(
                     "Missing public API type " + publicType,
@@ -100,7 +100,7 @@ public final class ReleaseAarContentsTest {
             }
             assertEquals(
                 "The core AAR exposes an unexpected JVM-public top-level facade implementation",
-                Set.of("Mask", "ResizeRequest", "RgbaImage", "SeamCarver", "SeamCarvingException"),
+                Set.of("Mask", "ResizeProgress", "ResizeRequest", "RgbaImage", "SeamCarver", "SeamCarvingException"),
                 publicTopLevelTypes
             );
             String publicFacade = javapPublic(classesJarPath, publicTopLevelTypes);
@@ -222,6 +222,18 @@ public final class ReleaseAarContentsTest {
         assertTrue("SwiftKit must be a runtime-only consumer dependency", dependencyHasRuntimeScope(core, "swiftkit-core"));
     }
 
+    @Test
+    public void publishedCorePomExportsTheCoroutineFlowApiToConsumers() throws Exception {
+        File corePom = latestPom(new File(System.getProperty("corePomDirectory", "")));
+        String core = new String(Files.readAllBytes(corePom.toPath()), StandardCharsets.UTF_8);
+
+        assertTrue(core.contains("<artifactId>kotlinx-coroutines-core</artifactId>"));
+        assertTrue(
+            "Flow appears in the public API, so coroutines must be a compile-scope Maven dependency",
+            dependencyHasScope(core, "kotlinx-coroutines-core", "compile")
+        );
+    }
+
     private static File latestPom(File directory) {
         File[] poms = directory.listFiles((ignored, name) -> name.endsWith(".pom"));
         assertTrue("Expected a published Maven POM in " + directory, poms != null && poms.length > 0);
@@ -233,11 +245,15 @@ public final class ReleaseAarContentsTest {
     }
 
     private static boolean dependencyHasRuntimeScope(String pom, String artifactId) {
+        return dependencyHasScope(pom, artifactId, "runtime");
+    }
+
+    private static boolean dependencyHasScope(String pom, String artifactId, String scope) {
         int artifact = pom.indexOf("<artifactId>" + artifactId + "</artifactId>");
         if (artifact < 0) return false;
         int dependencyEnd = pom.indexOf("</dependency>", artifact);
         if (dependencyEnd < 0) return false;
-        return pom.substring(artifact, dependencyEnd).contains("<scope>runtime</scope>");
+        return pom.substring(artifact, dependencyEnd).contains("<scope>" + scope + "</scope>");
     }
 
     private static Set<String> classEntries(File jarFile) throws Exception {
