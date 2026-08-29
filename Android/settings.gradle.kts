@@ -19,3 +19,4 @@ rootProject.name = "SeamCarvingAndroid"
 include(":swiftkit-core")
 include(":seamcarving-android-bridge")
 include(":seamcarving-android-core")
+include(":seamcarving-android-bitmap")
