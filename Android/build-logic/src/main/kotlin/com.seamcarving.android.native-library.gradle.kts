@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.LibraryExtension
+import com.seamcarving.android.restrictGeneratedBridgeApi
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.ArrayDeque
@@ -33,9 +34,6 @@ val swiftScratchDirectory = layout.buildDirectory.dir("swiftpm")
 val generatedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
 val generatedSwiftJavaSources = layout.buildDirectory.dir("generated/swift-java")
 val swiftPluginOutputs = swiftScratchDirectory.map { it.dir("plugins/outputs") }
-val generatedBridgeClassDeclaration = Regex(
-    "^public final class (AndroidResizeBridge|AndroidResizeResult|BridgeProbe|SeamCarvingAndroidBridge)(.*)$",
-)
 
 pluginManager.apply("com.android.library")
 pluginManager.apply("com.seamcarving.android.toolchain")
@@ -65,7 +63,7 @@ val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
     inputs.file(File(swiftPackageDirectory, "Package.resolved"))
     inputs.dir(File(swiftPackageDirectory, "Sources/SeamCarvingAndroidBridge"))
     inputs.property("generatedJavaPackage", "io.github.seamcarving")
-    inputs.property("bindingPostProcessorVersion", 3)
+    inputs.property("bindingPostProcessorVersion", 4)
     outputs.dir(generatedSwiftJavaSources)
 
     doLast {
@@ -108,13 +106,14 @@ val generateSwiftJavaBindings = tasks.register("generateSwiftJavaBindings") {
             from(generatedJavaSource)
             into(destination)
             filter { line: String ->
-                line
+                restrictGeneratedBridgeApi(
+                    line
                     .replace("import org.swift.swiftkit.core.util.*;", "")
                     .replace("import org.swift.swiftkit.core.collections.*;", "")
                     .replace("import org.swift.swiftkit.core.annotations.*;", "")
                     .replace("@Unsigned ", "")
                     .replace("@Unsigned", "")
-                    .replace(generatedBridgeClassDeclaration, "final class $1$2")
+                )
                 }
         }
         val unexpectedSources = destination.walkTopDown()

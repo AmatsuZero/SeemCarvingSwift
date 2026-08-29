@@ -5,15 +5,18 @@ plugins {
     `maven-publish`
 }
 
-// This is a pinned, Android-specific subset vendored from swift-java 0.2.0.
-// Publish it under the SeamCarving namespace rather than claiming the
-// upstream Swift project's unpublished snapshot coordinate.
-group = "io.github.seamcarving"
-version = providers.gradleProperty("VERSION_NAME").get()
+// This is the Android-compatible subset of the pinned swift-java 0.2.0
+// SwiftKitCore module. It intentionally retains the exact upstream component
+// identity so Gradle selects one SwiftKitCore component when consumers also
+// depend on the canonical runtime; publishing the same classes under another
+// GAV would create duplicate-class failures.
+group = "org.swift.swiftkit"
+version = "1.0-SNAPSHOT"
 
 val coreProject = project(":seamcarving-android-core")
 val swiftJavaCheckout = coreProject.layout.buildDirectory.dir("swiftpm/checkouts/swift-java")
 val swiftKitCoreSources = swiftJavaCheckout.map { it.dir("SwiftKitCore/src/main/java") }
+val swiftKitCoreBuild = swiftJavaCheckout.map { it.file("SwiftKitCore/build.gradle.kts") }
 val generatedSources = layout.buildDirectory.dir("generated/swiftkit-core")
 val androidJniRuntimeSources = listOf(
     "org/swift/swiftkit/core/AutoSwiftMemorySession.java",
@@ -38,11 +41,22 @@ val stageSwiftKitCoreSources = tasks.register("stageSwiftKitCoreSources") {
     description = "Stages the Android JNI subset of the pinned upstream SwiftKitCore sources."
     dependsOn(":seamcarving-android-core:generateSwiftJavaBindings")
     inputs.dir(swiftKitCoreSources)
+    inputs.file(swiftKitCoreBuild)
     outputs.dir(generatedSources)
 
     doLast {
         val source = swiftKitCoreSources.get().asFile
         check(source.isDirectory) { "Pinned SwiftKitCore sources were not found at ${source.absolutePath}." }
+        val upstreamBuild = swiftKitCoreBuild.get().asFile.readText()
+        check(upstreamBuild.contains("group = \"${project.group}\"")) {
+            "Pinned SwiftKitCore changed its upstream Maven group; update the canonical Android runtime identity."
+        }
+        check(upstreamBuild.contains("version = \"${project.version}\"")) {
+            "Pinned SwiftKitCore changed its upstream Maven version; update the canonical Android runtime identity."
+        }
+        check(upstreamBuild.contains("artifactId = \"swiftkit-core\"")) {
+            "Pinned SwiftKitCore changed its upstream Maven artifact ID."
+        }
         val destination = generatedSources.get().asFile
         destination.deleteRecursively()
         copy {
@@ -65,7 +79,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.jar {
     dependsOn(stageSwiftKitCoreSources)
-    archiveBaseName.set("seamcarving-swiftkit-runtime")
+    archiveBaseName.set("swiftkit-core")
     from(swiftJavaCheckout.map { it.file("LICENSE.txt") }) {
         into("META-INF")
         rename { "LICENSE-swift-java.txt" }
@@ -83,7 +97,7 @@ tasks.named("sourcesJar") {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            artifactId = "seamcarving-swiftkit-runtime"
+            artifactId = "swiftkit-core"
             from(components["java"])
         }
     }

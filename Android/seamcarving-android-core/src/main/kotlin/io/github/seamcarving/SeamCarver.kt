@@ -14,16 +14,18 @@ class SeamCarver {
         try {
             val arena = SwiftArena.ofConfined()
             try {
-                val result = AndroidResizeBridge.resize(
-                    request.image.width,
-                    request.image.height,
-                    request.image.bytes,
-                    request.targetWidth,
-                    request.targetHeight,
-                    request.protectionMask?.values ?: FloatArray(0),
-                    request.removalMask?.values ?: FloatArray(0),
-                    arena,
-                ).awaitResult()
+                val result = FutureAwaiter.await(
+                    AndroidResizeBridge.resize(
+                        request.image.width,
+                        request.image.height,
+                        request.image.bytes,
+                        request.targetWidth,
+                        request.targetHeight,
+                        request.protectionMask?.values ?: FloatArray(0),
+                        request.removalMask?.values ?: FloatArray(0),
+                        arena,
+                    ),
+                )
                 return RgbaImage(result.width, result.height, result.bytes)
             } finally {
                 arena.close()
@@ -36,18 +38,20 @@ class SeamCarver {
     }
 }
 
-internal suspend fun <T> CompletableFuture<T>.awaitResult(): T = suspendCoroutine { continuation ->
-    whenComplete { result, error ->
-        if (error == null) {
-            continuation.resume(result)
-        } else {
-            continuation.resumeWithException(error.unwrapCompletionCause())
+private object FutureAwaiter {
+    suspend fun <T> await(future: CompletableFuture<T>): T = suspendCoroutine { continuation ->
+        future.whenComplete { result, error ->
+            if (error == null) {
+                continuation.resume(result)
+            } else {
+                continuation.resumeWithException(error.unwrapCompletionCause())
+            }
         }
     }
-}
 
-private fun Throwable.unwrapCompletionCause(): Throwable =
-    when (this) {
-        is CompletionException, is ExecutionException -> cause?.unwrapCompletionCause() ?: this
-        else -> this
-    }
+    private fun Throwable.unwrapCompletionCause(): Throwable =
+        when (this) {
+            is CompletionException, is ExecutionException -> cause?.unwrapCompletionCause() ?: this
+            else -> this
+        }
+}

@@ -55,7 +55,7 @@ tasks.withType<Test>().configureEach {
         systemProperty("swiftKitRuntimeJar", swiftKitRuntimeJar.get().asFile)
         systemProperty(
             "swiftKitRuntimeCoordinate",
-            "io.github.seamcarving:seamcarving-swiftkit-runtime:$version",
+            "org.swift.swiftkit:swiftkit-core:1.0-SNAPSHOT",
         )
         systemProperty("bridgeRuntimeJar", bridgeRuntimeJar.get().asFile)
         val localMaven = rootProject.layout.buildDirectory.dir("local-maven").get().asFile
@@ -70,7 +70,7 @@ tasks.withType<Test>().configureEach {
         )
         systemProperty(
             "swiftKitPomDirectory",
-            localMaven.resolve("io/github/seamcarving/seamcarving-swiftkit-runtime/$versionName"),
+            localMaven.resolve("org/swift/swiftkit/swiftkit-core/1.0-SNAPSHOT"),
         )
     } else {
         exclude("**/ReleaseAarContentsTest.class")

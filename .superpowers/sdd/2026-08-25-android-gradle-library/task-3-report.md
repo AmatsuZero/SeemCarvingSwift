@@ -40,11 +40,12 @@ connected JNI, release-boundary, and external Maven-consumer verification.
   `javaPackage` value from surviving beside the current bindings. The release
   regression rejects any legacy `io.github.seamcarving.internal` bridge class.
 - **Resolvable non-conflicting runtime coordinates:** the pinned Android subset
-  of upstream SwiftKitCore is published as
-  `io.github.seamcarving:seamcarving-swiftkit-runtime:$VERSION_NAME`, not under
-  the upstream project's `org.swift.swiftkit:*:1.0-SNAPSHOT` namespace. Core's
-  POM carries both private helper artifacts with runtime scope, and an external
-  Android application resolves and dexes them solely from local Maven.
+  of upstream SwiftKitCore retains upstream's canonical component identity,
+  `org.swift.swiftkit:swiftkit-core:1.0-SNAPSHOT`. Core and bridge POMs depend
+  on that exact runtime component. An external Android application declares
+  the same official GAV directly and through core, then proves Gradle resolves
+  exactly one component and passes Android's duplicate-class/dex gates using
+  only the task-local Maven fixture.
 - **Strict `DT_NEEDED` closure:** for each ABI, staging recursively scans the
   bridge and every copied library with the pinned NDK's `llvm-readelf`.
   Dependencies are copied from the bridge output, Swift runtime, or NDK C++
@@ -74,8 +75,10 @@ The boundary regression was then extended before the final fix. Against the
 in-progress implementation it failed 3 of 8 tests: one for stale
 `io.github.seamcarving.internal` classes, one for the colliding upstream
 snapshot coordinate, and one for the incorrect POM dependency. Clearing the
-SwiftPM plugin output at its source and assigning a project-owned runtime
-coordinate made the same 8 tests pass.
+SwiftPM plugin output at its source initially made the same 8 tests pass. The
+later publication-boundary review correctly found that a second GAV cannot be
+deduplicated against the upstream runtime, so the final fix uses the upstream
+component identity and exercises that dependency graph in an external app.
 
 ## Verification
 
@@ -125,3 +128,50 @@ Additional verification:
   `libSwiftJava.so`, `libswiftCore.so`, `libc++_shared.so`, and the required
   transitive Swift/Foundation runtime closure.
 - `rtk git diff --check` — passed.
+
+## Final publication-boundary closure (2026-08-29)
+
+This section supersedes the earlier project-owned-coordinate experiment.
+
+- `swiftkit-core` now derives the pinned SwiftJava 0.2.0 runtime sources while
+  retaining the exact upstream `org.swift.swiftkit:swiftkit-core:1.0-SNAPSHOT`
+  GAV. The staging task verifies that group, artifact, and version still match
+  the pinned upstream Gradle declaration before compiling or publishing the
+  local test fixture.
+- The Maven-only Android fixture declares both
+  `io.github.seamcarving:seamcarving-android-core:0.1.0-SNAPSHOT` and the
+  official SwiftKit GAV. Its verification requires exactly one SwiftKit module
+  component, rejects the obsolete project-owned runtime artifact, and then
+  runs `checkDebugDuplicateClasses`, dexing, and APK assembly.
+- `FutureAwaiter` is a file-private top-level object. The release test reads
+  class access flags and runs `javap -public`, allowing only the five intended
+  facade types and rejecting the former public `SeamCarverKt.awaitResult`
+  surface. Cancellation still preserves the original wrapped
+  `CancellationException` instance.
+- Generated JExtract ownership is name-independent: a tested post-processor
+  removes public ownership from every top-level Java class, interface, enum,
+  record, or annotation while retaining public members for same-package Kotlin
+  calls. Artifact inspection checks every generated top-level class, and a
+  consumer compilation probe confirms bridge types are inaccessible.
+
+Fresh evidence from the final boundary diff:
+
+- Generator mutation RED: with the generic post-processor bypassed,
+  `GeneratedBridgeVisibilityTest` failed at its first visibility assertion;
+  restored implementation GREEN: 1/1 passed with all 12 build-logic tasks
+  executed.
+- Facade mutation RED: changing `FutureAwaiter` back from `private` to
+  `internal` caused both the cancellation visibility assertion and release
+  AAR public-type allowlist to fail; restoring `private` returns the same 8
+  release tests to GREEN.
+- `:seamcarving-android-core:connectedDebugAndroidTest`: `BUILD SUCCESSFUL in
+  42s`; 2/2 tests, zero failures/errors on Android 13 ARM64.
+- `:seamcarving-android-core:testReleaseUnitTest --rerun`: final GREEN was
+  `BUILD SUCCESSFUL in 22s`; 8/8 tests, zero failures/errors (4 AAR/POM
+  boundary, 3 validation, 1
+  cancellation).
+- `:seamcarving-android-core:verifyExternalMavenConsumer`: nested Maven-only
+  build `BUILD SUCCESSFUL in 37s`; 35/35 tasks executed, including one-component
+  resolution, duplicate-class checking, dexing, and APK assembly.
+- `swiftly run swift +6.3.3 test --filter AndroidResizeBridgeTests`: 1/1 test,
+  zero failures.

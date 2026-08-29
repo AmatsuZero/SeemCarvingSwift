@@ -81,6 +81,33 @@ public final class ReleaseAarContentsTest {
                     classes.contains("io/github/seamcarving/" + publicType + ".class")
                 );
             }
+            Set<String> publicTopLevelTypes = new HashSet<>();
+            for (String classEntry : classes) {
+                if (!classEntry.startsWith("io/github/seamcarving/") ||
+                    classEntry.substring("io/github/seamcarving/".length()).contains("/") ||
+                    classEntry.contains("$") || !classEntry.endsWith(".class")) {
+                    continue;
+                }
+                try (DataInputStream input = new DataInputStream(
+                    classesJar.getInputStream(classesJar.getEntry(classEntry))
+                )) {
+                    if ((readClassAccessFlags(input) & 0x0001) != 0) {
+                        publicTopLevelTypes.add(
+                            classEntry.substring("io/github/seamcarving/".length(), classEntry.length() - 6)
+                        );
+                    }
+                }
+            }
+            assertEquals(
+                "The core AAR exposes an unexpected JVM-public top-level facade implementation",
+                Set.of("Mask", "ResizeRequest", "RgbaImage", "SeamCarver", "SeamCarvingException"),
+                publicTopLevelTypes
+            );
+            String publicFacade = javapPublic(classesJarPath, publicTopLevelTypes);
+            assertFalse(
+                "Coroutine implementation helper leaked into the Java-visible facade:\n" + publicFacade,
+                publicFacade.contains("awaitResult") || publicFacade.contains("access$")
+            );
             assertFalse(
                 "Legacy source package remains in the AAR",
                 classes.stream().anyMatch(name -> name.startsWith("com/seamcarving/android/core/"))
@@ -101,18 +128,22 @@ public final class ReleaseAarContentsTest {
                 classEntries(bridgeRuntimeJar).stream()
                     .anyMatch(name -> name.startsWith("io/github/seamcarving/internal/"))
             );
-            for (String bridgeType : new String[] {
-                "AndroidResizeBridge", "AndroidResizeResult", "BridgeProbe", "SeamCarvingAndroidBridge"
-            }) {
-                String classEntry = "io/github/seamcarving/" + bridgeType + ".class";
-                assertTrue("Missing generated bridge type " + bridgeType, bridgeJar.getEntry(classEntry) != null);
+            Set<String> generatedTopLevelTypes = new HashSet<>();
+            for (String classEntry : classEntries(bridgeRuntimeJar)) {
+                if (!classEntry.startsWith("io/github/seamcarving/") ||
+                    classEntry.substring("io/github/seamcarving/".length()).contains("/") ||
+                    classEntry.contains("$") || !classEntry.endsWith(".class")) {
+                    continue;
+                }
+                generatedTopLevelTypes.add(classEntry);
                 try (DataInputStream input = new DataInputStream(bridgeJar.getInputStream(bridgeJar.getEntry(classEntry)))) {
                     assertFalse(
-                        "Generated bridge type is JVM-public: " + bridgeType,
+                        "Generated bridge top-level type is JVM-public: " + classEntry,
                         (readClassAccessFlags(input) & 0x0001) != 0
                     );
                 }
             }
+            assertFalse("Generated bridge JAR contains no top-level bindings", generatedTopLevelTypes.isEmpty());
         }
 
         assertConsumerCompilation(new Path[] {classesJarPath}, "StableConsumer", """
@@ -130,14 +161,14 @@ public final class ReleaseAarContentsTest {
     }
 
     @Test
-    public void swiftKitRuntimeUsesAnOwnedCoordinateWithoutDuplicateClasses() throws Exception {
+    public void swiftKitRuntimeUsesTheCanonicalUpstreamCoordinateWithoutDuplicateClasses() throws Exception {
         File releaseAar = new File(System.getProperty("releaseAar"));
         File runtimeJar = new File(System.getProperty("swiftKitRuntimeJar", ""));
         File bridgeRuntimeJar = new File(System.getProperty("bridgeRuntimeJar", ""));
         assertTrue("SwiftKitCore runtime dependency JAR was not created: " + runtimeJar, runtimeJar.isFile());
         assertEquals(
-            "The vendored SwiftKit runtime must use a SeamCarving-owned, versioned coordinate",
-            "io.github.seamcarving:seamcarving-swiftkit-runtime:0.1.0-SNAPSHOT",
+            "The pinned Android SwiftKit subset must use the canonical upstream component identity",
+            "org.swift.swiftkit:swiftkit-core:1.0-SNAPSHOT",
             System.getProperty("swiftKitRuntimeCoordinate")
         );
 
@@ -183,12 +214,12 @@ public final class ReleaseAarContentsTest {
         String core = new String(Files.readAllBytes(corePom.toPath()), StandardCharsets.UTF_8);
         String bridge = new String(Files.readAllBytes(bridgePom.toPath()), StandardCharsets.UTF_8);
         assertTrue(core.contains("<artifactId>seamcarving-android-bridge</artifactId>"));
-        assertTrue(core.contains("<artifactId>seamcarving-swiftkit-runtime</artifactId>"));
-        assertTrue(bridge.contains("<artifactId>seamcarving-swiftkit-runtime</artifactId>"));
-        assertFalse(core.contains("<groupId>org.swift.swiftkit</groupId>"));
-        assertFalse(bridge.contains("<groupId>org.swift.swiftkit</groupId>"));
+        assertTrue(core.contains("<groupId>org.swift.swiftkit</groupId>"));
+        assertTrue(core.contains("<artifactId>swiftkit-core</artifactId>"));
+        assertTrue(bridge.contains("<groupId>org.swift.swiftkit</groupId>"));
+        assertTrue(bridge.contains("<artifactId>swiftkit-core</artifactId>"));
         assertTrue("Private bridge must be a runtime-only consumer dependency", dependencyHasRuntimeScope(core, "seamcarving-android-bridge"));
-        assertTrue("SwiftKit must be a runtime-only consumer dependency", dependencyHasRuntimeScope(core, "seamcarving-swiftkit-runtime"));
+        assertTrue("SwiftKit must be a runtime-only consumer dependency", dependencyHasRuntimeScope(core, "swiftkit-core"));
     }
 
     private static File latestPom(File directory) {
@@ -219,6 +250,24 @@ public final class ReleaseAarContentsTest {
             }
         }
         return classes;
+    }
+
+    private static String javapPublic(Path classesJar, Set<String> publicTopLevelTypes) throws Exception {
+        Path javap = Path.of(System.getProperty("java.home"), "bin", "javap");
+        assertTrue("Release AAR API test requires javap from a full JDK: " + javap, Files.isExecutable(javap));
+        java.util.List<String> command = new java.util.ArrayList<>();
+        command.add(javap.toString());
+        command.add("-public");
+        command.add("-classpath");
+        command.add(classesJar.toString());
+        publicTopLevelTypes.stream()
+            .map(name -> "io.github.seamcarving." + name)
+            .sorted()
+            .forEach(command::add);
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals("javap failed:\n" + output, 0, process.waitFor());
+        return output;
     }
 
     private static void assertConsumerCompilation(
