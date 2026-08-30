@@ -6,10 +6,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    id("com.seamcarving.android.publish")
 }
 
-group = "io.github.seamcarving"
-version = providers.gradleProperty("VERSION_NAME").get()
+description = "Optional ML Kit face-protection masks for SeamCarving"
 
 extensions.configure<LibraryExtension> {
     namespace = "io.github.seamcarving.mlkit"

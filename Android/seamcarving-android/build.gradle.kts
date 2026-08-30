@@ -8,10 +8,10 @@ plugins {
     id("com.seamcarving.android.publish")
 }
 
-description = "Android Bitmap adapters for SeamCarving"
+description = "Default SeamCarving Android facade with RGBA and Bitmap APIs"
 
 extensions.configure<LibraryExtension> {
-    namespace = "io.github.seamcarving.bitmap"
+    namespace = "io.github.seamcarving.facade"
     compileSdk = 35
 
     compileOptions {
@@ -21,7 +21,6 @@ extensions.configure<LibraryExtension> {
 
     defaultConfig {
         minSdk = 28
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 }
 
@@ -33,21 +32,15 @@ kotlin {
 
 dependencies {
     api(project(":seamcarving-android-core"))
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test:runner:1.6.2")
+    api(project(":seamcarving-android-bitmap"))
+    testImplementation(libs.junit)
 }
 
 tasks.withType<Test>().configureEach {
     if (name == "testReleaseUnitTest") {
-        dependsOn("bundleReleaseAar")
-        systemProperty(
-            "releaseAar",
-            layout.buildDirectory.file(
-                "outputs/aar/seamcarving-android-bitmap-release.aar",
-            ).get().asFile,
-        )
-    } else {
-        exclude("**/BitmapAarContentsTest.class")
+        val versionName = providers.gradleProperty("VERSION_NAME").get()
+        dependsOn(rootProject.tasks.named("publishAllPublicationsToBuildRepository"))
+        systemProperty("localMavenRepository", rootProject.layout.buildDirectory.dir("local-maven").get().asFile)
+        systemProperty("seamcarvingVersion", versionName)
     }
 }

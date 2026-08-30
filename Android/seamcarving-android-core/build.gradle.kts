@@ -2,24 +2,14 @@ import com.android.build.api.dsl.LibraryExtension
 import org.gradle.api.tasks.Exec
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.jvm.tasks.Jar
-import org.gradle.api.publish.maven.MavenPublication
 
 plugins {
     id("com.seamcarving.android.native-library")
     alias(libs.plugins.kotlin.android)
-    `maven-publish`
+    id("com.seamcarving.android.publish")
 }
 
-group = "io.github.seamcarving"
-version = providers.gradleProperty("VERSION_NAME").get()
-
-extensions.configure<LibraryExtension> {
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
-}
+description = "CPU-backed RGBA seam carving API and Android native runtime"
 
 kotlin {
     compilerOptions {
@@ -76,23 +66,6 @@ tasks.withType<Test>().configureEach {
         )
     } else {
         exclude("**/ReleaseAarContentsTest.class")
-    }
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            create<MavenPublication>("release") {
-                artifactId = "seamcarving-android-core"
-                from(components["release"])
-            }
-        }
-        repositories {
-            maven {
-                name = "Build"
-                url = uri(rootProject.layout.buildDirectory.dir("local-maven"))
-            }
-        }
     }
 }
 
