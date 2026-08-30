@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import io.github.seamcarving.SeamCarvingException
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -134,6 +135,44 @@ class FaceProtectionMaskTest {
 
         assertTrue(job.isCancelled)
         assertTrue(detector.closed.get())
+    }
+
+    @Test
+    fun detectorFailureRemainsPrimaryWhenClosingDetectorAlsoFails() {
+        val detectionFailure = IllegalStateException("detector failed")
+        val closeFailure = IllegalStateException("close failed")
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+
+        val thrown = assertThrows(SeamCarvingException::class.java) {
+            runBlocking {
+                bitmap.detectFaceProtectionMask(
+                    detect = { throw detectionFailure },
+                    close = { throw closeFailure },
+                )
+            }
+        }
+
+        assertSame(detectionFailure, thrown.cause)
+        assertEquals(listOf(closeFailure), thrown.suppressed.toList())
+    }
+
+    @Test
+    fun cancellationRemainsPrimaryWhenClosingDetectorAlsoFails() {
+        val cancellation = CancellationException("cancelled")
+        val closeFailure = IllegalStateException("close failed")
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+
+        val thrown = assertThrows(CancellationException::class.java) {
+            runBlocking {
+                bitmap.detectFaceProtectionMask(
+                    detect = { throw cancellation },
+                    close = { throw closeFailure },
+                )
+            }
+        }
+
+        assertSame(cancellation, thrown)
+        assertEquals(listOf(closeFailure), thrown.suppressed.toList())
     }
 
     private class RecordingDetector(

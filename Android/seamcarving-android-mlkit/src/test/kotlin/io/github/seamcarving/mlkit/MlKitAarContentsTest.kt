@@ -51,40 +51,70 @@ class MlKitAarContentsTest {
     }
 
     @Test
-    fun releaseAarPublicMethodsDoNotReferencePrivateImplementationTypes() {
+    fun releaseAarPublicAbiDoesNotReferenceGoogleOrNonPublicImplementationTypes() {
         val releaseAar = File(checkNotNull(System.getProperty("releaseAar")))
-        val classesJar = Files.createTempFile("seamcarving-mlkit-release", ".jar")
+        val classesJar = Files.createTempFile("seamcarving-mlkit-release", ".jar").toFile()
         ZipFile(releaseAar).use { archive ->
             val entry = checkNotNull(archive.getEntry("classes.jar"))
             archive.getInputStream(entry).use { input ->
-                Files.newOutputStream(classesJar).use(input::transferTo)
+                classesJar.outputStream().use(input::transferTo)
             }
         }
 
-        val javap = File(System.getProperty("java.home"), "bin/javap")
-        assertTrue("Release API test requires javap at $javap", javap.canExecute())
-        val process = ProcessBuilder(
-            javap.absolutePath,
-            "-private",
-            "-classpath",
-            classesJar.toString(),
-            "io.github.seamcarving.mlkit.FaceProtectionMaskKt",
-        ).redirectErrorStream(true).start()
-        val output = process.inputStream.bufferedReader().readText()
-        assertEquals("javap failed:\n$output", 0, process.waitFor())
-
-        val leakingMethods = output.lineSequence()
-            .map(String::trim)
-            .filter { line ->
-                line.startsWith("public ") && line.contains('(') &&
-                    PRIVATE_IMPLEMENTATION_TYPES.any(line::contains)
-            }
-            .toList()
+        val (publicClasses, nonPublicClasses) = classesJar.classNamesByVisibility()
+        val leakingMethods = publicClasses.flatMap { className ->
+            javapPrivate(classesJar, className).lineSequence()
+                .map(String::trim)
+                .filter { line ->
+                    line.startsWith("public ") && line.contains('(') &&
+                        (
+                            GOOGLE_IMPLEMENTATION_PREFIXES.any(line::contains) ||
+                                nonPublicClasses.any(line::contains)
+                        )
+                }
+                .map { signature -> "$className: $signature" }
+                .toList()
+        }
         assertTrue(
-            "Release AAR public methods reference private implementation types: $leakingMethods",
+            "Release AAR public ABI references Google or non-public implementation types: " +
+                leakingMethods.joinToString(),
             leakingMethods.isEmpty(),
         )
     }
+}
+
+private fun File.classNamesByVisibility(): Pair<List<String>, List<String>> {
+    val publicClasses = mutableListOf<String>()
+    val nonPublicClasses = mutableListOf<String>()
+    JarInputStream(inputStream()).use { jar ->
+        while (true) {
+            val entry = jar.nextJarEntry ?: break
+            if (!entry.name.endsWith(".class")) continue
+            val className = entry.name.removeSuffix(".class").replace('/', '.')
+            val accessFlags = DataInputStream(jar).readClassAccessFlags()
+            if (accessFlags and PUBLIC_ACCESS != 0) {
+                publicClasses += className
+            } else {
+                nonPublicClasses += className
+            }
+        }
+    }
+    return publicClasses to nonPublicClasses
+}
+
+private fun javapPrivate(classesJar: File, className: String): String {
+    val javap = File(System.getProperty("java.home"), "bin/javap")
+    assertTrue("Release API test requires javap at $javap", javap.canExecute())
+    val process = ProcessBuilder(
+        javap.absolutePath,
+        "-private",
+        "-classpath",
+        classesJar.toString(),
+        className,
+    ).redirectErrorStream(true).start()
+    val output = process.inputStream.bufferedReader().readText()
+    assertEquals("javap failed for $className:\n$output", 0, process.waitFor())
+    return output
 }
 
 private fun DataInputStream.readClassAccessFlags(): Int {
@@ -112,8 +142,7 @@ private fun DataInputStream.readClassAccessFlags(): Int {
 
 private const val CLASS_FILE_MAGIC = -889275714
 private const val PUBLIC_ACCESS = 0x0001
-private val PRIVATE_IMPLEMENTATION_TYPES = listOf(
-    "io.github.seamcarving.mlkit.FaceBoxDetector",
-    "io.github.seamcarving.mlkit.FaceBoxDetectorFactory",
-    "io.github.seamcarving.mlkit.FaceProtectionMask",
+private val GOOGLE_IMPLEMENTATION_PREFIXES = listOf(
+    "com.google.android.gms.",
+    "com.google.mlkit.",
 )

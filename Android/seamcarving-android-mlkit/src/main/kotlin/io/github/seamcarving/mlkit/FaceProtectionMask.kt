@@ -2,7 +2,6 @@ package io.github.seamcarving.mlkit
 
 import android.graphics.Bitmap
 import android.graphics.Rect
-import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -61,6 +60,7 @@ private suspend fun Bitmap.detectFaceProtectionMaskInternal(
         throw SeamCarvingException("Unable to create the ML Kit face detector.", error)
     }
 
+    var primaryFailure: Throwable? = null
     try {
         val rectangles = try {
             detect(this)
@@ -73,8 +73,21 @@ private suspend fun Bitmap.detectFaceProtectionMaskInternal(
         return withContext(Dispatchers.Default) {
             FaceProtectionMask.rasterize(width, height, rectangles, paddingPixels)
         }
+    } catch (error: Throwable) {
+        primaryFailure = error
+        throw error
     } finally {
-        close()
+        try {
+            close()
+        } catch (closeFailure: Throwable) {
+            val failure = primaryFailure
+            if (failure == null) {
+                throw closeFailure
+            }
+            if (closeFailure !== failure) {
+                failure.addSuppressed(closeFailure)
+            }
+        }
     }
 }
 
@@ -136,29 +149,29 @@ private fun createMlKitDetector(): Pair<suspend (Bitmap) -> List<Rect>, () -> Un
         .build()
     val detector = FaceDetection.getClient(options)
     val detect: suspend (Bitmap) -> List<Rect> = { bitmap ->
-        detector.process(InputImage.fromBitmap(bitmap, NO_ROTATION_DEGREES))
-            .awaitCancellable()
-            .map { face -> Rect(face.boundingBox) }
+        suspendCancellableCoroutine { continuation ->
+            detector.process(InputImage.fromBitmap(bitmap, NO_ROTATION_DEGREES))
+                .addOnCompleteListener(DIRECT_EXECUTOR) { completed ->
+                    if (!continuation.isActive) return@addOnCompleteListener
+                    when {
+                        completed.isCanceled -> continuation.cancel()
+                        completed.isSuccessful -> {
+                            continuation.resumeWith(Result.success(completed.result))
+                        }
+                        else -> continuation.resumeWith(
+                            Result.failure(
+                                completed.exception
+                                    ?: IllegalStateException(
+                                        "ML Kit task failed without an exception.",
+                                    ),
+                            ),
+                        )
+                    }
+                }
+        }.map { face -> Rect(face.boundingBox) }
     }
     return Pair(detect, detector::close)
 }
-
-private suspend fun <T> Task<T>.awaitCancellable(): T =
-    suspendCancellableCoroutine { continuation ->
-        addOnCompleteListener(DIRECT_EXECUTOR) { completed ->
-            if (!continuation.isActive) return@addOnCompleteListener
-            when {
-                completed.isCanceled -> continuation.cancel()
-                completed.isSuccessful -> continuation.resumeWith(Result.success(completed.result))
-                else -> continuation.resumeWith(
-                    Result.failure(
-                        completed.exception
-                            ?: IllegalStateException("ML Kit task failed without an exception."),
-                    ),
-                )
-            }
-        }
-    }
 
 private val DIRECT_EXECUTOR = Executor { command -> command.run() }
 private const val NO_ROTATION_DEGREES = 0
