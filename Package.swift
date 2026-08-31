@@ -1,4 +1,5 @@
 // swift-tools-version: 6.0
+import CompilerPluginSupport
 import PackageDescription
 
 let package = Package(
@@ -22,14 +23,31 @@ let package = Package(
         // Deprecated source-compatible umbrella for existing CLI library users.
         .library(name: "SeamCarvingCLI", targets: ["SeamCarvingCLI"]),
         .library(name: "SeamCarvingBenchmark", targets: ["SeamCarvingBenchmark"]),
+        .library(name: "SeamCarvingAndroidBridge", type: .dynamic, targets: ["SeamCarvingAndroidBridge"]),
         .executable(name: "seamcarve-cli", targets: ["seamcarve-cli-apple"]),
         .executable(name: "seamcarve-benchmark", targets: ["seamcarve-benchmark"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.0"),
+        .package(url: "https://github.com/swiftlang/swift-java", exact: "0.2.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", exact: "0.4.0"),
     ],
     targets: [
         .target(name: "SeamCarvingCore"),
+        .target(
+            name: "SeamCarvingAndroidBridge",
+            dependencies: [
+                "SeamCarvingCore",
+                .product(name: "SwiftJava", package: "swift-java"),
+            ],
+            exclude: ["swift-java.config"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ],
+            plugins: [
+                .plugin(name: "JExtractSwiftPlugin", package: "swift-java"),
+            ]
+        ),
         .target(name: "SeamCarvingAccelerate", dependencies: ["SeamCarvingCore"]),
         .target(
             name: "SeamCarvingMetal",
@@ -110,6 +128,7 @@ let package = Package(
         ),
         .executableTarget(name: "seamcarve-benchmark", dependencies: ["SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingCoreTests", dependencies: ["SeamCarvingCore"]),
+        .testTarget(name: "SeamCarvingAndroidBridgeTests", dependencies: ["SeamCarvingAndroidBridge"]),
         .testTarget(name: "SeamCarvingBenchmarkTests", dependencies: ["SeamCarvingCore", "SeamCarvingBenchmark"]),
         .testTarget(name: "SeamCarvingAccelerateTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate"]),
         .testTarget(name: "SeamCarvingMetalTests", dependencies: ["SeamCarvingCore", "SeamCarvingAccelerate", "SeamCarvingMetal"]),

@@ -51,6 +51,38 @@ let result = try await SeamCarver().resize(image, to: target)
 See the [API guide](docs/api.html) for masks, progress, cancellation,
 enlargement, and the Apple facade.
 
+### Use the Android Gradle library
+
+Android is available as a CPU-only Gradle library with `minSdk = 28`. The
+published core AAR contains `arm64-v8a`, `armeabi-v7a`, and `x86_64` native
+libraries; application consumers install neither Swift nor the Android NDK.
+
+The default facade gives an Android app the RGBA core and `Bitmap` adapters:
+
+```kotlin
+repositories {
+    mavenCentral() // use a released version after the Maven Central release gate
+}
+
+dependencies {
+    implementation("io.github.seamcarving:seamcarving-android:<version>")
+}
+```
+
+`<version>` is intentionally not a promise that a snapshot has been uploaded:
+the repository currently verifies release candidates by publishing to
+`Android/build/local-maven`, and a separate signed release workflow is required
+before a version is available from Maven Central. A developer testing that
+local publication must add its filesystem Maven repository explicitly; an
+ordinary application should use only the released Maven Central coordinate.
+
+For a buffer-only integration depend on
+`seamcarving-android-core`; `seamcarving-android-bitmap` adds `Bitmap`
+conversion. `seamcarving-android-mlkit` is opt-in and supplies face-protection
+masks—it is deliberately excluded from the default facade. The Kotlin API,
+RGBA contract, progress/cancellation, `Bitmap` ownership, mask semantics, and
+local-consumer troubleshooting are documented in [Android/README.md](Android/README.md).
+
 ### Import the Apple capability you use
 
 The v2 `SeamCarvingApple` product is a compatibility facade for the CGImage
@@ -98,8 +130,9 @@ gate validates the portable algorithm target, not complete image I/O or
 application support on those hosts. The repository also contains an
 [experimental static browser WASM demo](Examples/WasmDemo/README.md) that
 runs the CPU Core path locally in a Worker. It is not a declaration of general
-WASM platform, image-I/O library, CLI, or application support. Android remains
-an adapter boundary ready for implementation, not a supported platform.
+WASM platform, image-I/O library, CLI, or application support. Android has a
+separate CPU Gradle-library delivery surface; it does not make the Apple CLI,
+editor, image codecs, Metal, or Vision capabilities available on Android.
 
 ### Run the CLI
 
@@ -175,6 +208,12 @@ SeamCarvingCore
     │   ├── SeamCarvingUIKit
     │   └── SeamCarvingAppKit
     └── SeamCarvingApple (CGImage compatibility facade)
+
+Android Gradle artifacts (separate distribution boundary)
+    ├── seamcarving-android-core (CPU RGBA API + Swift runtime)
+    ├── seamcarving-android-bitmap (Bitmap adapter)
+    ├── seamcarving-android-mlkit (optional ML Kit masks)
+    └── seamcarving-android (core + Bitmap facade)
 ```
 
 Core owns image and mask semantics, energy, dynamic programming, seam editing,

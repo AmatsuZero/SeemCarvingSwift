@@ -1,0 +1,23 @@
+[versions]
+android-gradle-plugin = "8.10.1"
+gradle = "8.14.5"
+kotlin = "2.1.21"
+ndk = "27.3.13750724"
+swift = "6.3.3"
+swift-android-sdk = "swift-6.3.3-RELEASE_android"
+swift-java = "0.2.0"
+mlkit-face-detection = "16.1.7"
+robolectric = "4.16.1"
+junit = "4.13.2"
+androidx-test-runner = "1.6.2"
+
+[libraries]
+mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkit-face-detection" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
+android-library = { id = "com.android.library", version.ref = "android-gradle-plugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
