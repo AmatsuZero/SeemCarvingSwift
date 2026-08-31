@@ -49,6 +49,34 @@ let result = try await SeamCarver().resize(image, to: target)
 
 Mask、进度、取消、放大和 Apple facade 示例见 [Swift API 指南](docs/api-zh.html)。
 
+### 使用 Android Gradle library
+
+Android 版本是 CPU-only 的 Gradle library，`minSdk = 28`。Core AAR 包含
+`arm64-v8a`、`armeabi-v7a` 和 `x86_64` 三种 ABI 的 native library；应用侧不需要
+安装 Swift 或 Android NDK。
+
+默认 facade 同时提供 RGBA Core 和 `Bitmap` adapter：
+
+```kotlin
+repositories {
+    mavenCentral() // Maven Central release gate 完成后使用已发布版本
+}
+
+dependencies {
+    implementation("io.github.seamcarving:seamcarving-android:<version>")
+}
+```
+
+`<version>` 并不表示任意 snapshot 已上传。当前仓库会先发布到
+`Android/build/local-maven` 并验证；只有独立的签名发布流程完成后，版本才会在
+Maven Central 可用。测试本地发布时必须显式添加该文件系统 Maven repository；普通
+应用应只依赖已发布的 Maven Central coordinate。
+
+只使用像素 buffer 时依赖 `seamcarving-android-core`；需要 `Bitmap` 转换时加入
+`seamcarving-android-bitmap`。`seamcarving-android-mlkit` 是显式可选的人脸保护
+mask adapter，默认 facade 特意不包含它。Kotlin API、RGBA 语义、进度/取消、`Bitmap`
+所有权、mask 语义和本地 consumer 排障见 [Android/README.md](Android/README.md)。
+
 ### 按所用能力导入 Apple 模块
 
 v2 的 `SeamCarvingApple` product 是仅面向 CGImage 的兼容 facade：它只重新导出
@@ -93,8 +121,9 @@ macOS/Linux/Windows CI 验证矩阵共同保护。只有仓库 CI 实际记录�
 Linux/Windows 记为“已验证”。该 gate 验证的是可移植算法 target，并不代表这些
 宿主的完整图像 I/O 或 App 已受支持。仓库还提供了一个在 Worker 中本地运行 CPU
 Core 的[实验性静态浏览器 WASM demo](Examples/WasmDemo/README.md)；这不表示已经支持
-通用 WASM 平台、图像 I/O library、CLI 或 application。Android 仍只是已预留的 adapter
-边界，尚不是已支持的平台。
+通用 WASM 平台、图像 I/O library、CLI 或 application。Android 已提供独立的 CPU
+Gradle-library 交付面；它不会让 Apple CLI、编辑器、image codec、Metal 或 Vision
+能力在 Android 上可用。
 
 ### 使用 CLI
 
@@ -175,6 +204,12 @@ SeamCarvingCore
     │   ├── SeamCarvingUIKit
     │   └── SeamCarvingAppKit
     └── SeamCarvingApple（CGImage compatibility facade）
+
+Android Gradle artifacts（独立交付边界）
+    ├── seamcarving-android-core（CPU RGBA API + Swift runtime）
+    ├── seamcarving-android-bitmap（Bitmap adapter）
+    ├── seamcarving-android-mlkit（可选 ML Kit mask）
+    └── seamcarving-android（core + Bitmap facade）
 ```
 
 Core 负责图像/mask 语义、energy、dynamic programming、seam editing、planning 和 CPU

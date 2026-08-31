@@ -29,6 +29,7 @@ Classification legend:
 | 15 | Typed CLI argument parsing | CLI | `swift-argument-parser` handles syntax while domain validation remains in CLI configuration | verified; parser regression and full package tests pass |
 | 16 | Capability-based platform modules | Core/Apple adapters | Core has no Apple-framework dependency; image-object bridges are separate Runtime/Imaging/CoreVideo/UIKit/AppKit products | verified by the Core-only macOS/Linux/Windows build gate and target separation; this does not claim full Windows/Linux application support |
 | 17 | Experimental browser WASM demo | Isolated WASM bridge / Canvas | Local PNG/JPEG browser workflow resizes RGBA8 pixels in a Worker and exports PNG without network upload | experimental; static-host browser E2E and manual Safari/Edge checklist are required; this is not general WASM, image-I/O, CLI, or app support |
+| 18 | Android Gradle CPU library | Android bridge / Kotlin artifacts | `minSdk 28` apps resolve the facade or separated core/Bitmap/optional-ML-Kit artifacts; only core packages Swift runtime for arm64-v8a, armeabi-v7a, and x86_64 | implemented; CI defines pinned Swift/NDK ABI, Android-device, and Maven-only consumer gates; remote signed Maven publication remains a separate release action |
 
 ## Face protection is a capability choice, not Pigo compatibility
 
@@ -61,8 +62,17 @@ capability products explicitly. The Core cross-host CI gate validates only
 `SeamCarvingCore`; it is not a declaration that Windows or Linux image I/O, UI,
 or CLI support has shipped. The isolated [experimental browser WASM demo](../Examples/WasmDemo/README.md)
 executes the CPU Core path locally in a Worker, but does not imply general WASM
-platform, image-I/O, CLI, or application support. Android remains an
-architecture-ready adapter boundary, not a supported platform.
+platform, image-I/O, CLI, or application support.
+
+Android is a distinct CPU-backed Gradle distribution: its stable API is Kotlin,
+not generated JNI. The default artifact includes the RGBA core and `Bitmap`
+adapter but excludes ML Kit; apps add the optional ML Kit artifact only when
+face protection is required. Android `Bitmap` conversion owns explicit
+`AARRGGBB`/RGBA8 mapping, and face detection stays Kotlin-side. The delivery
+does not claim Android support for the Apple app, CLI, codecs, Accelerate,
+Metal, or Vision. Consumers use a released Maven coordinate and need no
+Swift/NDK; repository CI first validates a local Maven graph before a separate
+credentialed remote release is allowed.
 
 The current CLI uses Apple ImageIO/CoreGraphics codecs. Future cross-host work
 will split its model/pipeline layer into `SeamCarvingCLIModel` and the Apple

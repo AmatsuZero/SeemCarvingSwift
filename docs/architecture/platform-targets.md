@@ -18,8 +18,16 @@ SeamCarvingCore
 ├── SeamCarvingUIKit                      (AppleImaging + UIKit)
 └── SeamCarvingAppKit                     (AppleImaging + AppKit)
 
+Android（已实现为独立 Gradle library）：
+SeamCarvingAndroidBridge
+└── SeamCarvingCore + JNI-safe RGBA bridge
+    └── seamcarving-android-core（RGBA/mask + native runtime）
+        ├── seamcarving-android-bitmap（Bitmap adapter）
+        ├── seamcarving-android-mlkit（可选 face-protection mask）
+        └── seamcarving-android（默认 core + Bitmap facade）
+
 未来：
-SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
+SeamCarvingWasm / SeamCarvingWindows
 └── SeamCarvingCore + 各自的像素缓冲或图像对象 bridge
 ```
 
@@ -35,6 +43,10 @@ SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
 | `SeamCarvingCoreVideo` | `CVPixelBuffer` bridge | UIKit、AppKit |
 | `SeamCarvingUIKit` | `UIImage` bridge 与 `UIImage.Orientation` | AppKit |
 | `SeamCarvingAppKit` | `NSImage` bridge | UIKit、Catalyst 分支 |
+| `SeamCarvingAndroidBridge` | 仅将 `RGBA8Image`、目标尺寸、mask 与 progress/cancel bridge 到 JNI | Android/ML Kit import、Apple backend、公开 JNI API |
+| `seamcarving-android-core` | 稳定 Kotlin RGBA/mask API、native runtime 与 CPU carving | `Bitmap`、ML Kit、重复 runtime library |
+| `seamcarving-android-bitmap` | `Bitmap` 与 RGBA8 的显式 `AARRGGBB` 转换 | native `.so`、ML Kit |
+| `seamcarving-android-mlkit` | Android ML Kit face box 到保护 mask | Swift import、默认 facade 的传递依赖 |
 
 ## 条件编译规则
 
@@ -43,6 +55,12 @@ SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
 3. 不为同一份实现同时提供 UIKit/AppKit API；二者分别属于独立 target。
 4. 运行时 fallback（Metal → Accelerate → CPU）是 capability 选择，不是 OS 分支，应封装在 `SeamCarvingAppleRuntime`。
 5. 缺少可选能力时应返回明确的 `SeamCarvingError.invalidConfiguration`，而不是静默改变算法或隐藏 API。
+6. Android 的 stable external API 只限 Kotlin 的 `io.github.seamcarving` package；swift-java
+   生成的 Java/JNI 类和 Swift runtime 均为实现细节。`RgbaImage` 是 upright、origin-zero、
+   straight-alpha、row-major RGBA8，且 byte count 必须为 `width * height * 4`。
+7. Android `Bitmap` adapter 使用 `getPixels()`/`setPixels()` 显式转换 `AARRGGBB`，不能依赖
+   backing storage 的 byte order 或 row stride。ML Kit 人脸检测和保护 mask 只在 optional
+   Gradle artifact 中实现，Swift 侧不导入 Android 或 ML Kit。
 
 ## 公共 API 与兼容性
 
@@ -58,4 +76,11 @@ SeamCarvingWasm / SeamCarvingAndroid / SeamCarvingWindows
 - `Package.platforms: [.iOS(.v17), .macOS(.v14)]` 表示 Apple 侧的 deployment floor；它约束 Apple API 的最低系统版本，不是 Apple-exclusive host restriction。
 - v2 立即支持：Apple 平台（iOS 17+、macOS 14+）的现有功能。
 - v2 立即验证：仓库当前仅以 manifest 隔离后的 `SeamCarvingCoreTests` 本地证明 macOS Core gate；Linux/Windows 仍是 CI 验证 gate，只有仓库 CI 实际通过 `swift build --target SeamCarvingCore` 与隔离后的 Core tests 后，才能把对应宿主记为已验证。
-- v2 预留：Wasm、Android、Windows 的 adapter contract；它们在各自 toolchain、图像 I/O 和 CI 可用前不列为已支持的平台。
+- Android 当前支持：`minSdk 28` 的 CPU Gradle library。Core AAR 只为
+  `arm64-v8a`、`armeabi-v7a`、`x86_64` 打包 Swift/C++ runtime；默认 facade 包含 Core +
+  Bitmap、明确排除 ML Kit。消费者不安装 Swift/NDK；仓库构建则固定 Swift 6.3.3、对应
+  Android SDK 与 NDK r27d。Kotlin Flow 的取消会协作式取消 native resize。
+- Android 不支持：Apple CLI、SwiftUI app、ImageIO/CoreGraphics codec、Accelerate、Metal 或
+  Vision。远端 Maven Central 上传和签名是独立 credential-gated release 流程，常规 CI 只
+  验证本地 Maven publication 与外部 consumer。
+- v2 预留：Wasm、Windows 的 adapter contract；它们在各自 toolchain、图像 I/O 和 CI 可用前不列为已支持的平台。
