@@ -2,4 +2,5 @@
 **/.gradle/
 **/.kotlin/
 **/build/
+build-logic/bin/
 local.properties
