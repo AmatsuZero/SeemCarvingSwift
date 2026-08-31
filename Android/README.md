@@ -42,7 +42,7 @@ dependencies {
 }
 ```
 
-All release AARs include source JARs. Native Swift and C++ libraries for
+Every published release coordinate includes a separate sources JAR. Native Swift and C++ libraries for
 `arm64-v8a`, `armeabi-v7a`, and `x86_64` are packaged only in the core AAR.
 
 ## Repository and release status
